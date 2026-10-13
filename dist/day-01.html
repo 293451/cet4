@@ -1,0 +1,679 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 01 · A Library on the Coast</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 01 · 10/13 · Unit 1 第 1-30 词</div>
+  <h1>A Library on the Coast<span class="cn">海边的一座图书馆</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button data-src="audio/day-01.mp3" class="on">正常语速</button>
+    <button data-src="audio/day-01-0.75x.mp3">慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-01.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3925"><p class="en"><span class="w" data-s="43" data-e="213">Twenty</span> <span class="w" data-s="256" data-e="427">years</span> <span class="w" data-s="469" data-e="683">ago,</span> <span class="w" data-s="896" data-e="1067">a</span> <span class="w" data-s="1237" data-e="1408">small</span> <span class="w" data-s="1451" data-e="1664">town</span> <span class="w" data-s="1707" data-e="1877">on</span> <span class="w" data-s="1920" data-e="1963">the</span> <span class="w target" data-s="2005" data-e="2219" title="海岸;海滨">coast</span> <span class="w" data-s="2261" data-e="2475">was</span> <span class="w" data-s="2517" data-e="2603">a</span> <span class="w" data-s="2645" data-e="2773">quiet</span> <span class="w target" data-s="2816" data-e="3243" title="宇宙；领域，体系">universe</span> <span class="w" data-s="3285" data-e="3584">of</span> <span class="w" data-s="3627" data-e="3712">its</span> <span class="w" data-s="3755" data-e="3925">own.</span></p><p class="zh">二十年前，海边的一座小镇就是一个安静的世界，自成一格。</p></div>
+<div class="pair" data-s0="4139" data-s1="9515"><p class="en"><span class="w" data-s="4139" data-e="4949">People</span> <span class="w" data-s="4992" data-e="5163">there</span> <span class="w" data-s="5205" data-e="5376">tried</span> <span class="w" data-s="5419" data-e="5675">to</span> <span class="w target" data-s="5717" data-e="6016" title="统一;联合">unify</span> <span class="w" data-s="6059" data-e="6613">everything:</span> <span class="w" data-s="6912" data-e="7296">one</span> <span class="w" data-s="7339" data-e="7637">market,</span> <span class="w" data-s="7893" data-e="8107">one</span> <span class="w" data-s="8235" data-e="8576">school,</span> <span class="w" data-s="8832" data-e="9131">one</span> <span class="w" data-s="9259" data-e="9515">opinion.</span></p><p class="zh">那里的人试图把一切都统一起来：一个市场、一所学校、一种观点。</p></div>
+<div class="pair" data-s0="10336" data-s1="13536"><p class="en"><span class="w" data-s="10336" data-e="10422">To</span> <span class="w target" data-s="10464" data-e="10720" title="联合">unite</span> <span class="w" data-s="10763" data-e="10934">the</span> <span class="w" data-s="10976" data-e="11062">town,</span> <span class="w" data-s="11318" data-e="11531">the</span> <span class="w" data-s="11616" data-e="11787">leaders</span> <span class="w" data-s="11830" data-e="12043">built</span> <span class="w" data-s="12086" data-e="12256">a</span> <span class="w target" data-s="12299" data-e="12555" title="联盟，工会；联合">union</span> <span class="w" data-s="12598" data-e="12683">of</span> <span class="w" data-s="12726" data-e="13067">shops</span> <span class="w" data-s="13110" data-e="13195">and</span> <span class="w" data-s="13238" data-e="13536">farms.</span></p><p class="zh">为了让小镇团结起来，领导人们组建了一个商店与农场的联合体。</p></div>
+<div class="pair" data-s0="13750" data-s1="15243"><p class="en"><span class="w" data-s="13750" data-e="14304">But</span> <span class="w" data-s="14347" data-e="14475">the</span> <span class="w" data-s="14518" data-e="14603">town</span> <span class="w" data-s="14646" data-e="14859">was</span> <span class="w target" data-s="14902" data-e="15243" title="多种多样的;不一样的">diverse.</span></p><p class="zh">但这座小镇是多元的。</p></div>
+<div class="pair" data-s0="15499" data-s1="17760"><p class="en"><span class="w" data-s="15499" data-e="16182">Not</span> <span class="w" data-s="16224" data-e="16480">everyone</span> <span class="w" data-s="16523" data-e="16779">wanted</span> <span class="w" data-s="16822" data-e="17078">the</span> <span class="w" data-s="17120" data-e="17206">same</span> <span class="w" data-s="17248" data-e="17419">kind</span> <span class="w" data-s="17462" data-e="17632">of</span> <span class="w" data-s="17675" data-e="17760">life.</span></p><p class="zh">不是每个人都想要同一种生活。</p></div>
+<div class="pair" data-s0="18059" data-s1="20192"><p class="en"><span class="w" data-s="18059" data-e="18742">Then</span> <span class="w" data-s="18784" data-e="19126">a</span> <span class="w" data-s="19168" data-e="19424">young</span> <span class="w" data-s="19467" data-e="19766">teacher</span> <span class="w" data-s="19808" data-e="20192">arrived.</span></p><p class="zh">后来，一位年轻老师来了。</p></div>
+<div class="pair" data-s0="20406" data-s1="24807"><p class="en"><span class="w" data-s="20406" data-e="21003">She</span> <span class="w" data-s="21046" data-e="21216">was</span> <span class="w target" data-s="21259" data-e="21728" title="多才多艺的；多功能的;多面手的">versatile.</span> <span class="w" data-s="22418" data-e="22588">She</span> <span class="w" data-s="22631" data-e="22716">could</span> <span class="w" data-s="22759" data-e="22930">teach,</span> <span class="w" data-s="23228" data-e="23612">draw,</span> <span class="w" data-s="23911" data-e="24082">and</span> <span class="w" data-s="24124" data-e="24338">fix</span> <span class="w" data-s="24380" data-e="24807">machines.</span></p><p class="zh">她多才多艺。能教书、能画画、还能修机器。</p></div>
+<div class="pair" data-s0="25063" data-s1="28007"><p class="en"><span class="w" data-s="25063" data-e="25703">She</span> <span class="w" data-s="25746" data-e="25916">wanted</span> <span class="w" data-s="25959" data-e="26172">to</span> <span class="w target" data-s="26215" data-e="26428" title="转变，改变；转换；改变信仰 n. 改变信仰者">convert</span> <span class="w" data-s="26471" data-e="26642">an</span> <span class="w" data-s="26684" data-e="26770">old</span> <span class="w" data-s="26812" data-e="27239">factory</span> <span class="w" data-s="27282" data-e="27452">into</span> <span class="w" data-s="27495" data-e="27623">a</span> <span class="w" data-s="27666" data-e="28007">library.</span></p><p class="zh">她想把一座旧工厂改造成图书馆。</p></div>
+<div class="pair" data-s0="28178" data-s1="29842"><p class="en"><span class="w" data-s="28178" data-e="28946">Many</span> <span class="w" data-s="28988" data-e="29116">people</span> <span class="w" data-s="29159" data-e="29415">were</span> <span class="w" data-s="29458" data-e="29586">against</span> <span class="w" data-s="29628" data-e="29842">it.</span></p><p class="zh">很多人反对。</p></div>
+<div class="pair" data-s0="30391" data-s1="33633"><p class="en"><span class="w" data-s="30391" data-e="30561">The</span> <span class="w" data-s="30604" data-e="30732">plan</span> <span class="w" data-s="30775" data-e="31201">caused</span> <span class="w" data-s="31244" data-e="31287">a</span> <span class="w target" data-s="31329" data-e="31671" title="反抗，起义；造反v. 叛逆；反抗，反叛">revolt,</span> <span class="w" data-s="31799" data-e="32012">and</span> <span class="w" data-s="32140" data-e="32268">the</span> <span class="w target" data-s="32311" data-e="32823" title="争议，论战">controversy</span> <span class="w" data-s="32865" data-e="33164">lasted</span> <span class="w" data-s="33207" data-e="33335">a</span> <span class="w" data-s="33377" data-e="33420">whole</span> <span class="w" data-s="33463" data-e="33633">year.</span></p><p class="zh">这个计划引发了一场反抗，争议持续了整整一年。</p></div>
+<div class="pair" data-s0="33932" data-s1="38412"><p class="en"><span class="w target" data-s="33932" data-e="34999" title="与之相异的；相对立的，相反的n.相反 的事实(或情况)">Contrary</span> <span class="w" data-s="35041" data-e="35212">to</span> <span class="w" data-s="35255" data-e="35297">what</span> <span class="w" data-s="35340" data-e="35425">the</span> <span class="w" data-s="35468" data-e="35681">critics</span> <span class="w" data-s="35724" data-e="35852">said,</span> <span class="w" data-s="36151" data-e="36279">the</span> <span class="w" data-s="36620" data-e="37047">library</span> <span class="w" data-s="37089" data-e="37260">did</span> <span class="w" data-s="37303" data-e="37431">not</span> <span class="w target" data-s="37473" data-e="37729" title="逆转；倒挡">reverse</span> <span class="w" data-s="37772" data-e="37943">the</span> <span class="w" data-s="37985" data-e="38241">town&#x27;s</span> <span class="w" data-s="38284" data-e="38412">luck.</span></p><p class="zh">与批评者所说的相反，图书馆并没有逆转小镇的运气。</p></div>
+<div class="pair" data-s0="38668" data-s1="40929"><p class="en"><span class="w" data-s="38668" data-e="39265">In</span> <span class="w target" data-s="39308" data-e="39777" title="明显的差异；对比，对照 v.对比，对照">contrast,</span> <span class="w" data-s="40033" data-e="40247">it</span> <span class="w" data-s="40417" data-e="40801">improved</span> <span class="w" data-s="40844" data-e="40929">it.</span></p><p class="zh">相比之下，它让小镇变好了。</p></div>
+<div class="pair" data-s0="41578" data-s1="44181"><p class="en"><span class="w" data-s="41578" data-e="42048">Slowly,</span> <span class="w" data-s="42218" data-e="42816">ideas</span> <span class="w" data-s="42858" data-e="43456">began</span> <span class="w" data-s="43498" data-e="43754">to</span> <span class="w target" data-s="43797" data-e="44181" title="演变，进化">evolve.</span></p><p class="zh">慢慢地，观念开始演变。</p></div>
+<div class="pair" data-s0="44480" data-s1="50496"><p class="en"><span class="w" data-s="44480" data-e="45376">Every</span> <span class="w" data-s="45418" data-e="45717">evening,</span> <span class="w" data-s="46058" data-e="46656">children</span> <span class="w target" data-s="46698" data-e="47338" title="旋转；环绕">revolved</span> <span class="w" data-s="47381" data-e="47552">around</span> <span class="w" data-s="47594" data-e="47808">the</span> <span class="w" data-s="47850" data-e="47936">new</span> <span class="w" data-s="47978" data-e="48533">bookshelves,</span> <span class="w" data-s="48746" data-e="48960">and</span> <span class="w" data-s="49173" data-e="49600">their</span> <span class="w" data-s="49642" data-e="49770">parents</span> <span class="w" data-s="49813" data-e="50197">got</span> <span class="w target" data-s="50240" data-e="50496" title="涉及；包含；需要">involved.</span></p><p class="zh">每天傍晚，孩子们围在新的书架旁，他们的父母也参与进来。</p></div>
+<div class="pair" data-s0="50880" data-s1="53184"><p class="en"><span class="w" data-s="50880" data-e="51520">The</span> <span class="w" data-s="51562" data-e="51989">factory</span> <span class="w" data-s="52032" data-e="52245">used</span> <span class="w" data-s="52288" data-e="52458">to</span> <span class="w" data-s="52501" data-e="52757">smell</span> <span class="w target" data-s="52800" data-e="53184" title="令人厌恶的；不友好的；严重的">nasty.</span></p><p class="zh">那座工厂以前气味很难闻。</p></div>
+<div class="pair" data-s0="53787" data-s1="56689"><p class="en"><span class="w" data-s="53787" data-e="53915">The</span> <span class="w" data-s="53958" data-e="54214">teacher</span> <span class="w" data-s="54257" data-e="54555">cleaned</span> <span class="w" data-s="54598" data-e="54641">it</span> <span class="w" data-s="54683" data-e="54897">and</span> <span class="w" data-s="55153" data-e="55281">kept</span> <span class="w" data-s="55323" data-e="55451">a</span> <span class="w target" data-s="55494" data-e="55793" title="正式的；庄重的；正规的">formal</span> <span class="w" data-s="55835" data-e="56006">record</span> <span class="w" data-s="56049" data-e="56262">of</span> <span class="w" data-s="56305" data-e="56433">every</span> <span class="w" data-s="56475" data-e="56689">book.</span></p><p class="zh">老师把它打扫干净，并为每一本书做了正式的记录。</p></div>
+<div class="pair" data-s0="56902" data-s1="60827"><p class="en"><span class="w" data-s="56902" data-e="57158">She</span> <span class="w" data-s="57542" data-e="57841">wore</span> <span class="w" data-s="57883" data-e="57926">a</span> <span class="w target" data-s="57969" data-e="58267" title="校服，制服">uniform</span> <span class="w" data-s="58310" data-e="58566">blue</span> <span class="w" data-s="58609" data-e="58950">coat,</span> <span class="w" data-s="59078" data-e="59291">but</span> <span class="w" data-s="59505" data-e="59675">she</span> <span class="w" data-s="59718" data-e="59803">never</span> <span class="w" data-s="59846" data-e="60059">asked</span> <span class="w" data-s="60102" data-e="60358">anyone</span> <span class="w" data-s="60401" data-e="60571">to</span> <span class="w target" data-s="60614" data-e="60827" title="(~to)遵守；相一致">conform.</span></p><p class="zh">她穿着统一的蓝色外套，但从不要求任何人服从。</p></div>
+<div class="pair" data-s0="61459" data-s1="64616"><p class="en"><span class="w" data-s="61459" data-e="61757">Instead,</span> <span class="w" data-s="62013" data-e="62184">she</span> <span class="w" data-s="62440" data-e="62611">asked</span> <span class="w" data-s="62653" data-e="62824">the</span> <span class="w" data-s="62867" data-e="63379">townsfolk</span> <span class="w" data-s="63421" data-e="63507">to</span> <span class="w target" data-s="63549" data-e="63976" title="确切表达；认真阐述；制定；规划">formulate</span> <span class="w" data-s="64019" data-e="64147">their</span> <span class="w" data-s="64189" data-e="64317">own</span> <span class="w" data-s="64360" data-e="64616">rules.</span></p><p class="zh">相反，她请镇上的人自己制定规则。</p></div>
+<div class="pair" data-s0="64957" data-s1="67133"><p class="en"><span class="w" data-s="64957" data-e="65213">It</span> <span class="w" data-s="65597" data-e="65725">was</span> <span class="w" data-s="65768" data-e="65896">a</span> <span class="w target" data-s="65939" data-e="66152" title="&amp;. v. 改革，革新">reform</span> <span class="w" data-s="66195" data-e="66451">no</span> <span class="w" data-s="66493" data-e="66664">one</span> <span class="w" data-s="66707" data-e="66749">had</span> <span class="w" data-s="66792" data-e="67133">planned.</span></p><p class="zh">这是一场谁都没计划过的改革。</p></div>
+<div class="pair" data-s0="67389" data-s1="72637"><p class="en"><span class="w" data-s="67389" data-e="67859">The</span> <span class="w target" data-s="67901" data-e="68200" title="形成，组成；形成物，组成物">formation</span> <span class="w" data-s="68243" data-e="68584">of</span> <span class="w" data-s="68627" data-e="68669">a</span> <span class="w" data-s="68712" data-e="68797">new</span> <span class="w" data-s="68840" data-e="68968">habit</span> <span class="w" data-s="69011" data-e="69352">takes</span> <span class="w" data-s="69395" data-e="69651">time,</span> <span class="w" data-s="69949" data-e="70120">so</span> <span class="w" data-s="70419" data-e="70589">she</span> <span class="w" data-s="70632" data-e="70760">also</span> <span class="w" data-s="70803" data-e="71101">changed</span> <span class="w" data-s="71144" data-e="71400">the</span> <span class="w target" data-s="71443" data-e="71741" title="形成，组成；形成物，组成物">format</span> <span class="w" data-s="71784" data-e="71955">of</span> <span class="w" data-s="71997" data-e="72083">the</span> <span class="w" data-s="72125" data-e="72381">weekly</span> <span class="w" data-s="72424" data-e="72637">meeting.</span></p><p class="zh">新习惯的养成需要时间，所以她同时改变了每周会议的形式。</p></div>
+<div class="pair" data-s0="73285" data-s1="74693"><p class="en"><span class="w" data-s="73285" data-e="73711">Students</span> <span class="w target" data-s="73754" data-e="74181" title="做；执行；演出；工作；运转">performed</span> <span class="w" data-s="74223" data-e="74394">short</span> <span class="w" data-s="74437" data-e="74693">plays.</span></p><p class="zh">学生们表演短剧。</p></div>
+<div class="pair" data-s0="75034" data-s1="78319"><p class="en"><span class="w" data-s="75034" data-e="75589">She</span> <span class="w target" data-s="75631" data-e="75930" title="通知，告知；(使)了解，(使)熟悉">informed</span> <span class="w" data-s="75973" data-e="76314">every</span> <span class="w" data-s="76357" data-e="76655">family</span> <span class="w" data-s="76698" data-e="77039">and</span> <span class="w target" data-s="77082" data-e="77423" title="(正式)通报,通知">notified</span> <span class="w" data-s="77466" data-e="77722">them</span> <span class="w" data-s="77765" data-e="77935">of</span> <span class="w" data-s="77978" data-e="78063">each</span> <span class="w" data-s="78106" data-e="78319">change.</span></p><p class="zh">她通知了每一户人家，把每一项变动都告知他们。</p></div>
+<div class="pair" data-s0="78661" data-s1="80837"><p class="en"><span class="w" data-s="78661" data-e="79471">The</span> <span class="w" data-s="79514" data-e="79685">result</span> <span class="w" data-s="79727" data-e="80026">was</span> <span class="w target" data-s="80069" data-e="80837" title="显著的；显而易见的">noticeable.</span></p><p class="zh">效果是显而易见的。</p></div>
+<div class="pair" data-s0="81007" data-s1="85018"><p class="en"><span class="w" data-s="81007" data-e="81391">On</span> <span class="w" data-s="81519" data-e="81690">the</span> <span class="w" data-s="81733" data-e="82287">library&#x27;s</span> <span class="w" data-s="82330" data-e="82415">first</span> <span class="w target" data-s="82458" data-e="83013" title="周年纪念日">anniversary,</span> <span class="w" data-s="83226" data-e="83397">the</span> <span class="w" data-s="83738" data-e="84079">mayor</span> <span class="w" data-s="84122" data-e="84335">raised</span> <span class="w" data-s="84463" data-e="84762">a</span> <span class="w target" data-s="84805" data-e="85018" title="为……干杯；烤，烘n. 吐司，烤面包片； 祝酒，敬酒">toast.</span></p><p class="zh">在图书馆一周年纪念日那天，镇长举杯致意。</p></div>
+<div class="pair" data-s0="85274" data-s1="87194"><p class="en"><span class="w" data-s="85274" data-e="85402">This</span> <span class="w" data-s="85445" data-e="85615">town</span> <span class="w" data-s="85658" data-e="85999">finally</span> <span class="w" data-s="86042" data-e="86383">found</span> <span class="w" data-s="86426" data-e="86767">its</span> <span class="w" data-s="86810" data-e="86981">own</span> <span class="w" data-s="87023" data-e="87194">voice.</span></p><p class="zh">这座小镇终于找到了自己的声音。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">coast</span>
+          <span class="ipa">/kəust/</span>
+          <span class="pos">n.</span>
+          <span class="cn">海岸;海滨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small town on the coast</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“靠死它”。靠着 谁？靠着大海啊→海岸。 (005) 第一单元</div>          <div class="root"><span class="lbl">根</span>coast 本义「肋骨、边缘」→ 陆地的边缘</div>          <div class="zt"><span class="lbl">真题</span>There&#x27;s a Coast Guard building and a tall trade tower, as well as a park, golf course and university.那里有一座海岸警卫队大楼、一座 高大的贸易塔，还有一个公园、一个高尔夫球场 和一所大学。</div>          <div class="fam"><span class="lbl">族</span>coastal adj. 沿海的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">universe</span>
+          <span class="ipa">/&#x27;ju:niv3:rs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">宇宙；领域，体系</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a quiet universe of its own</div>          <div class="mnem"><span class="lbl">记</span>verse词根表示“旋转”(这是一 个拟声词根，大家可以想象陀螺转起来的声 音)。uni 前缀表示“统一，一起”(United States 联合的州，就是美国)。那这个单词就解释为联 合起来一起转，就是“宇宙”。</div>          <div class="root"><span class="lbl">根</span>uni(一个) + vers(转) → 转成一个整体</div>          <div class="zt"><span class="lbl">真题</span>Thus we have models of the structure of the universe and of the atom. 因此，我们拥有宇 宙和原子结构的模型。</div>          <div class="fam"><span class="lbl">族</span>universal adj. 通用的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">unify</span>
+          <span class="ipa">/&#x27;ju:nıfaı/</span>
+          <span class="pos">v.</span>
+          <span class="cn">统一;联合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to unify everything</div>          <div class="root"><span class="lbl">根</span>uni(一个) + fy(使动)</div>          <div class="zt"><span class="lbl">真题</span>In linking towns and people to one another it helped unify the United States. 它将 城镇和人民联系在一起来帮助美国统一。</div>          <div class="fam"><span class="lbl">族</span>unification n. 统一</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">unite</span>
+          <span class="ipa">/ju&#x27;nait/</span>
+          <span class="pos">v.</span>
+          <span class="cn">联合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To unite the town</div>          <div class="root"><span class="lbl">根</span>uni(一个) + ite → 变成一个</div>          <div class="zt"><span class="lbl">真题</span>Even the United States Postal Service (USPS) suspended mail delivery temporarily. 甚至连美国邮政服务也暂停了邮件投递。</div>          <div class="fam"><span class="lbl">族</span>unity n. 团结</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">union</span>
+          <span class="ipa">/&#x27;ju:niən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">联盟，工会；联合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a union of shops and farms</div>          <div class="root"><span class="lbl">根</span>uni(一个) + on(名词)</div>          <div class="zt"><span class="lbl">真题</span>She is a trade union representative. 她是 一个工会代表。(2016)</div>          <div class="fam"><span class="lbl">族</span>reunion n. 团聚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">diverse</span>
+          <span class="ipa">/daı&#x27;v3:rs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">多种多样的;不一样的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>But the town was diverse.</div>          <div class="mnem"><span class="lbl">记</span>di表示“分开”；verse 表示“旋 转”，连到一起就是“分开旋转”，分开转，转开 了，就会转成“不同的，多种多样的”。</div>          <div class="root"><span class="lbl">根</span>di(分开) + vers(转) → 转向不同方向</div>          <div class="zt"><span class="lbl">真题</span>People from diverse backgrounds no longer socialize. 来自不同背景的人不再社交。 (2023)</div>          <div class="fam"><span class="lbl">族</span>diversity n. 多样性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">convert</span>
+          <span class="ipa">/kən&#x27;v3:rt, &#x27;ka:nv3:rt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">转变，改变；转换；改变信仰 n. 改变信仰者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>convert an old factory into a library</div>          <div class="mnem"><span class="lbl">记</span>con前缀表示“共同，一起”； vert词根表示“旋转”。convert 是一起转，那就 是彻底地“改变”了。</div>          <div class="root"><span class="lbl">根</span>con(完全) + vert(转) → 彻底转过来</div>          <div class="zt"><span class="lbl">真题</span>One converts sunlight into energy and the other has to eat food to make its energy. - 种是把阳光转化为能量，另一种是必须吃食物 来产生能量。</div>          <div class="colloc"><span class="lbl">搭</span>convert A into B 把 A 改造成 B</div>          <div class="fam"><span class="lbl">族</span>conversion n. 转变</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">versatile</span>
+          <span class="ipa">/&#x27;v3:sətail/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">多才多艺的；多功能的;多面手的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was versatile.</div>          <div class="mnem"><span class="lbl">记</span>ver 词根表示“转”;sat(sit 的过 去式)坐;ile想成lie(躺)→坐着躺着都能转的 →多功能的；多才多艺的。</div>          <div class="root"><span class="lbl">根</span>vers(转) + atile → 什么都能转，处处都行</div>          <div class="fam"><span class="lbl">族</span>versatility n. 多才多艺</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">reverse</span>
+          <span class="ipa">/rı&#x27;v3:rs/</span>
+          <span class="pos">v. / adj.</span>
+          <span class="cn">逆转；倒挡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>did not reverse the town&#x27;s luck</div>          <div class="root"><span class="lbl">根</span>re(回、反) + vers(转) → 往回转</div>          <div class="zt"><span class="lbl">真题</span>They are trying to prevent, limit or even reverse disease by changing what patients eat. 他们正试图通过改变患者的饮食来预防、限制 甚至逆转疾病。(2018)</div>          <div class="fam"><span class="lbl">族</span>reversal n. 逆转</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">anniversary</span>
+          <span class="ipa">/ænı&#x27;v3:rsəri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">周年纪念日</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On the library&#x27;s first anniversary</div>          <div class="mnem"><span class="lbl">记</span>anni颠倒过来就是 nian，汉字 表示“年”；vers“旋转”；ary是名词后缀。连在 一起就是一年转一次→周年纪念日。 002</div>          <div class="root"><span class="lbl">根</span>anni(年) + vers(转) + ary → 一年转一圈</div>          <div class="zt"><span class="lbl">真题</span>Thomas Jefferson and John Adams died on July 4, 1826, the fiftieth anniversary of American Independence.托马斯·杰斐逊和约 翰·亚当斯于1826年7月4日，美国独立50周 年纪念日去世。</div>          <div class="fam"><span class="lbl">族</span>annual adj. 每年的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">evolve</span>
+          <span class="ipa">/t&#x27;volv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">演变，进化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>ideas began to evolve</div>          <div class="mnem"><span class="lbl">记</span>词根 volve很像 volvo（沃尔 沃)。沃尔沃最大的特点在于汽车的轮胎高速 旋转时，汽车的安全性能很高。那词根 volve的 意思就是“旋转”。e表示“出去”，转出去需要螺 旋式上升，所以它的意思就是“进化；发展”。</div>          <div class="root"><span class="lbl">根</span>e(向外) + volve(卷、转) → 慢慢转开、展开</div>          <div class="zt"><span class="lbl">真题</span>Lunch boxes have evolved along with the transformation of schools. 随着学校的改革，午 餐盒也在不断发展。(2020)</div>          <div class="fam"><span class="lbl">族</span>evolution n. 进化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">revolve</span>
+          <span class="ipa">/rı&#x27;volv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">旋转；环绕</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>children revolved around the new bookshelves</div>          <div class="mnem"><span class="lbl">记</span>re 表示“重复”;volve表示“旋 转”。那重复地旋转还是“旋转；环绕”。</div>          <div class="root"><span class="lbl">根</span>re(再) + volve(转) → 不停地转</div>          <div class="zt"><span class="lbl">真题</span>In a telephone survey of more than 2,000 adults, 21% said they believed the sun revolved around the earth. 在一项对 2 000 多位成年人 的电话调查中，21%的人表示他们相信太阳绕 着地球转。</div>          <div class="colloc"><span class="lbl">搭</span>revolve around 围绕……转</div>          <div class="fam"><span class="lbl">族</span>revolver n. 左轮手枪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">involve</span>
+          <span class="ipa">/ın&#x27;vplv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">涉及；包含；需要</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>their parents got involved</div>          <div class="mnem"><span class="lbl">记</span>in 表示“里面”；volve 表示“旋 转”。也就是转进去，卷入。我的事情把你也卷 进来了，那它的意思就是“涉及；包含”。</div>          <div class="root"><span class="lbl">根</span>in(进入) + volve(卷) → 被卷进去</div>          <div class="zt"><span class="lbl">真题</span>The pursuit of a fulfilling career involves personal sacrifice. 追求令人满意的事业需要个 人的牺牲。(2020)</div>          <div class="colloc"><span class="lbl">搭</span>get involved in 参与……</div>          <div class="fam"><span class="lbl">族</span>involvement n. 参与</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">revolt</span>
+          <span class="ipa">/rı&#x27;vəult/</span>
+          <span class="pos">n. / v.</span>
+          <span class="cn">反抗，起义；造反v. 叛逆；反抗，反叛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The plan caused a revolt</div>          <div class="mnem"><span class="lbl">记</span>re(相反，反对；不)十 volt(转， volvo沃尔沃汽车就是旋转)→反转过来(对抗 自己人)→反叛。</div>          <div class="root"><span class="lbl">根</span>re(反) + volt(转) → 反转过来对抗</div>          <div class="zt"><span class="lbl">真题</span>A man permanently in revolt against big companies, ended up being hailed by many of those corporate giants as one of the greatest chief executives of his time. 一个长期反抗大公 司的人，最终被许多公司巨头誉为他那个时代 (003) 第一单元 最伟大的首席执行官之一。 例 The people revolted against foreign rule. 人们起来反抗外来统治。</div>          <div class="fam"><span class="lbl">族</span>revolting adj. 令人反感的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">controversy</span>
+          <span class="ipa">/&#x27;ka:ntrəvə:rsi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">争议，论战</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the controversy lasted a whole year</div>          <div class="mnem"><span class="lbl">记</span>前缀 contro意为“相反，反对”； vers 意为“旋转”;y 是名词后缀。controversy 就是相反的转动，那就是“争议，争论”。</div>          <div class="root"><span class="lbl">根</span>contro(相反) + vers(转) + y → 两边对着转</div>          <div class="zt"><span class="lbl">真题</span>Much controversy has been aroused about whether the students should find a job or start their own business after graduation. 关于 学生毕业后应该找工作还是创业，引起了很多 争议。(2016)</div>          <div class="fam"><span class="lbl">族</span>controversial adj. 有争议的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">contrary</span>
+          <span class="ipa">/&#x27;ka:ntreri/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">与之相异的；相对立的，相反的n.相反 的事实(或情况)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Contrary to what the critics said</div>          <div class="root"><span class="lbl">根</span>contra(相反) + ary</div>          <div class="zt"><span class="lbl">真题</span>We begin to realize that some of our conclusions are flawed(有缺陷的) or contrary to our fundamental values. 我们开始意识到我 们的一些结论是有缺陷的，或者与我们的基本 价值观相悖。</div>          <div class="colloc"><span class="lbl">搭</span>contrary to + n. 与……相反【高频】</div>          <div class="fam"><span class="lbl">族</span>contrarily adv. 相反地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">contrast</span>
+          <span class="ipa">/&#x27;ka:ntræst, kən&#x27;træst/</span>
+          <span class="pos">n. / v.</span>
+          <span class="cn">明显的差异；对比，对照 v.对比，对照</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In contrast, it improved it.</div>          <div class="mnem"><span class="lbl">记</span>contra 相反的，相对的；st 想成 “街道(street)”。为什么说这条街道繁华？是 因为和相对的那条街道形成了“对比”。</div>          <div class="root"><span class="lbl">根</span>contra(相反) + st(站) → 站在对面比</div>          <div class="zt"><span class="lbl">真题</span>In contrast, the recent surge in world grain prices is trend-driven. 相比之下，最近全 球粮食价格的飞涨是趋势造成的。(2016)</div>          <div class="colloc"><span class="lbl">搭</span>in contrast 相比之下【高频】</div>          <div class="fam"><span class="lbl">族</span>contrasting adj. 形成对照的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">nasty</span>
+          <span class="ipa">/&#x27;næsti/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">令人厌恶的；不友好的；严重的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The factory used to smell nasty.</div>          <div class="mnem"><span class="lbl">记</span>那(na)试题(sty)，想到临近期 末了，还有那么多试题没有做，真是太讨厌了→ 令人讨厌的。</div>          <div class="root"><span class="lbl">根</span>词源不明，靠场景记：nasty smell 难闻的气味</div>          <div class="zt"><span class="lbl">真题</span>Shopping for food involved mud, noisy chickens, clouds of flies, nasty smells and bargaining.购买食物充满了泥泞、吵闹的鸡群、 成群的苍蝇、恶臭的气味和讨价还价。(2023)</div>          <div class="fam"><span class="lbl">族</span>nastily adv. 讨厌地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">formal</span>
+          <span class="ipa">/&#x27;fə:rml/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">正式的；庄重的；正规的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>kept a formal record</div>          <div class="mnem"><span class="lbl">记</span>形式(form)上的（al，形容词后 缀，表示“……的”)，就是“正式的”。</div>          <div class="root"><span class="lbl">根</span>form(形式) + al → 讲究形式的</div>          <div class="zt"><span class="lbl">真题</span>Large companies, especially, like a background of formal education coupled with work experience. 大公司尤其喜欢有正规教育 背景和工作经验的人。</div>          <div class="fam"><span class="lbl">族</span>formally adv. 正式地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">uniform</span>
+          <span class="ipa">/&#x27;ju:nifəirm/</span>
+          <span class="pos">n. / adj.</span>
+          <span class="cn">校服，制服</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She wore a uniform blue coat</div>          <div class="root"><span class="lbl">根</span>uni(一个) + form(形式) → 同一个形式</div>          <div class="zt"><span class="lbl">真题</span>Among the arguments for uniforms, one of the first is that in the eyes of most people they look more professional than civilian clothes.在关于制服的争论中，首先争论的是， 在大多数人的眼中，制服看起来比便装更专业。</div>          <div class="fam"><span class="lbl">族</span>uniformly adv. 一致地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">formation</span>
+          <span class="ipa">/fə:r&#x27;mei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">形成，组成；形成物，组成物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The formation of a new habit takes time</div>          <div class="mnem"><span class="lbl">记</span>该单词源于form（形成）， formation是它的名词，意为“形成物”。</div>          <div class="root"><span class="lbl">根</span>form(形式) + ation(名词)</div>          <div class="zt"><span class="lbl">真题</span>The particles interfere with the formation of carbon-14 on earth. 这些粒子干扰了地球上 碳14的形成。</div>          <div class="fam"><span class="lbl">族</span>form v. 形成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">reform</span>
+          <span class="ipa">/r1&#x27;fə:rm/</span>
+          <span class="pos">n. / v.</span>
+          <span class="cn">&amp;. v. 改革，革新</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was a reform no one had planned.</div>          <div class="mnem"><span class="lbl">记</span>re表示“重复”，形成(form)之 后再次形成，那就是“改革”。</div>          <div class="root"><span class="lbl">根</span>re(再) + form(形式) → 重新塑形</div>          <div class="zt"><span class="lbl">真题</span>With China&#x27;s reform and opening up, nowadays quite a number of youngsters would like to celebrate their weddings in western style.随着中国的改革开放，现如今有相当多的 年轻人喜欢用西方风格来庆祝他们的婚礼。 (2016)</div>          <div class="fam"><span class="lbl">族</span>reformer n. 改革者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">format</span>
+          <span class="ipa">/&#x27;fə:rmæt/</span>
+          <span class="pos">n. / v.</span>
+          <span class="cn">总体安排；计划；设计；格式v. 格式化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>changed the format of the weekly meeting</div>          <div class="root"><span class="lbl">根</span>form(形式) + at</div>          <div class="fam"><span class="lbl">族</span>formation n. 形成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">conform</span>
+          <span class="ipa">/kən&#x27;fə:rm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(~to)遵守；相一致</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never asked anyone to conform</div>          <div class="mnem"><span class="lbl">记</span>所有学生都穿校服、留短发，都 (con)是一种形式(form)，那就是“遵守；相一 致”。</div>          <div class="root"><span class="lbl">根</span>con(共同) + form(形式) → 都变成同一形式</div>          <div class="zt"><span class="lbl">真题</span>A behavior that does not conform to social norms may be described as being deviant. 不符合社会规范的行为可能被描述为偏离常 规。(2022)</div>          <div class="colloc"><span class="lbl">搭</span>conform to 符合……</div>          <div class="fam"><span class="lbl">族</span>conformity n. 遵从</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">formulate</span>
+          <span class="ipa">/&#x27;fə:rmjuleit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">确切表达；认真阐述；制定；规划</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>formulate their own rules</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以记忆为：四个（for 发音似four)妈妈(mu母，就是妈妈)迟到(late)。 开家长会时，四个妈妈迟到了，她们要明确地告 诉老师，说明理由→确切表达；认真阐述。</div>          <div class="root"><span class="lbl">根</span>form(形式) + ulate → 把想法做成形式</div>          <div class="zt"><span class="lbl">真题</span>Governments need to formulate energy policies that promote economically and environmentally sound development. 各国政府需要制定促进经 济和环境健康发展的能源政策。</div>          <div class="fam"><span class="lbl">族</span>formulation n. 制定</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">perform</span>
+          <span class="ipa">/pər&#x27;fə:rm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">做；执行；演出；工作；运转</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Students performed short plays.</div>          <div class="root"><span class="lbl">根</span>per(彻底) + form(形式) → 彻底做出来</div>          <div class="zt"><span class="lbl">真题</span>Furthermore, in-class exams force students to learn how to perform under pressure，and essential work skill. 此外，课堂 考试迫使学生学会如何在压力下表现，以及基 本的工作技能。(2017)</div>          <div class="fam"><span class="lbl">族</span>performance n. 表演；表现</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">inform</span>
+          <span class="ipa">/in&#x27;fo:rm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">通知，告知；(使)了解，(使)熟悉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She informed every family</div>          <div class="mnem"><span class="lbl">记</span>该单词源于information信息， 信息不就是你知道的东西吗？所以inform 的 意思是“通知，告知；(使)了解”。</div>          <div class="root"><span class="lbl">根</span>in(进入) + form(形式) → 把信息装进对方脑子</div>          <div class="zt"><span class="lbl">真题</span>She is well informed about the design business. 她对设计业务有很好的了解。(2020)</div>          <div class="colloc"><span class="lbl">搭</span>inform sb. of sth. 告知某人某事</div>          <div class="fam"><span class="lbl">族</span>information n. 信息</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">notify</span>
+          <span class="ipa">/&#x27;nəutifar/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(正式)通报,通知</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>notified them of each change</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词形式我们很熟 悉：notice通知，布告，那动词就是“通知，通报”。</div>          <div class="root"><span class="lbl">根</span>not(知道) + ify(使动) → 使知道</div>          <div class="zt"><span class="lbl">真题</span>When the system thinks it&#x27;s being jammed,it&#x27;ll notify you via push alert(推送警 报).当系统认为自己被干扰时，它会通过推送 警报通知你。(2016)</div>          <div class="colloc"><span class="lbl">搭</span>notify sb. of sth. 通知某人某事</div>          <div class="fam"><span class="lbl">族</span>notification n. 通知</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">noticeable</span>
+          <span class="ipa">/&#x27;nəutisəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">显著的；显而易见的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The result was noticeable.</div>          <div class="mnem"><span class="lbl">记</span>notice(v.注意)十able(能够)→ 能够注意到的→显而易见的。</div>          <div class="root"><span class="lbl">根</span>notice(注意到) + able(能) → 能被注意到的</div>          <div class="zt"><span class="lbl">真题</span>Some studies have also found an impact for men, though a less noticeable one. 一 些研 究也发现了对男性的影响，尽管不太明显。</div>          <div class="fam"><span class="lbl">族</span>notice n./v. 注意</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">toast</span>
+          <span class="ipa">/təust/</span>
+          <span class="pos">n. / v.</span>
+          <span class="cn">为……干杯；烤，烘n. 吐司，烤面包片； 祝酒，敬酒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mayor raised a toast</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：吐司。</div>          <div class="root"><span class="lbl">根</span>一词两义：烤面包 / 举杯——靠搭配区分</div>          <div class="colloc"><span class="lbl">搭</span>raise a toast 举杯祝酒</div>          <div class="fam"><span class="lbl">族</span>toaster n. 烤面包机</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 1 · Day 01</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+document.querySelectorAll('.speeds button').forEach(b => b.onclick = () => {
+  const was = !au.paused, t = au.currentTime;
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.src = b.dataset.src;
+  au.load();
+  au.addEventListener('loadedmetadata', function once() {
+    au.removeEventListener('loadedmetadata', once);
+    au.currentTime = Math.min(t, au.duration - 0.1);
+    if (was) au.play();
+  });
+});
+</script>
+</body>
+</html>

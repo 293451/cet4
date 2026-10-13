@@ -1,0 +1,27 @@
+# ═══ 密钥 —— 绝对不要提交 ═══
+.secrets/
+*.key
+*.token
+*token*
+*secret*
+*key*
+
+# ═══ 书的 OCR 数据（体积大 + 含原书全文，不入库）═══
+book/
+
+# ═══ 源内容与脚本（本地保留，不上 Pages）═══
+content/
+build/
+logs/
+progress.json
+*.bat
+*.md
+
+# ═══ 临时产物 ═══
+__pycache__/
+*.pyc
+node_modules/
+package-lock.json
+package.json
+_preview*.png
+_cards.png
