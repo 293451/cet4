@@ -125,8 +125,8 @@ footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
     <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
   </div>
   <div class="speeds">
-    <button data-src="audio/day-01.mp3" class="on">正常语速</button>
-    <button data-src="audio/day-01-0.75x.mp3">慢速 0.75x</button>
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
   </div>
   <div class="modes">
     <button data-mode="both" class="on">双语</button>
@@ -662,18 +662,37 @@ document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
 })();
 
 // 语速切换
-document.querySelectorAll('.speeds button').forEach(b => b.onclick = () => {
-  const was = !au.paused, t = au.currentTime;
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
   document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
   b.classList.add('on');
-  au.src = b.dataset.src;
-  au.load();
-  au.addEventListener('loadedmetadata', function once() {
-    au.removeEventListener('loadedmetadata', once);
-    au.currentTime = Math.min(t, au.duration - 0.1);
-    if (was) au.play();
-  });
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
 });
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
 </script>
 </body>
 </html>
