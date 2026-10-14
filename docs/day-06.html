@@ -1,0 +1,687 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 06 · The Shop That Sold Nothing</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 06 · 10/18 · Unit 5~6 第 151-180 词</div>
+  <h1>The Shop That Sold Nothing<span class="cn">什么也不卖的店</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-06.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4736"><p class="en"><span class="w" data-s="43" data-e="213">Most</span> <span class="w" data-s="256" data-e="384">of</span> <span class="w" data-s="427" data-e="512">us</span> <span class="w target" data-s="555" data-e="896" title="消耗，耗费(燃料、能量、时间等)；吃；喝">consume</span> <span class="w" data-s="939" data-e="1109">far</span> <span class="w" data-s="1152" data-e="1451">more</span> <span class="w" data-s="1493" data-e="1621">than</span> <span class="w" data-s="1664" data-e="1749">we</span> <span class="w" data-s="1792" data-e="1920">need,</span> <span class="w" data-s="2133" data-e="2347">and</span> <span class="w" data-s="2645" data-e="2773">the</span> <span class="w" data-s="2816" data-e="2944">average</span> <span class="w target" data-s="2987" data-e="3584" title="消费者">consumer</span> <span class="w" data-s="3627" data-e="3797">never</span> <span class="w" data-s="3840" data-e="4139">stops</span> <span class="w" data-s="4181" data-e="4309">to</span> <span class="w" data-s="4352" data-e="4437">ask</span> <span class="w" data-s="4480" data-e="4736">why.</span></p><p class="zh">我们中大多数人消费的远超所需，而普通消费者从不停下来问为什么。</p></div>
+<div class="pair" data-s0="4992" data-s1="10325"><p class="en"><span class="w" data-s="4992" data-e="5931">Every</span> <span class="w" data-s="5973" data-e="6187">shop</span> <span class="w" data-s="6229" data-e="6613">invents</span> <span class="w" data-s="6656" data-e="6784">a</span> <span class="w target" data-s="6827" data-e="6955" title="风俗，习俗；习惯；光顾">custom</span> <span class="w" data-s="6997" data-e="7211">of</span> <span class="w" data-s="7253" data-e="7339">its</span> <span class="w" data-s="7381" data-e="7509">own,</span> <span class="w" data-s="7723" data-e="7893">and</span> <span class="w" data-s="8149" data-e="8277">it</span> <span class="w" data-s="8320" data-e="8576">serves</span> <span class="w" data-s="8619" data-e="8704">the</span> <span class="w target" data-s="8747" data-e="9088" title="顾客">customer</span> <span class="w" data-s="9131" data-e="9387">rather</span> <span class="w" data-s="9600" data-e="9899">than</span> <span class="w" data-s="9941" data-e="10027">the</span> <span class="w target" data-s="10069" data-e="10325" title="客户；委托人">client.</span></p><p class="zh">每家店都会形成自己的惯例，它服务的是顾客而非客户。</p></div>
+<div class="pair" data-s0="10539" data-s1="13611"><p class="en"><span class="w" data-s="10539" data-e="10624">The</span> <span class="w" data-s="10667" data-e="10923">owner</span> <span class="w" data-s="10965" data-e="11093">was</span> <span class="w" data-s="11136" data-e="11264">a</span> <span class="w" data-s="11307" data-e="11392">kind</span> <span class="w" data-s="11435" data-e="11605">of</span> <span class="w target" data-s="11648" data-e="11861" title="代理人，经纪人；间谍">agent,</span> <span class="w" data-s="12032" data-e="12288">working</span> <span class="w" data-s="12544" data-e="12843">for</span> <span class="w" data-s="12885" data-e="13013">a</span> <span class="w" data-s="13056" data-e="13141">large</span> <span class="w target" data-s="13184" data-e="13611" title="服务机构；(尤指)代理机构，经销机构；(政府 的)专门机构">agency.</span></p><p class="zh">店主算是某种代理人，为一家大机构工作。</p></div>
+<div class="pair" data-s0="14479" data-s1="16100"><p class="en"><span class="w" data-s="14479" data-e="14564">Then</span> <span class="w" data-s="14607" data-e="14905">an</span> <span class="w target" data-s="15332" data-e="15631" title="使不安，使恐慌 n. 惊恐；忧虑；警报">alarm</span> <span class="w" data-s="15673" data-e="15887">went</span> <span class="w" data-s="15929" data-e="16100">off.</span></p><p class="zh">接着警报响了。</p></div>
+<div class="pair" data-s0="16313" data-s1="21519"><p class="en"><span class="w" data-s="16313" data-e="17209">It</span> <span class="w" data-s="17252" data-e="17380">was</span> <span class="w" data-s="17423" data-e="17508">not</span> <span class="w" data-s="17551" data-e="17636">a</span> <span class="w" data-s="17679" data-e="17764">real</span> <span class="w target" data-s="17807" data-e="18063" title="恐吓，威胁；凶兆">threat,</span> <span class="w" data-s="18319" data-e="18831">only</span> <span class="w" data-s="18873" data-e="19129">a</span> <span class="w" data-s="19172" data-e="19300">sudden</span> <span class="w target" data-s="19343" data-e="19599" title="恐惧，害怕v.害怕，畏惧；为……担心">fear</span> <span class="w" data-s="19641" data-e="19940">that</span> <span class="w" data-s="19983" data-e="20111">made</span> <span class="w" data-s="20153" data-e="20239">the</span> <span class="w" data-s="20281" data-e="20367">whole</span> <span class="w" data-s="20409" data-e="20751">street</span> <span class="w" data-s="20793" data-e="21049">feel</span> <span class="w target" data-s="21092" data-e="21519" title="凶猛的；狂热的；猛烈的">fierce.</span></p><p class="zh">那不是真正的威胁，只是一阵突然的恐惧，让整条街都变得凶险起来。</p></div>
+<div class="pair" data-s0="21647" data-s1="25145"><p class="en"><span class="w" data-s="21647" data-e="22713">Nothing</span> <span class="w" data-s="22756" data-e="22841">could</span> <span class="w target" data-s="22884" data-e="23225" title="使惊吓，使惊恐">frighten</span> <span class="w" data-s="23268" data-e="23353">him</span> <span class="w" data-s="23396" data-e="23439">now,</span> <span class="w" data-s="23652" data-e="23823">and</span> <span class="w" data-s="24079" data-e="24207">there</span> <span class="w" data-s="24249" data-e="24335">was</span> <span class="w" data-s="24377" data-e="24463">no</span> <span class="w" data-s="24505" data-e="24633">time</span> <span class="w" data-s="24676" data-e="24847">to</span> <span class="w target" data-s="24889" data-e="25145" title="惊恐，恐慌；人心惶惶的局面；惶恐不安 v.(使)惊慌，惊慌失措">panic.</span></p><p class="zh">现在没什么能吓到他了，也来不及惊慌。</p></div>
+<div class="pair" data-s0="25359" data-s1="28345"><p class="en"><span class="w" data-s="25359" data-e="25615">Still,</span> <span class="w" data-s="25828" data-e="25999">he</span> <span class="w" data-s="26212" data-e="26383">felt</span> <span class="w target" data-s="26425" data-e="26852" title="心神不安的，担心的">uneasy,</span> <span class="w" data-s="26980" data-e="27151">and</span> <span class="w" data-s="27364" data-e="27535">he</span> <span class="w" data-s="27577" data-e="27663">could</span> <span class="w" data-s="27705" data-e="27791">not</span> <span class="w target" data-s="27833" data-e="28047" title="舒适，轻松 v. 减轻，缓和">ease</span> <span class="w" data-s="28089" data-e="28175">the</span> <span class="w" data-s="28217" data-e="28345">feeling.</span></p><p class="zh">但他仍感到不安，而且无法让这种感觉缓解。</p></div>
+<div class="pair" data-s0="28559" data-s1="29540"><p class="en"><span class="w" data-s="28559" data-e="28815">He</span> <span class="w" data-s="29028" data-e="29156">grew</span> <span class="w target" data-s="29199" data-e="29540" title="忧虑的，焦虑的，不安的；渴望的">anxious.</span></p><p class="zh">他变得焦虑。</p></div>
+<div class="pair" data-s0="30499" data-s1="35235"><p class="en"><span class="w" data-s="30499" data-e="30584">The</span> <span class="w target" data-s="30627" data-e="30755" title="迹象;标志 v. 签(名);署(名);签字 starting to return to normal. 对他们来说，那是 生活开始回归正常的第一个迹象。">sign</span> <span class="w" data-s="30797" data-e="31011">above</span> <span class="w" data-s="31053" data-e="31224">the</span> <span class="w" data-s="31267" data-e="31395">door</span> <span class="w" data-s="31437" data-e="31864">carried</span> <span class="w" data-s="31907" data-e="31992">his</span> <span class="w target" data-s="32035" data-e="32376" title="署名；签字；签名">signature,</span> <span class="w" data-s="32589" data-e="32760">and</span> <span class="w" data-s="32973" data-e="33357">a</span> <span class="w" data-s="33400" data-e="33528">small</span> <span class="w target" data-s="33571" data-e="34040" title="信号；暗号；标志；指示灯 v. 发信号；标志； 表明">signal</span> <span class="w" data-s="34083" data-e="34211">light</span> <span class="w" data-s="34253" data-e="34723">blinked</span> <span class="w" data-s="34765" data-e="35021">beside</span> <span class="w" data-s="35064" data-e="35235">it.</span></p><p class="zh">门上方的招牌上有他的签名，旁边一盏小信号灯闪着。</p></div>
+<div class="pair" data-s0="35405" data-s1="39885"><p class="en"><span class="w" data-s="35405" data-e="36045">He</span> <span class="w" data-s="36088" data-e="36301">had</span> <span class="w" data-s="36344" data-e="36515">decided</span> <span class="w" data-s="36557" data-e="36813">to</span> <span class="w target" data-s="36856" data-e="37112" title="分配(某物)；分派，指定；委派">assign</span> <span class="w" data-s="37155" data-e="37411">one</span> <span class="w" data-s="37453" data-e="37795">simple</span> <span class="w" data-s="37837" data-e="38136">rule,</span> <span class="w" data-s="38392" data-e="38563">and</span> <span class="w" data-s="38691" data-e="39032">to</span> <span class="w target" data-s="39075" data-e="39331" title="辞职;辞去(某职务)">resign</span> <span class="w" data-s="39373" data-e="39587">from</span> <span class="w" data-s="39629" data-e="39757">the</span> <span class="w" data-s="39800" data-e="39885">rest.</span></p><p class="zh">他决定只定下一条简单的规矩，其余的都辞掉。</p></div>
+<div class="pair" data-s0="40184" data-s1="44963"><p class="en"><span class="w" data-s="40184" data-e="40312">To</span> <span class="w" data-s="40355" data-e="40440">be</span> <span class="w target" data-s="40483" data-e="40909" title="有重大意义的，重要的；显著的">significant,</span> <span class="w" data-s="41123" data-e="41293">a</span> <span class="w" data-s="41677" data-e="41805">shop</span> <span class="w" data-s="41848" data-e="42104">had</span> <span class="w" data-s="42147" data-e="42232">to</span> <span class="w" data-s="42275" data-e="42360">sell</span> <span class="w" data-s="42403" data-e="42659">something</span> <span class="w target" data-s="42701" data-e="43128" title="必需品；要素，要点 adj.必不可少的；本质的">essential,</span> <span class="w" data-s="43384" data-e="43555">something</span> <span class="w target" data-s="44024" data-e="44963" title="不可或缺的，必不可少的">indispensable.</span></p><p class="zh">一家店要有分量，就得卖真正必需的东西，缺它不行的东西。</p></div>
+<div class="pair" data-s0="45871" data-s1="47961"><p class="en"><span class="w" data-s="45871" data-e="46041">That</span> <span class="w" data-s="46084" data-e="46255">was</span> <span class="w target" data-s="46297" data-e="46468" title="必需的；必然的">necessary,</span> <span class="w" data-s="46895" data-e="47108">though</span> <span class="w" data-s="47236" data-e="47449">not</span> <span class="w target" data-s="47492" data-e="47961" title="不可避免的;不能防止的">inevitable.</span></p><p class="zh">那是必要的，虽然并非不可避免。</p></div>
+<div class="pair" data-s0="48132" data-s1="51076"><p class="en"><span class="w" data-s="48132" data-e="48516">He</span> <span class="w" data-s="48559" data-e="48857">would</span> <span class="w target" data-s="48900" data-e="49028" title="任命，委任；安排；确定(时间、地点)">appoint</span> <span class="w" data-s="49071" data-e="49327">a</span> <span class="w" data-s="49369" data-e="49455">new</span> <span class="w" data-s="49497" data-e="49839">manager</span> <span class="w" data-s="49881" data-e="50137">and</span> <span class="w target" data-s="50265" data-e="50607" title="使失望；使破灭">disappoint</span> <span class="w" data-s="50649" data-e="50863">no</span> <span class="w" data-s="50905" data-e="51076">one.</span></p><p class="zh">他会任命一位新经理，不让任何人失望。</p></div>
+<div class="pair" data-s0="51204" data-s1="55471"><p class="en"><span class="w" data-s="51204" data-e="51417">He</span> <span class="w" data-s="51588" data-e="51972">had</span> <span class="w" data-s="52015" data-e="52100">to</span> <span class="w target" data-s="52143" data-e="52612" title="为(某人)提供住宿(或膳宿、座位等)；适应； 容纳；为……提供空间">accommodate</span> <span class="w" data-s="52655" data-e="52825">every</span> <span class="w" data-s="52868" data-e="53124">kind</span> <span class="w" data-s="53167" data-e="53380">of</span> <span class="w" data-s="53423" data-e="53721">visitor,</span> <span class="w" data-s="53892" data-e="54063">and</span> <span class="w target" data-s="54148" data-e="54617" title="使适应；使适合">adapt</span> <span class="w" data-s="54660" data-e="54703">to</span> <span class="w" data-s="54745" data-e="54831">each</span> <span class="w" data-s="54873" data-e="55044">one</span> <span class="w" data-s="55087" data-e="55300">in</span> <span class="w" data-s="55343" data-e="55471">turn.</span></p><p class="zh">他得容纳各种各样的来客，并逐一去适应他们。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">consume</span>
+          <span class="ipa">/kən&#x27;su:m/</span>
+          <span class="pos"></span>
+          <span class="cn">消耗，耗费(燃料、能量、时间等)；吃；喝</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Most of us consume far more than we need</div>          <div class="root"><span class="lbl">根</span>con(完全) + sume(拿) → 全拿走 → 消耗</div>          <div class="zt"><span class="lbl">真题</span>More affluent and educated people tend to consume higher quality diets. 更富裕和受教 育程度更高的人倾向于食用更高质量的饮食。 (2022)</div>          <div class="fam"><span class="lbl">族</span>consumption n. 消耗</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">consumer</span>
+          <span class="ipa">/kən&#x27;su:mər/</span>
+          <span class="pos"></span>
+          <span class="cn">消费者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the average consumer never stops</div>          <div class="root"><span class="lbl">根</span>consume + er(人)</div>          <div class="zt"><span class="lbl">真题</span>That was great for the consumer, not so much for the manufacturer. 那对消费者来说很 好，对制造商来说则不然。</div>          <div class="fam"><span class="lbl">族</span>consume v. 消费</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">custom</span>
+          <span class="ipa">/&#x27;kastəm/</span>
+          <span class="pos"></span>
+          <span class="cn">风俗，习俗；习惯；光顾</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every shop invents a custom of its own</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“卡死它们”。货 物进出海关(customs)时，要缴纳关税，这是一 种“习惯，习俗”。而对于那些走私的物品，海关 则会“卡死它们”。</div>          <div class="root"><span class="lbl">根</span>本义「习惯」→ 关税（按惯例征收）</div>          <div class="zt"><span class="lbl">真题</span>One common French custom of greetings is cheek-kissing, but it is mostly restricted to close acquaintances and family members. 一种 常见的法国的问候习俗是亲吻脸颊，但它通常 限于亲密的熟人和家人之间。(2021)</div>          <div class="fam"><span class="lbl">族</span>customer n. 顾客</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">customer</span>
+          <span class="ipa">/&#x27;kastəmər/</span>
+          <span class="pos"></span>
+          <span class="cn">顾客</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it serves the customer</div>          <div class="mnem"><span class="lbl">记</span>这个单词源于custom(风俗；习 惯；光顾)，那 customer(经常光顾一个地方的 人)就是“顾客”。</div>          <div class="root"><span class="lbl">根</span>custom(惯例) + er → 常来的客人</div>          <div class="zt"><span class="lbl">真题</span>Some hired flag wavers to direct customers to empty parking spaces. 一些(公司)雇用挥舞 旗帜的人引导顾客去空置的停车位。</div>          <div class="fam"><span class="lbl">族</span>custom n. 习惯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">client</span>
+          <span class="ipa">/&#x27;klaiənt/</span>
+          <span class="pos"></span>
+          <span class="cn">客户；委托人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rather than the client</div>          <div class="mnem"><span class="lbl">记</span>ent 想成 enter(进来)；那这个 单词就可以记忆为：可(c)里(li)进来，拉个“客 户”进来可真不容易啊。</div>          <div class="root"><span class="lbl">根</span>cli(倾斜、依靠) + ent → 依赖你的服务的人</div>          <div class="zt"><span class="lbl">真题</span>He inquired about his client&#x27;s family background. 他询问了客户的家庭背景。(2021)</div>          <div class="fam"><span class="lbl">族</span>clientele n. 客户群</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">agent</span>
+          <span class="ipa">/&#x27;eidzənt/</span>
+          <span class="pos"></span>
+          <span class="cn">代理人，经纪人；间谍</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The owner was a kind of agent</div>          <div class="root"><span class="lbl">根</span>ag(做) + ent(人) → 做事的人 → 代理人</div>          <div class="zt"><span class="lbl">真题</span>The agents were able to utilize their full potential and experiences. 代理商能够充分利 用他们的潜力和经验。</div>          <div class="fam"><span class="lbl">族</span>agency n. 机构</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">agency</span>
+          <span class="ipa">/&#x27;eidzənsi/</span>
+          <span class="pos"></span>
+          <span class="cn">服务机构；(尤指)代理机构，经销机构；(政府 的)专门机构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>working for a large agency</div>          <div class="root"><span class="lbl">根</span>agent 的名词 → 机构、作用</div>          <div class="zt"><span class="lbl">真题</span>Within 10 minutes, I had impressed the (020) interviewer enough to be offered a job with the agency. 不到 10 分钟，我就给面试官留下了深 刻的印象，得到了这家公司的工作机会。</div>          <div class="fam"><span class="lbl">族</span>agent n. 代理人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">alarm</span>
+          <span class="ipa">/ə&#x27;la:rm/</span>
+          <span class="pos"></span>
+          <span class="cn">使不安，使恐慌 n. 惊恐；忧虑；警报</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then an alarm went off</div>          <div class="root"><span class="lbl">根</span>al(到) + arm(武器) → 喊大家拿武器 → 警报</div>          <div class="zt"><span class="lbl">真题</span>The speed at which cities are growing in the less developed countries is alarming. 欠发 达国家里城市的发展速度令人担忧。</div>          <div class="fam"><span class="lbl">族</span>alarming adj. 令人担忧的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">fear</span>
+          <span class="ipa">/frə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">恐惧，害怕v.害怕，畏惧；为……担心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>only a sudden fear</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“飞蛾”。我 女儿看见飞蛾，吓得头晕，尖叫不止→恐惧， 害怕。</div>          <div class="root"><span class="lbl">根</span>最基础的「怕」</div>          <div class="zt"><span class="lbl">真题</span>The daughter feared her mother would be ignored there. 女儿担心她的母亲在那里会 被忽视。(2016) 例 Once upon a time there was a certain king who feared famine.从前，有一个国王，他害怕 饥荒。</div>          <div class="fam"><span class="lbl">族</span>fearful adj. 可怕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">fierce</span>
+          <span class="ipa">/firs/</span>
+          <span class="pos"></span>
+          <span class="cn">凶猛的；狂热的；猛烈的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>made the whole street feel fierce</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“飞蛾死”。飞 蛾扑火的时候是不是很“狂热的；凶猛的”？</div>          <div class="root"><span class="lbl">根</span>本义「野性的」→ 凶猛的、激烈的</div>          <div class="fam"><span class="lbl">族</span>fiercely adv. 猛烈地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">threat</span>
+          <span class="ipa">/θret/</span>
+          <span class="pos"></span>
+          <span class="cn">恐吓，威胁；凶兆</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was not a real threat</div>          <div class="mnem"><span class="lbl">记</span>threa 发音类似“throw(扔)”。 那这个单词就可以联想成：扔他(t)，是不是在 “威胁”他？</div>          <div class="root"><span class="lbl">根</span>与 threat（威胁）相关：thr- 表「挤压」</div>          <div class="zt"><span class="lbl">真题</span>There are growing concerns that robots could become a threat. 人们越来越担心机器人 可能成为威胁。(2016)</div>          <div class="fam"><span class="lbl">族</span>threaten v. 威胁</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">frighten</span>
+          <span class="ipa">/&#x27;fraitn/</span>
+          <span class="pos"></span>
+          <span class="cn">使惊吓，使惊恐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nothing could frighten him now</div>          <div class="mnem"><span class="lbl">记</span>fight打，中间多了一个字母 r， 想成花，那就是用花打你，肯定不疼，所以用花 打你，只是在吓唬你，en是动词后缀，表示“使成 为……，使变得……”→使惊吓。</div>          <div class="root"><span class="lbl">根</span>fright(惊吓) + en(使动)</div>          <div class="zt"><span class="lbl">真题</span>The editor is frightened by this news. 编辑被这个消息吓坏了。</div>          <div class="fam"><span class="lbl">族</span>fright n. 惊吓</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">panic</span>
+          <span class="ipa">/&#x27;pænık/</span>
+          <span class="pos"></span>
+          <span class="cn">惊恐，恐慌；人心惶惶的局面；惶恐不安 v.(使)惊慌，惊慌失措</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was no time to panic</div>          <div class="mnem"><span class="lbl">记</span>我家的弟弟球球很调皮，有一 天我发现，他竟然把我的IC卡放到平底锅 (pan)里，太吓人了→恐慌，惊恐。</div>          <div class="root"><span class="lbl">根</span>源自希腊牧神 Pan，他一声吼就让人惊慌</div>          <div class="zt"><span class="lbl">真题</span>Alex Pang&#x27;s amusing new book The Distraction Addiction addresses those of us who feel panic without a cellphone or computer.亚历克斯·庞的有趣的新书《分心成 瘾》，讲述了我们那些没有手机或电脑就会感到 恐慌的人。</div>          <div class="fam"><span class="lbl">族</span>panicky adj. 惊慌的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">uneasy</span>
+          <span class="ipa">/Δn&#x27;i:zi/</span>
+          <span class="pos"></span>
+          <span class="cn">心神不安的，担心的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he felt uneasy</div>          <div class="mnem"><span class="lbl">记</span>不(un)容易的(easy),没有那么 容易的事情，你做的时候，一定是“担心的”。</div>          <div class="root"><span class="lbl">根</span>un(不) + easy(轻松) → 不自在</div>          <div class="zt"><span class="lbl">真题</span>But across society, the abstraction of the idea of cash makes me uneasy. 但在整个社会 中，现金概念的抽象化让我感到不安。(2020)</div>          <div class="fam"><span class="lbl">族</span>unease n. 不安</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">ease</span>
+          <span class="ipa">/i:z/</span>
+          <span class="pos"></span>
+          <span class="cn">舒适，轻松 v. 减轻，缓和</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could not ease the feeling</div>          <div class="mnem"><span class="lbl">记</span>这个单词特别像“easy”，那它的 意思就很容易记忆了→舒服，轻松。</div>          <div class="root"><span class="lbl">根</span>easy 的动词形式 → 使轻松</div>          <div class="zt"><span class="lbl">真题</span>He doesn&#x27;t feel at ease in the firm. 他在 公司里感到不自在。</div>          <div class="fam"><span class="lbl">族</span>easy adj. 容易的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">anxious</span>
+          <span class="ipa">/&#x27;ænk∫əs/</span>
+          <span class="pos"></span>
+          <span class="cn">忧虑的，焦虑的，不安的；渴望的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He grew anxious</div>          <div class="mnem"><span class="lbl">记</span>读音类似“俺可笑死”。俺都笑 “死”了，可见俺一点也不“忧虑，焦虑”呀。</div>          <div class="root"><span class="lbl">根</span>anx(紧、勒) + ious → 心里发紧</div>          <div class="zt"><span class="lbl">真题</span>That study found that those moms who were more anxious, depressed and angry were more likely to feed their kids unhealthy diets. 那项研究发现，那些更焦虑、抑郁和愤怒的母亲 更有可能给她们的孩子吃不健康的饮食。(2016) 例 The girl appeared anxious, had lost weight and was not sleeping well. 那个女孩显得很焦 虑，体重减轻了，觉也睡不好。</div>          <div class="fam"><span class="lbl">族</span>anxiety n. 焦虑</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">sign</span>
+          <span class="ipa">/sain/</span>
+          <span class="pos"></span>
+          <span class="cn">迹象;标志 v. 签(名);署(名);签字 starting to return to normal. 对他们来说，那是 生活开始回归正常的第一个迹象。</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The sign above the door</div>          <div class="root"><span class="lbl">根</span>本义「标记」→ 签名、符号</div>          <div class="fam"><span class="lbl">族</span>signal n. 信号</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">signature</span>
+          <span class="ipa">/&#x27;signət∫ər/</span>
+          <span class="pos"></span>
+          <span class="cn">署名；签字；签名</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>carried his signature</div>          <div class="mnem"><span class="lbl">记</span>sign v. 签字，signature 是它的 名词形式。</div>          <div class="root"><span class="lbl">根</span>sign + ature(名词) → 亲笔签名</div>          <div class="zt"><span class="lbl">真题</span>The group has collected nearly 2, 000 signatures, including some from famous people like Noam Chomsky. 该组织已经收集了近 2 000个签名，其中包括一些来自像诺姆·乔姆 斯基这样的名人的签名。</div>          <div class="fam"><span class="lbl">族</span>sign v. 签名</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">signal</span>
+          <span class="ipa">/&#x27;signəl/</span>
+          <span class="pos"></span>
+          <span class="cn">信号；暗号；标志；指示灯 v. 发信号；标志； 表明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small signal light blinked</div>          <div class="root"><span class="lbl">根</span>sign(标记) + al → 传递信息的标记</div>          <div class="zt"><span class="lbl">真题</span>She suggested that activities like knitting and crocheting make it harder for the brain to register pain signals. 她认为，像编织和钩针这 样的活动会使大脑更难注意到疼痛信号。</div>          <div class="fam"><span class="lbl">族</span>sign n. 标记</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">assign</span>
+          <span class="ipa">/ə&#x27;sain/</span>
+          <span class="pos"></span>
+          <span class="cn">分配(某物)；分派，指定；委派</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>decided to assign one simple rule</div>          <div class="root"><span class="lbl">根</span>as(向) + sign(标记) → 指定给某人</div>          <div class="zt"><span class="lbl">真题</span>In her study, participants were randomly (随机地) assigned to two groups. 在她的研究 中，参与者被随机分配到两组。(2017)</div>          <div class="fam"><span class="lbl">族</span>assignment n. 任务</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">resign</span>
+          <span class="ipa">/rı&#x27;zaın/</span>
+          <span class="pos"></span>
+          <span class="cn">辞职;辞去(某职务)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to resign from the rest</div>          <div class="mnem"><span class="lbl">记</span>字面意思是再次（re）签字 (sign)，我们进一个单位一般签两次字，一次人 职，一次就是离职了→辞职。</div>          <div class="root"><span class="lbl">根</span>re(回) + sign(签字) → 签字交回 → 辞职</div>          <div class="zt"><span class="lbl">真题</span>The following year, things got worse and Gerald Ratner was forced to resign. 第二年，情 况变得更糟，杰拉尔德·拉特纳被迫辞职。</div>          <div class="fam"><span class="lbl">族</span>resignation n. 辞职</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">significant</span>
+          <span class="ipa">/sig&#x27;nıfıkənt/</span>
+          <span class="pos"></span>
+          <span class="cn">有重大意义的，重要的；显著的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To be significant</div>          <div class="mnem"><span class="lbl">记</span>词根词缀法：sign“标记，标志”； signify“使……标记化（ify动词后缀，使…… 化)，显示”。significant做标记的，你会在哪里 做标记？重要的地方啊→有重大意义的，重 要的。</div>          <div class="root"><span class="lbl">根</span>sign(标记) + ificant → 值得做标记的 → 重要的</div>          <div class="zt"><span class="lbl">真题</span>The report says America&#x27;s urbanization will continue to be the most significant issue affecting the industry.该报告称，美国的城市化 将继续成为影响工业的最重要问题。(2017)</div>          <div class="fam"><span class="lbl">族</span>significance n. 重要性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">essential</span>
+          <span class="ipa">/ı&#x27;sen∫l/</span>
+          <span class="pos"></span>
+          <span class="cn">必需品；要素，要点 adj.必不可少的；本质的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sell something essential</div>          <div class="mnem"><span class="lbl">记</span>essence n. 精油；本质，实质。 很多人在护肤品里会见到这个单词，叫精华液。 (022)</div>          <div class="root"><span class="lbl">根</span>ess(存在) + ential → 关乎存在的 → 必需的</div>          <div class="zt"><span class="lbl">真题</span>They cannot measure the essentials of effective written communication. 他们无法衡 量有效书面沟通的要素。</div>          <div class="fam"><span class="lbl">族</span>essence n. 本质</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">indispensable</span>
+          <span class="ipa">/Indı&#x27;spensəbl/</span>
+          <span class="pos"></span>
+          <span class="cn">不可或缺的，必不可少的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>something indispensable</div>          <div class="mnem"><span class="lbl">记</span>先记忆该单词的反义词 dispensable,dis 表示否定;pens 钢笔;able 形容 词后缀；连在一起就是：没有钢笔的。现在用钢 笔的人越来越少，都用签字笔了，所以没有钢笔 这件事又怎样了？→不重要的，可有可无的。 那 indispensable作为反义词意思就很明显了→ 不可缺少的。</div>          <div class="root"><span class="lbl">根</span>in(不) + dispensable(可省去的) → 不可缺的</div>          <div class="zt"><span class="lbl">真题</span>Higher education is indispensable if you want to go far in both your studies and life. 如 果你想在学习和生活中走得更远，高等教育是 必不可少的。</div>          <div class="fam"><span class="lbl">族</span>dispense v. 分配</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">necessary</span>
+          <span class="ipa">/&#x27;nesəseri/</span>
+          <span class="pos"></span>
+          <span class="cn">必需的；必然的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>That was necessary</div>          <div class="root"><span class="lbl">根</span>ne(不) + cess(走) + ary → 走不开的 → 必要的</div>          <div class="zt"><span class="lbl">真题</span>Fast technological change makes it necessary for one to constantly upgrade their skills. 快速 的技术变革使人们有必要不断地提高自己的 技能。</div>          <div class="fam"><span class="lbl">族</span>necessity n. 必要性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">inevitable</span>
+          <span class="ipa">/ın&#x27;evitəbl/</span>
+          <span class="pos"></span>
+          <span class="cn">不可避免的;不能防止的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>though not inevitable</div>          <div class="mnem"><span class="lbl">记</span>先看该单词的反义词 evitable， evi发音类似“俺为”，table“桌子”，连在一起就 是：俺为桌子。如果一群小偷去你家，发现你家 徒四壁，但是他们不能空手离开，就偷了一张桌 子，结果你为了保护桌子被打得鼻青脸肿。为 了一张桌子被打成这样，值得吗？本可以避免 的，那inevitable就是“不可避免的”。 (023 第一单元</div>          <div class="root"><span class="lbl">根</span>in(不) + evitable(可避免的) → 不可避免的</div>          <div class="zt"><span class="lbl">真题</span>Remember, failure is inevitable, and every failure you survive is a learning experience.记住，失败是不可避免的，你经历的 每一次失败都是一次学习的体验。(2023)</div>          <div class="fam"><span class="lbl">族</span>inevitably adv. 必然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">appoint</span>
+          <span class="ipa">/ə&#x27;point/</span>
+          <span class="pos"></span>
+          <span class="cn">任命，委任；安排；确定(时间、地点)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would appoint a new manager</div>          <div class="mnem"><span class="lbl">记</span>老板一再地(ap)指着(point)你 说：“你去干……吧！”是不是在给你“安排，委 任”工作？</div>          <div class="root"><span class="lbl">根</span>ap(向) + point(指) → 指定</div>          <div class="zt"><span class="lbl">真题</span>The man has missed his appointment. 这 个人错过了他的约会。</div>          <div class="fam"><span class="lbl">族</span>appointment n. 约会、任命</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">disappoint</span>
+          <span class="ipa">/disə&#x27;point/</span>
+          <span class="pos"></span>
+          <span class="cn">使失望；使破灭</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>disappoint no one</div>          <div class="mnem"><span class="lbl">记</span>appoint任命，指派，那这个单 词就是不(dis)给你分配、指派任务了，也就是你 被领导忽略了，不再得到重视了，你是不是很失 望？→使失望。</div>          <div class="root"><span class="lbl">根</span>dis(取消) + appoint(安排) → 安排的落空 → 使失望</div>          <div class="zt"><span class="lbl">真题</span>Some say we should never meet our heroes, lest they disappoint us when we find out how normal they are. 有人说我们永远不应 该见到我们的英雄，免得当我们发现他们是多 么普通时失望。(2022)</div>          <div class="fam"><span class="lbl">族</span>disappointment n. 失望</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">accommodate</span>
+          <span class="ipa">/ə&#x27;ka:mədeit/</span>
+          <span class="pos"></span>
+          <span class="cn">为(某人)提供住宿(或膳宿、座位等)；适应； 容纳；为……提供空间</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had to accommodate every kind of visitor</div>          <div class="mnem"><span class="lbl">记</span>一再地（ac）十来（commo发音 类似 come)+约会(date);我在北京，你在天津， 一次次来跟你约会，你最起码得给我提供一个 住的地方吧→提供住宿。刚跟你来约会，是不是 很腼腆？后来一次次来跟你约会就“适应”了。</div>          <div class="root"><span class="lbl">根</span>ac + com(共同) + mod(方式) → 用各种方式容纳</div>          <div class="zt"><span class="lbl">真题</span>They were usually poorly cared for and too narrow to accommodate automobiles. 它们 通常没有得到很好的维护，而且太窄，无法容纳 汽车。</div>          <div class="fam"><span class="lbl">族</span>accommodation n. 住宿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">adapt</span>
+          <span class="ipa">/ə&#x27;dæpt/</span>
+          <span class="pos"></span>
+          <span class="cn">使适应；使适合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>adapt to each one in turn</div>          <div class="mnem"><span class="lbl">记</span>d(谐音为“地”）的前后都是 “a”，你在某地多年，别人吃什么，你吃什么；别 人干什么，你干什么，你跟那些当地人一样了→ 使适应。</div>          <div class="root"><span class="lbl">根</span>ad(向) + apt(合适) → 使合适 → 适应</div>          <div class="zt"><span class="lbl">真题</span>They have difficulty adapting to climate change. 他们很难适应气候变化。(2023) 例It took him a while to adapt himself to his new surroundings. 他过了好一阵子才适应了新 环境。</div>          <div class="fam"><span class="lbl">族</span>adaptation n. 适应</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5~6 · Day 06</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

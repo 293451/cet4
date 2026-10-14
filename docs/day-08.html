@@ -1,0 +1,688 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 08 · The Glassmaker</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 08 · 10/20 · Unit 7~8 第 211-240 词</div>
+  <h1>The Glassmaker<span class="cn">制玻璃的人</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-08.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2091"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="256">fire</span> <span class="w" data-s="299" data-e="555">must</span> <span class="w target" data-s="597" data-e="853" title="点燃，着火">ignite</span> <span class="w" data-s="896" data-e="1152">before</span> <span class="w" data-s="1195" data-e="1451">anything</span> <span class="w" data-s="1493" data-e="1749">else</span> <span class="w" data-s="1792" data-e="1920">can</span> <span class="w" data-s="1963" data-e="2091">happen.</span></p><p class="zh">火必须先点燃，别的才谈得上。</p></div>
+<div class="pair" data-s0="2347" data-s1="9600"><p class="en"><span class="w" data-s="2347" data-e="2688">He</span> <span class="w" data-s="2944" data-e="3328">would</span> <span class="w target" data-s="3371" data-e="3627" title="突出，使显著n. 最精彩的部分">highlight</span> <span class="w" data-s="3669" data-e="3840">the</span> <span class="w" data-s="3883" data-e="4096">hottest</span> <span class="w" data-s="4139" data-e="4267">point</span> <span class="w" data-s="4309" data-e="4523">with</span> <span class="w" data-s="4565" data-e="4651">a</span> <span class="w" data-s="4693" data-e="4779">thin</span> <span class="w" data-s="4821" data-e="5077">iron</span> <span class="w" data-s="5120" data-e="5547">rod,</span> <span class="w" data-s="5717" data-e="5931">and</span> <span class="w" data-s="6016" data-e="6400">the</span> <span class="w target" data-s="6443" data-e="6656" title="太阳的；日光的；与太阳有关的">solar</span> <span class="w" data-s="6699" data-e="6827">heat</span> <span class="w" data-s="6869" data-e="7040">from</span> <span class="w" data-s="7083" data-e="7211">the</span> <span class="w target" data-s="7253" data-e="7509" title="阳光">sunlight</span> <span class="w" data-s="7552" data-e="7680">at</span> <span class="w target" data-s="7723" data-e="8021" title="">sunset</span> <span class="w" data-s="8064" data-e="8320">was</span> <span class="w" data-s="8619" data-e="8789">enough</span> <span class="w" data-s="8832" data-e="9045">for</span> <span class="w" data-s="9088" data-e="9131">the</span> <span class="w" data-s="9173" data-e="9259">first</span> <span class="w" data-s="9301" data-e="9600">melt.</span></p><p class="zh">他会用一根细铁棍标出最热的那个点，而日落时阳光带来的热量就够第一次熔化了。</p></div>
+<div class="pair" data-s0="10162" data-s1="12125"><p class="en"><span class="w" data-s="10162" data-e="10375">Long</span> <span class="w" data-s="10418" data-e="10674">before</span> <span class="w target" data-s="10717" data-e="11058" title="黎明；开端v. 破晓；开始">dawn</span> <span class="w" data-s="11101" data-e="11314">he</span> <span class="w" data-s="11357" data-e="11485">was</span> <span class="w" data-s="11527" data-e="11698">already</span> <span class="w" data-s="11741" data-e="11954">at</span> <span class="w" data-s="11997" data-e="12125">work.</span></p><p class="zh">天还没亮他就已经在干活了。</p></div>
+<div class="pair" data-s0="12338" data-s1="18525"><p class="en"><span class="w" data-s="12338" data-e="12722">A</span> <span class="w target" data-s="12893" data-e="13149" title="固体adj.固体的；坚固的；可靠的">solid</span> <span class="w" data-s="13191" data-e="13447">base</span> <span class="w" data-s="13490" data-e="13789">had</span> <span class="w" data-s="13831" data-e="13917">to</span> <span class="w target" data-s="13959" data-e="14514" title="使巩固；使加强">consolidate</span> <span class="w" data-s="14557" data-e="14813">before</span> <span class="w" data-s="14855" data-e="14983">the</span> <span class="w target" data-s="15026" data-e="15325" title="流动的 n. 液体">fluid</span> <span class="w" data-s="15367" data-e="15453">would</span> <span class="w" data-s="15495" data-e="15623">hold</span> <span class="w" data-s="15666" data-e="15794">its</span> <span class="w" data-s="15837" data-e="16007">shape,</span> <span class="w" data-s="16306" data-e="16391">and</span> <span class="w" data-s="16519" data-e="16818">the</span> <span class="w target" data-s="16861" data-e="17031" title="液体 adj. 液体的，液态的">liquid</span> <span class="w" data-s="17074" data-e="17202">glass</span> <span class="w" data-s="17245" data-e="17629">turned</span> <span class="w" data-s="17671" data-e="17842">like</span> <span class="w" data-s="17885" data-e="18098">slow</span> <span class="w" data-s="18141" data-e="18525">honey.</span></p><p class="zh">得先形成一个坚实的底，流体才能定住形状，液态玻璃转动起来像缓慢的蜂蜜。</p></div>
+<div class="pair" data-s0="18738" data-s1="22919"><p class="en"><span class="w" data-s="18738" data-e="18866">The</span> <span class="w target" data-s="18909" data-e="19207" title="体积；容积；量；额；音量；一卷；一册">volume</span> <span class="w" data-s="19250" data-e="19335">of</span> <span class="w" data-s="19378" data-e="19463">the</span> <span class="w" data-s="19506" data-e="19762">furnace</span> <span class="w" data-s="19805" data-e="20146">mattered,</span> <span class="w" data-s="20274" data-e="20402">and</span> <span class="w" data-s="20743" data-e="20871">there</span> <span class="w" data-s="20914" data-e="20999">was</span> <span class="w" data-s="21042" data-e="21127">a</span> <span class="w target" data-s="21170" data-e="21469" title="最小值；最少量；最低限度 adj.最低的；最 小的；最低限度的">minimum</span> <span class="w" data-s="21511" data-e="21639">and</span> <span class="w" data-s="21682" data-e="21767">a</span> <span class="w target" data-s="21810" data-e="22194" title="最大量；最大限度；最高限度 adlj. 最高的； 最多的；最大极限的">maximum</span> <span class="w" data-s="22237" data-e="22365">for</span> <span class="w" data-s="22407" data-e="22535">every</span> <span class="w" data-s="22578" data-e="22919">batch.</span></p><p class="zh">炉子的容积很要紧，每一炉都有个最小量和最大量。</p></div>
+<div class="pair" data-s0="23133" data-s1="25053"><p class="en"><span class="w" data-s="23133" data-e="23645">He</span> <span class="w" data-s="23858" data-e="24157">lowered</span> <span class="w" data-s="24199" data-e="24285">the</span> <span class="w target" data-s="24327" data-e="24541" title="船；容器；器皿；脉管；导管">vessel</span> <span class="w" data-s="24583" data-e="24754">into</span> <span class="w" data-s="24797" data-e="24925">the</span> <span class="w" data-s="24967" data-e="25053">heat.</span></p><p class="zh">他把容器放低，送进热里。</p></div>
+<div class="pair" data-s0="25999" data-s1="29583"><p class="en"><span class="w" data-s="25999" data-e="26127">He</span> <span class="w" data-s="26169" data-e="26255">could</span> <span class="w" data-s="26297" data-e="26425">feel</span> <span class="w" data-s="26468" data-e="26639">the</span> <span class="w target" data-s="26681" data-e="26980" title="脉搏；脉率 v. 搏动；跳动；震动">pulse</span> <span class="w" data-s="27023" data-e="27065">of</span> <span class="w" data-s="27108" data-e="27193">the</span> <span class="w" data-s="27236" data-e="27492">flame,</span> <span class="w" data-s="27663" data-e="27705">and</span> <span class="w" data-s="27748" data-e="28132">a</span> <span class="w" data-s="28175" data-e="28260">sudden</span> <span class="w target" data-s="28303" data-e="28815" title="冲动；心血来潮；推动力；刺激">impulse</span> <span class="w" data-s="28857" data-e="28943">made</span> <span class="w" data-s="28985" data-e="29113">him</span> <span class="w" data-s="29156" data-e="29241">pull</span> <span class="w" data-s="29284" data-e="29412">it</span> <span class="w" data-s="29455" data-e="29583">back.</span></p><p class="zh">他能感到火焰的搏动，一个突然的冲动让他把它抽了回来。</p></div>
+<div class="pair" data-s0="29839" data-s1="33039"><p class="en"><span class="w" data-s="29839" data-e="30479">A</span> <span class="w target" data-s="30521" data-e="30777" title="">flood</span> <span class="w" data-s="30820" data-e="30905">of</span> <span class="w" data-s="30948" data-e="31204">orange</span> <span class="w" data-s="31247" data-e="31417">light</span> <span class="w" data-s="31460" data-e="31716">seemed</span> <span class="w" data-s="31759" data-e="31929">to</span> <span class="w target" data-s="31972" data-e="32399" title="(大小、数量、质量等)波动；(在……之间)起 伏不定">fluctuate</span> <span class="w" data-s="32441" data-e="32612">across</span> <span class="w" data-s="32655" data-e="32868">the</span> <span class="w" data-s="32911" data-e="33039">floor.</span></p><p class="zh">一片橘色的光在地面上起伏闪动。</p></div>
+<div class="pair" data-s0="33380" data-s1="36964"><p class="en"><span class="w" data-s="33380" data-e="33508">He</span> <span class="w" data-s="33551" data-e="33636">had</span> <span class="w" data-s="33679" data-e="33764">to</span> <span class="w target" data-s="33807" data-e="33977" title="出血，流血">bleed</span> <span class="w" data-s="34020" data-e="34105">the</span> <span class="w" data-s="34148" data-e="34276">air</span> <span class="w" data-s="34319" data-e="34447">out</span> <span class="w" data-s="34489" data-e="34745">slowly,</span> <span class="w" data-s="35001" data-e="35257">then</span> <span class="w target" data-s="35428" data-e="35599" title="干的；干燥的 v.(使)变干；(把……) 弄干">dry</span> <span class="w" data-s="35641" data-e="35855">the</span> <span class="w" data-s="35897" data-e="36025">surface</span> <span class="w" data-s="36068" data-e="36452">before</span> <span class="w" data-s="36495" data-e="36665">it</span> <span class="w" data-s="36708" data-e="36964">cooled.</span></p><p class="zh">他得慢慢地把空气放掉，然后在它冷却之前把表面烘干。</p></div>
+<div class="pair" data-s0="37177" data-s1="40676"><p class="en"><span class="w" data-s="37177" data-e="37561">The</span> <span class="w" data-s="37647" data-e="37775">glass</span> <span class="w" data-s="37817" data-e="38031">would</span> <span class="w target" data-s="38073" data-e="38372" title="泡；气泡；肥皂泡;泡沫(很可能持续不长的好 景或好运) v. 起泡；冒泡">bubble,</span> <span class="w" data-s="38457" data-e="38671">and</span> <span class="w" data-s="38841" data-e="39012">one</span> <span class="w target" data-s="39055" data-e="39439" title="电灯泡；球状物">bulb</span> <span class="w" data-s="39481" data-e="39524">of</span> <span class="w" data-s="39567" data-e="39652">air</span> <span class="w" data-s="39695" data-e="39865">could</span> <span class="w" data-s="39908" data-e="40207">ruin</span> <span class="w" data-s="40249" data-e="40335">the</span> <span class="w" data-s="40377" data-e="40463">whole</span> <span class="w" data-s="40505" data-e="40676">piece.</span></p><p class="zh">玻璃会起泡，一个气泡就能毁掉整件作品。</p></div>
+<div class="pair" data-s0="41749" data-s1="45248"><p class="en"><span class="w" data-s="41749" data-e="41877">His</span> <span class="w" data-s="41920" data-e="42090">work</span> <span class="w" data-s="42133" data-e="42346">was</span> <span class="w" data-s="42389" data-e="42474">a</span> <span class="w" data-s="42517" data-e="42560">kind</span> <span class="w" data-s="42602" data-e="42773">of</span> <span class="w target" data-s="42816" data-e="43157" title="手势；姿势 v. 做手势；用动作示意 (031) 第二单元">gesture,</span> <span class="w" data-s="43328" data-e="43797">a</span> <span class="w target" data-s="43840" data-e="44266" title="按揭(由银行等提供房产抵押借款)；按揭贷 款 v.(向银行等)抵押(房产)">mortgage</span> <span class="w" data-s="44309" data-e="44480">on</span> <span class="w" data-s="44522" data-e="44608">his</span> <span class="w" data-s="44650" data-e="44778">own</span> <span class="w" data-s="44821" data-e="45248">patience.</span></p><p class="zh">他的活计是某种姿态，是拿自己的耐心作抵押。</p></div>
+<div class="pair" data-s0="45418" data-s1="48064"><p class="en"><span class="w" data-s="45418" data-e="45973">He</span> <span class="w" data-s="46016" data-e="46144">tried</span> <span class="w" data-s="46186" data-e="46400">to</span> <span class="w target" data-s="46442" data-e="46656" title="吸引(注意力);使从事，使参与；使订婚">engage</span> <span class="w" data-s="46698" data-e="46912">the</span> <span class="w" data-s="46954" data-e="47125">material</span> <span class="w" data-s="47168" data-e="47509">on</span> <span class="w" data-s="47552" data-e="47680">its</span> <span class="w" data-s="47722" data-e="47850">own</span> <span class="w" data-s="47893" data-e="48064">terms.</span></p><p class="zh">他试着按照材料本身的性子去和它打交道。</p></div>
+<div class="pair" data-s0="48405" data-s1="54080"><p class="en"><span class="w" data-s="48405" data-e="48832">It</span> <span class="w" data-s="49045" data-e="49173">was</span> <span class="w" data-s="49216" data-e="49301">a</span> <span class="w target" data-s="49344" data-e="49770" title="认知的，感知的；认识的 v. 认识，认出，辨别出；承认；意识到">cognitive</span> <span class="w" data-s="49813" data-e="50069">task</span> <span class="w" data-s="50112" data-e="50325">as</span> <span class="w" data-s="50368" data-e="50666">much</span> <span class="w" data-s="50709" data-e="50837">as</span> <span class="w" data-s="50880" data-e="50922">a</span> <span class="w" data-s="50965" data-e="51093">physical</span> <span class="w" data-s="51136" data-e="51477">one,</span> <span class="w" data-s="51605" data-e="51776">and</span> <span class="w" data-s="52074" data-e="52288">he</span> <span class="w" data-s="52330" data-e="52416">could</span> <span class="w target" data-s="52458" data-e="52842" title="">recognize</span> <span class="w" data-s="52885" data-e="53056">a</span> <span class="w" data-s="53098" data-e="53184">good</span> <span class="w" data-s="53226" data-e="53440">piece</span> <span class="w" data-s="53482" data-e="53738">at</span> <span class="w" data-s="53781" data-e="53866">a</span> <span class="w" data-s="53909" data-e="54080">glance.</span></p><p class="zh">这既是认知的活，也是体力的活；他一眼就能认出一件好东西。</p></div>
+<div class="pair" data-s0="54763" data-s1="57109"><p class="en"><span class="w" data-s="54763" data-e="54891">The</span> <span class="w" data-s="54933" data-e="55061">real</span> <span class="w target" data-s="55104" data-e="55317" title="">challenge</span> <span class="w" data-s="55360" data-e="55659">was</span> <span class="w" data-s="55701" data-e="55872">never</span> <span class="w" data-s="55915" data-e="56085">the</span> <span class="w" data-s="56128" data-e="56213">glass,</span> <span class="w" data-s="56512" data-e="56725">but</span> <span class="w" data-s="56853" data-e="56981">the</span> <span class="w" data-s="57024" data-e="57109">waiting.</span></p><p class="zh">真正的难关从来不是玻璃，而是等待。</p></div>
+<div class="pair" data-s0="57408" data-s1="61589"><p class="en"><span class="w" data-s="57408" data-e="57579">He</span> <span class="w" data-s="58091" data-e="58432">planted</span> <span class="w" data-s="58475" data-e="58560">a</span> <span class="w" data-s="58603" data-e="58731">small</span> <span class="w target" data-s="58773" data-e="59029" title="旗 v. 标示 adj. 全球的，全世界的 to ease the current global food shortage. 必须 解决环境问题，以缓解目前的全球粮食短缺。 (2016)">flag</span> <span class="w" data-s="59072" data-e="59328">on</span> <span class="w" data-s="59371" data-e="59413">the</span> <span class="w" data-s="59456" data-e="59627">shelf</span> <span class="w" data-s="59669" data-e="59968">and</span> <span class="w" data-s="60011" data-e="60309">set</span> <span class="w" data-s="60352" data-e="60480">a</span> <span class="w target" data-s="60523" data-e="60651" title="">global</span> <span class="w" data-s="60693" data-e="60992">rule</span> <span class="w" data-s="61035" data-e="61291">for</span> <span class="w" data-s="61333" data-e="61589">himself.</span></p><p class="zh">他在架子上插了一面小旗，给自己定了一条通用的规矩。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">ignite</span>
+          <span class="ipa">/ıg&#x27;nait/</span>
+          <span class="pos"></span>
+          <span class="cn">点燃，着火</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The fire must ignite</div>          <div class="mnem"><span class="lbl">记</span>ig(发音似“一个”)+nite(发音 似night)，一个夜晚，没有电，你就“点燃”一根 蜡烛吧。</div>          <div class="root"><span class="lbl">根</span>ign(火) + ite → 点燃</div>          <div class="fam"><span class="lbl">族</span>ignition n. 点火</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">highlight</span>
+          <span class="ipa">/&#x27;harlait/</span>
+          <span class="pos"></span>
+          <span class="cn">突出，使显著n. 最精彩的部分</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would highlight the hottest point</div>          <div class="mnem"><span class="lbl">记</span>high高，light 灯，想象一个灯 高挂着，照着你，那你就显得很“突出”了。</div>          <div class="root"><span class="lbl">根</span>high(高) + light(光) → 用光照高处 → 突出</div>          <div class="zt"><span class="lbl">真题</span>The menu featured 120 different dishes, highlighting eight different soups, 40 main courses，and 32 desserts. 菜单上有 120 种不同 的菜肴，突出了8种不同的汤、40道主菜和32 种甜点。(2018)</div>          <div class="fam"><span class="lbl">族</span>highlighter n. 荧光笔</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">solar</span>
+          <span class="ipa">/&#x27;səulər/</span>
+          <span class="pos"></span>
+          <span class="cn">太阳的；日光的；与太阳有关的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the solar heat from the sunlight</div>          <div class="mnem"><span class="lbl">记</span>发音类似“馊了”。因为长久不 见阳光，东西都发霉，馊了，所以应该晒晒太阳。 →太阳的。</div>          <div class="root"><span class="lbl">根</span>sol(太阳) + ar</div>          <div class="zt"><span class="lbl">真题</span>The rest of the energy savings comes from the solar units. 其余的能源节约来自太阳 能装置。(2013)</div>          <div class="fam"><span class="lbl">族</span>solstice n. 至日</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">sunlight</span>
+          <span class="ipa">/&#x27;sanlait/</span>
+          <span class="pos"></span>
+          <span class="cn">阳光</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>from the sunlight at sunset</div>          <div class="root"><span class="lbl">根</span>sun(太阳) + light(光)</div>          <div class="zt"><span class="lbl">真题</span>When we think of animals and plants, we have a pretty good way of dividing them into two distinct groups: one converts sunlight into energy and the other has to eat food to make its energy. 当我们想到动物和植物时，我 们有一种很好的方法把它们分成两种不同的 组：一种将阳光转化为能量，另一种必须吃食物 来产生能量。(2019)</div>          <div class="fam"><span class="lbl">族</span>sunshine n. 阳光</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">sunset</span>
+          <span class="ipa">/&#x27;sanset/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sunlight at sunset</div>          <div class="root"><span class="lbl">根</span>sun + set(落下)</div>          <div class="zt"><span class="lbl">真题</span>From sunrise to sunset, my father, my younger brother and I cut the weeds in the very large yards.从日出到日落，我和我的父亲、我的 弟弟在非常大的院子里除草。</div>          <div class="fam"><span class="lbl">族</span>sunrise n. 日出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">dawn</span>
+          <span class="ipa">/də:n/</span>
+          <span class="pos"></span>
+          <span class="cn">黎明；开端v. 破晓；开始</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Long before dawn</div>          <div class="root"><span class="lbl">根</span>本义「破晓」→ 开端</div>          <div class="zt"><span class="lbl">真题</span>At dawn on July 16, 1945, the atomic bomb was set off. 1945 年 7 月 16 日黎明时分， 原子弹爆炸了。</div>          <div class="fam"><span class="lbl">族</span>dawning n. 黎明</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">solid</span>
+          <span class="ipa">/&#x27;sa:lıd/</span>
+          <span class="pos"></span>
+          <span class="cn">固体adj.固体的；坚固的；可靠的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A solid base had to consolidate</div>          <div class="mnem"><span class="lbl">记</span>发音类似：“稍(so)立的(lid)”。 一个东西可以稍微立在那儿，说明是个“固 体”啊。</div>          <div class="root"><span class="lbl">根</span>sol(整块) + id → 结实的</div>          <div class="zt"><span class="lbl">真题</span>The candidate was productive, or intelligent, or a solid scientist or something that&#x27;s clearly solid praise. 候选人要么是多产 的，要么是聪明的，要么是一个可靠的科学家， 或者是有一些明显值得称赞的东西。(2017)</div>          <div class="fam"><span class="lbl">族</span>solidity n. 坚固</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">consolidate</span>
+          <span class="ipa">/kən&#x27;sa:lıdeit/</span>
+          <span class="pos"></span>
+          <span class="cn">使巩固；使加强</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to consolidate before the fluid would hold</div>          <div class="mnem"><span class="lbl">记</span>solid结实的固体。那这个单 词就是所有的(con)都很结实(solid)，ate 是动 词的后缀，那就是“使巩固，使加强”。</div>          <div class="root"><span class="lbl">根</span>con(共同) + solid(结实) + ate → 使变结实 → 巩固</div>          <div class="zt"><span class="lbl">真题</span>Small schools consolidated into larger ones, meaning more students were farther away from home. 小学校合并成更大的学校，这 意味着更多的学生离家更远。</div>          <div class="fam"><span class="lbl">族</span>consolidation n. 巩固</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">fluid</span>
+          <span class="ipa">/&#x27;flu:d/</span>
+          <span class="pos"></span>
+          <span class="cn">流动的 n. 液体</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>before the fluid would hold its shape</div>          <div class="mnem"><span class="lbl">记</span>fl想象成汉字“飞流”；id 想象 成“一地”。那就是飞流了一地，什么东西能流 一地呢？答案是“液体”。</div>          <div class="root"><span class="lbl">根</span>flu(流) + id → 能流的</div>          <div class="zt"><span class="lbl">真题</span>A dry mouth may reduce taste sensitivity, but taste is restored by drinking fluids. 口干可 能会降低味觉的敏感度，但通过饮用液体可以 恢复味觉。(2019)</div>          <div class="fam"><span class="lbl">族</span>fluent adj. 流利的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">liquid</span>
+          <span class="ipa">/&#x27;lıkwıd/</span>
+          <span class="pos"></span>
+          <span class="cn">液体 adj. 液体的，液态的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the liquid glass turned like slow honey</div>          <div class="mnem"><span class="lbl">记</span>发音类似“立刻的”。喝了一些 “液体”，立刻就倒下了。</div>          <div class="root"><span class="lbl">根</span>liqu(液体) + id</div>          <div class="zt"><span class="lbl">真题</span>The difference lies in what&#x27;s in the globules and what&#x27;s in the surrounding liquid. 不同之处在于液滴中的物质和周围液体中的 物质。</div>          <div class="fam"><span class="lbl">族</span>liquor n. 烈酒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">volume</span>
+          <span class="ipa">/&#x27;va:lju:m, &#x27;va:ljəm/</span>
+          <span class="pos"></span>
+          <span class="cn">体积；容积；量；额；音量；一卷；一册</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The volume of the furnace mattered</div>          <div class="mnem"><span class="lbl">记</span>这个单词我们在生活中随处可 见，比如音量、容积。</div>          <div class="root"><span class="lbl">根</span>volu(卷、转) + me → 卷起来的量 → 体积、音量</div>          <div class="zt"><span class="lbl">真题</span>Companies keep large volumes of records because they don&#x27;t trust their suppliers, their contractors or their customers. 公司因为不信 任他们的供应商、承包商或客户，所以会保存大 量的记录。(2020)</div>          <div class="fam"><span class="lbl">族</span>voluminous adj. 大量的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">minimum</span>
+          <span class="ipa">/&#x27;minıməm/</span>
+          <span class="pos"></span>
+          <span class="cn">最小值；最少量；最低限度 adj.最低的；最 小的；最低限度的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was a minimum and a maximum</div>          <div class="mnem"><span class="lbl">记</span>mini表示“微小的，细小的”，比 如 mini copper(“宝马”的一款车)。</div>          <div class="root"><span class="lbl">根</span>mini(小) + mum(最) → 最小</div>          <div class="zt"><span class="lbl">真题</span>They have their weight reduced to minimum.它们的重量被减到最小。(2017)</div>          <div class="fam"><span class="lbl">族</span>minimal adj. 最小的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">maximum</span>
+          <span class="ipa">/&#x27;mæksiməm/</span>
+          <span class="pos"></span>
+          <span class="cn">最大量；最大限度；最高限度 adlj. 最高的； 最多的；最大极限的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a minimum and a maximum for every batch</div>          <div class="root"><span class="lbl">根</span>maxi(大) + mum(最) → 最大</div>          <div class="fam"><span class="lbl">族</span>maximize v. 最大化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">vessel</span>
+          <span class="ipa">/&#x27;vesl/</span>
+          <span class="pos"></span>
+          <span class="cn">船；容器；器皿；脉管；导管</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He lowered the vessel into the heat</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“歪艘（船）”。一 艘“船”歪了。</div>          <div class="root"><span class="lbl">根</span>本义「容器」→ 船舰、血管</div>          <div class="zt"><span class="lbl">真题</span>The advantages, not surprisingly, were greater for African Americans, who are more likely to develop high blood pressure than other ethnic groups, and for the elderly, since blood vessels stiffen with age, which can lead to higher blood pressure. 毫不奇怪，这对非裔 美国人的好处更大，他们比其他种族更容易患 高血压，并且对老年人的好处更大，因为血管随 着年龄的增长而变硬，这可能导致血压升高。 例A smaller vessel would have capsized. 小 点的船可能会倾覆。 例 It occurs because blood flow gets reduced in that blood vessel. 它的发生是因为那条血管 中的血流量减少了。</div>          <div class="fam"><span class="lbl">族</span>blood vessel 血管</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">pulse</span>
+          <span class="ipa">/pals/</span>
+          <span class="pos"></span>
+          <span class="cn">脉搏；脉率 v. 搏动；跳动；震动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could feel the pulse of the flame</div>          <div class="root"><span class="lbl">根</span>puls(推、打) + e → 搏动</div>          <div class="zt"><span class="lbl">真题</span>The Chinese doctor took my pulse and asked to see my tongue. 中医给我把了脉，要求 看我的舌头。</div>          <div class="fam"><span class="lbl">族</span>pulsate v. 搏动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">impulse</span>
+          <span class="ipa">/&#x27;ımpals/</span>
+          <span class="pos"></span>
+          <span class="cn">冲动；心血来潮；推动力；刺激</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a sudden impulse made him pull it back</div>          <div class="mnem"><span class="lbl">记</span>我妹（im想成我妹妹）扑了 (pul)撒(重庆人说话的语气词，se谐音)，那就 是妹妹“冲动”去做一件事情啊。</div>          <div class="root"><span class="lbl">根</span>im(向内) + pulse(推) → 内心的推动 → 冲动</div>          <div class="zt"><span class="lbl">真题</span>As Silicon Valley has become home to more successful companies, the flood of people to the area has caused housing prices to skyrocket.因为硅谷成为更多成功公司的所在 地，大量人口涌入该地区导致房价飙升。 (2020)</div>          <div class="fam"><span class="lbl">族</span>impulsive adj. 冲动的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">flood</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A flood of orange light</div>          <div class="root"><span class="lbl">根</span>本义「洪水」→ 大量涌来</div>          <div class="fam"><span class="lbl">族</span>flooding n. 水灾</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">fluctuate</span>
+          <span class="ipa">/&#x27;flakt∫ueit/</span>
+          <span class="pos"></span>
+          <span class="cn">(大小、数量、质量等)波动；(在……之间)起 伏不定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>seemed to fluctuate across the floor</div>          <div class="mnem"><span class="lbl">记</span>该单词前半部分的发音类似 “flood(洪水)”。提到洪水，就能想象洪水“波 动”，对吧？</div>          <div class="root"><span class="lbl">根</span>fluct(波浪) + uate → 像波浪般起伏</div>          <div class="fam"><span class="lbl">族</span>fluctuation n. 波动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">bleed</span>
+          <span class="ipa">/bli:d/</span>
+          <span class="pos"></span>
+          <span class="cn">出血，流血</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had to bleed the air out slowly</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词我们很熟悉， 是 blood。bleed 就是“流血”。</div>          <div class="root"><span class="lbl">根</span>blood 的动词形式 → 放（血、气）</div>          <div class="zt"><span class="lbl">真题</span>It is harmful to heart surgery patients with stomach bleeding. 它对有胃出血的心脏手 术患者有害。</div>          <div class="fam"><span class="lbl">族</span>bleeding n. 出血</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">dry</span>
+          <span class="ipa">/drai/</span>
+          <span class="pos"></span>
+          <span class="cn">干的；干燥的 v.(使)变干；(把……) 弄干</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then dry the surface before it cooled</div>          <div class="root"><span class="lbl">根</span>最基础的「干」</div>          <div class="zt"><span class="lbl">真题</span>As water tables have fallen and irrigation wells have gone dry, China&#x27;s wheat crop, the world&#x27;s largest，has declined by 8%. 由于地下 水位下降，灌溉井干涸，世界上最大的小麦生产 国—中国，其小麦产量下降了8%。（2016)</div>          <div class="fam"><span class="lbl">族</span>dryness n. 干燥</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">bubble</span>
+          <span class="ipa">/&#x27;babl/</span>
+          <span class="pos"></span>
+          <span class="cn">泡；气泡；肥皂泡;泡沫(很可能持续不长的好 景或好运) v. 起泡；冒泡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The glass would bubble</div>          <div class="mnem"><span class="lbl">记</span>该单词的发音，让我们想到“气 泡”爆炸时噼噼啪啪的声音。</div>          <div class="root"><span class="lbl">根</span>拟声词：咕嘟咕嘟</div>          <div class="zt"><span class="lbl">真题</span>When the bubble burst, demand collapsed. 当泡沫破裂时，需求就崩溃了。</div>          <div class="fam"><span class="lbl">族</span>bubbly adj. 起泡的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">bulb</span>
+          <span class="ipa">/balb/</span>
+          <span class="pos"></span>
+          <span class="cn">电灯泡；球状物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one bulb of air could ruin the whole piece</div>          <div class="mnem"><span class="lbl">记</span>单词前部分发音类似“包”。 “电灯泡”是不是就像个大包一样的东西？</div>          <div class="root"><span class="lbl">根</span>本义「球茎」→ 球状物 → 灯泡</div>          <div class="zt"><span class="lbl">真题</span>Don&#x27;t we have a brighter bulb somewhere? 我们不是有一个更亮的灯泡放在某个地方吗？</div>          <div class="fam"><span class="lbl">族</span>bulbous adj. 球状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">gesture</span>
+          <span class="ipa">/&#x27;dzest∫ər/</span>
+          <span class="pos"></span>
+          <span class="cn">手势；姿势 v. 做手势；用动作示意 (031) 第二单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His work was a kind of gesture</div>          <div class="mnem"><span class="lbl">记</span>ge（哥哥)，s（摔)，ture看成 true(真的)，连在一起就是哥哥摔的“姿势”真的 很有型啊。</div>          <div class="root"><span class="lbl">根</span>gest(做动作) + ure → 姿态、手势</div>          <div class="zt"><span class="lbl">真题</span>Substitutions of one gesture for the other often create not only humorous but also embarrassing moment.用一种手势代替另一种 手势通常不仅会带来幽默的时刻，还会带来尴 尬的时刻。(2014)</div>          <div class="fam"><span class="lbl">族</span>gesticulate v. 打手势</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">engage</span>
+          <span class="ipa">/ın&#x27;geıd3/</span>
+          <span class="pos"></span>
+          <span class="cn">吸引(注意力);使从事，使参与；使订婚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He tried to engage the material</div>          <div class="mnem"><span class="lbl">记</span>engage谐音“姻给之”→给之婚 姻→订婚→他邀请宾客们“参加”典礼，大家都 被新款的仪式所“吸引”。</div>          <div class="root"><span class="lbl">根</span>en(使) + gage(抵押) → 使投入（旧时作抵押）</div>          <div class="zt"><span class="lbl">真题</span>Companies, marketers and teachers have long looked for fun ways to engage people&#x27;s reward-seeking or competitive spirits. 长期以 来，公司、营销人员和教师一直在寻找有趣的方 式来激发人们寻求奖励或竞争的精神。(2016)</div>          <div class="fam"><span class="lbl">族</span>engagement n. 参与、订婚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">mortgage</span>
+          <span class="ipa">/&#x27;mə:rgıd3/</span>
+          <span class="pos"></span>
+          <span class="cn">按揭(由银行等提供房产抵押借款)；按揭贷 款 v.(向银行等)抵押(房产)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a mortgage on his own patience</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为摩托(mort发音)十 给(ga发音)+哥(ge发音)→把你最爱的摩托 给哥哥了，作为“抵押”啊。</div>          <div class="root"><span class="lbl">根</span>mort(死) + gage(抵押) → 到死才还清 → 抵押贷款</div>          <div class="zt"><span class="lbl">真题</span>Today a similar mortgage would claim more than twice that share of his monthly earnings.如今，一笔类似的抵押贷款将占他月 收入中那笔份额的两倍以上。</div>          <div class="fam"><span class="lbl">族</span>mortgagor n. 抵押人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">cognitive</span>
+          <span class="ipa">/&#x27;ka:gnətiv/</span>
+          <span class="pos"></span>
+          <span class="cn">认知的，感知的；认识的 v. 认识，认出，辨别出；承认；意识到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was a cognitive task</div>          <div class="mnem"><span class="lbl">记</span>该单词用汉语拼音记忆更合 适：插(cha)了(1le)恩(n)哥(ge)，设想下，恩哥 那么凶，有一天你挑衅他，用叉子插了恩哥的蛋 糕，明显你在“挑战”他啊。</div>          <div class="root"><span class="lbl">根</span>cognit(认识) + ive</div>          <div class="zt"><span class="lbl">真题</span>We can live a peaceful life despite the various challenges of the modern world. 尽管 现代世界有各种挑战，我们仍然可以过上和平 的生活。(2016)</div>          <div class="fam"><span class="lbl">族</span>cognition n. 认知</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">recognize</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could recognize a good piece</div>          <div class="root"><span class="lbl">根</span>re(再) + cogn(认识) + ize → 重新认出</div>          <div class="fam"><span class="lbl">族</span>recognition n. 识别</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">challenge</span>
+          <span class="ipa">/&#x27;t∫ælind3/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The real challenge was never the glass</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：当（wh想成 when)我们吃(eat)的时候，一般都是吃“小麦” 制成的食物。</div>          <div class="root"><span class="lbl">根</span>本义「控告、质疑」→ 挑战</div>          <div class="zt"><span class="lbl">真题</span>They grew wheat and corn on a small farm. 他们在一个小农场里种植小麦和玉米。</div>          <div class="fam"><span class="lbl">族</span>challenging adj. 有挑战的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">flag</span>
+          <span class="ipa">/flæg/</span>
+          <span class="pos"></span>
+          <span class="cn">旗 v. 标示 adj. 全球的，全世界的 to ease the current global food shortage. 必须 解决环境问题，以缓解目前的全球粮食短缺。 (2016)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He planted a small flag on the shelf</div>          <div class="mnem"><span class="lbl">记</span>哥哥(g)搂(lo)，哥哥搂着什么？ 一个“地球仪”啊。</div>          <div class="root"><span class="lbl">根</span>本义「旗帜」→ 标记、变弱</div>          <div class="zt"><span class="lbl">真题</span>When you forget entire experiences, he says, that&#x27;s “a red flag that something more serious may be involved.”他说，当你忘记了整 个经历，那是“一个危险信号，可能涉及更严重 的事情。”</div>          <div class="fam"><span class="lbl">族</span>flagging adj. 疲软的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">global</span>
+          <span class="ipa">/&#x27;gləubl/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>set a global rule for himself</div>          <div class="mnem"><span class="lbl">记</span>哥哥(g)站到低处(low)。中国 有句古话，叫做“比上不足，比下有余”。哥哥跟</div>          <div class="root"><span class="lbl">根</span>globe(球、地球) + al → 全球的、总体的</div>          <div class="zt"><span class="lbl">真题</span>Environmental problems must be solved 上面的比瞬间失色，但是跟下面的比，就显得光 芒四射了→发光。</div>          <div class="fam"><span class="lbl">族</span>globe n. 地球</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7~8 · Day 08</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

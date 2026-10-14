@@ -1,0 +1,688 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 05 · The Clockmaker&#x27;s Shop</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 05 · 10/17 · Unit 4~5 第 121-150 词</div>
+  <h1>The Clockmaker&#x27;s Shop<span class="cn">钟表匠的铺子</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-05.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4181"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">shop</span> <span class="w" data-s="341" data-e="555">sold</span> <span class="w target" data-s="597" data-e="1109" title="通货；货币；通用">currency</span> <span class="w" data-s="1152" data-e="1323">from</span> <span class="w" data-s="1365" data-e="1536">every</span> <span class="w" data-s="1579" data-e="1835">age,</span> <span class="w" data-s="2091" data-e="2261">and</span> <span class="w" data-s="2475" data-e="2603">its</span> <span class="w" data-s="2645" data-e="2901">clocks</span> <span class="w" data-s="2944" data-e="3115">were</span> <span class="w target" data-s="3157" data-e="3328" title="现代的；当代的;近代的">modern</span> <span class="w" data-s="3371" data-e="3669">and</span> <span class="w target" data-s="3712" data-e="4181" title="直到最近的；现代的，最新的">up-to-date.</span></p><p class="zh">这家铺子卖各个年代的货币，它的钟既现代又时新。</p></div>
+<div class="pair" data-s0="4352" data-s1="7765"><p class="en"><span class="w target" data-s="4352" data-e="5120" title="时尚；时装业；时兴；流行款式">Fashion</span> <span class="w" data-s="5163" data-e="5376">changed,</span> <span class="w" data-s="5803" data-e="6059">but</span> <span class="w" data-s="6229" data-e="6357">a</span> <span class="w" data-s="6400" data-e="6443">good</span> <span class="w" data-s="6485" data-e="6699">clock</span> <span class="w" data-s="6741" data-e="7040">did</span> <span class="w" data-s="7083" data-e="7211">not</span> <span class="w" data-s="7253" data-e="7509">follow</span> <span class="w" data-s="7552" data-e="7765">it.</span></p><p class="zh">时尚在变，但一只好钟不跟着变。</p></div>
+<div class="pair" data-s0="8374" data-s1="12129"><p class="en"><span class="w" data-s="8374" data-e="8459">The</span> <span class="w" data-s="8502" data-e="8587">building</span> <span class="w" data-s="8630" data-e="8929">itself</span> <span class="w" data-s="8971" data-e="9227">was</span> <span class="w" data-s="9270" data-e="9441">old,</span> <span class="w" data-s="9654" data-e="9867">once</span> <span class="w" data-s="10038" data-e="10209">a</span> <span class="w target" data-s="10251" data-e="10507" title="">temple,</span> <span class="w" data-s="10635" data-e="10806">and</span> <span class="w" data-s="11019" data-e="11190">later</span> <span class="w" data-s="11233" data-e="11446">a</span> <span class="w target" data-s="11489" data-e="11915" title="暂时的，临时的">temporary</span> <span class="w" data-s="11958" data-e="12129">market.</span></p><p class="zh">这栋楼本身很老，曾是座庙，后来成了临时集市。</p></div>
+<div class="pair" data-s0="12427" data-s1="17761"><p class="en"><span class="w" data-s="12427" data-e="13195">Today</span> <span class="w" data-s="13238" data-e="13366">it</span> <span class="w" data-s="13409" data-e="13451">was</span> <span class="w" data-s="13494" data-e="13579">a</span> <span class="w target" data-s="13622" data-e="14091" title="当代的；现在的，目前的">contemporary</span> <span class="w" data-s="14134" data-e="14305">shop</span> <span class="w" data-s="14347" data-e="14731">with</span> <span class="w" data-s="14859" data-e="14987">the</span> <span class="w" data-s="15030" data-e="15115">same</span> <span class="w" data-s="15158" data-e="15371">old</span> <span class="w" data-s="15414" data-e="15755">walls,</span> <span class="w" data-s="15969" data-e="16182">and</span> <span class="w" data-s="16225" data-e="16438">the</span> <span class="w" data-s="16481" data-e="16609">space</span> <span class="w" data-s="16651" data-e="16993">inside</span> <span class="w" data-s="17035" data-e="17334">was</span> <span class="w target" data-s="17377" data-e="17761" title="大量的；充裕的">abundant.</span></p><p class="zh">如今它是一家当代的铺子，墙还是那面老墙，里面的空间很充裕。</p></div>
+<div class="pair" data-s0="18319" data-s1="22714"><p class="en"><span class="w" data-s="18319" data-e="18405">A</span> <span class="w target" data-s="18447" data-e="18533" title="许多，大量；一群，一堆；群众，平民百姓 adj. 民众的;大量的 (017 第一单元">mass</span> <span class="w" data-s="18575" data-e="18831">of</span> <span class="w" data-s="18874" data-e="19301">boxes</span> <span class="w" data-s="19343" data-e="19557">sat</span> <span class="w" data-s="19599" data-e="19727">in</span> <span class="w" data-s="19770" data-e="19813">the</span> <span class="w" data-s="19855" data-e="19983">corner,</span> <span class="w" data-s="20282" data-e="20538">and</span> <span class="w" data-s="20581" data-e="20837">one</span> <span class="w target" data-s="20879" data-e="21135" title="大量的;大规模的；巨大的;严重的">massive</span> <span class="w" data-s="21178" data-e="21818">cabinet</span> <span class="w" data-s="21861" data-e="22159">leaned</span> <span class="w" data-s="22202" data-e="22287">against</span> <span class="w" data-s="22330" data-e="22543">the</span> <span class="w" data-s="22586" data-e="22714">wall.</span></p><p class="zh">角落里堆着一大堆盒子，一个大柜子靠着墙。</p></div>
+<div class="pair" data-s0="23013" data-s1="26639"><p class="en"><span class="w" data-s="23013" data-e="23695">The</span> <span class="w" data-s="23738" data-e="23951">owner</span> <span class="w" data-s="23994" data-e="24122">gave</span> <span class="w" data-s="24165" data-e="24293">a</span> <span class="w" data-s="24335" data-e="24421">short</span> <span class="w target" data-s="24463" data-e="24890" title="">massage</span> <span class="w" data-s="24933" data-e="25189">to</span> <span class="w" data-s="25231" data-e="25317">his</span> <span class="w" data-s="25359" data-e="25445">hands</span> <span class="w" data-s="25487" data-e="25786">before</span> <span class="w" data-s="25829" data-e="26042">he</span> <span class="w" data-s="26085" data-e="26213">began</span> <span class="w" data-s="26255" data-e="26469">to</span> <span class="w" data-s="26511" data-e="26639">work.</span></p><p class="zh">开工前，店主给自己的手做了个短暂的按摩。</p></div>
+<div class="pair" data-s0="26895" data-s1="30821"><p class="en"><span class="w" data-s="26895" data-e="27493">There</span> <span class="w" data-s="27535" data-e="27663">were</span> <span class="w target" data-s="27706" data-e="28047" title="众多的；许多的">numerous</span> <span class="w" data-s="28090" data-e="28218">parts</span> <span class="w" data-s="28261" data-e="28517">on</span> <span class="w" data-s="28559" data-e="28645">the</span> <span class="w" data-s="28687" data-e="28986">desk,</span> <span class="w" data-s="29157" data-e="29455">in</span> <span class="w" data-s="29498" data-e="29669">fact</span> <span class="w target" data-s="29711" data-e="30821" title="无数的，大量的，数不清的">innumerable.</span></p><p class="zh">桌上零件繁多，实际上数不胜数。</p></div>
+<div class="pair" data-s0="31327" data-s1="33247"><p class="en"><span class="w" data-s="31327" data-e="31412">He</span> <span class="w" data-s="31455" data-e="31583">had</span> <span class="w" data-s="31625" data-e="31711">to</span> <span class="w target" data-s="31753" data-e="32180" title="乘，乘以；成倍增加；迅速增加；(使)繁殖； 增殖">multiply</span> <span class="w" data-s="32223" data-e="32436">the</span> <span class="w" data-s="32479" data-e="32607">numbers</span> <span class="w" data-s="32649" data-e="32905">in</span> <span class="w" data-s="32948" data-e="33076">his</span> <span class="w" data-s="33119" data-e="33247">head.</span></p><p class="zh">他得在脑子里把这些数字相乘。</p></div>
+<div class="pair" data-s0="33503" data-s1="43487"><p class="en"><span class="w" data-s="33503" data-e="34185">To</span> <span class="w target" data-s="34228" data-e="34697" title="完成；达到；实现">accomplish</span> <span class="w" data-s="34740" data-e="34911">a</span> <span class="w" data-s="34953" data-e="35124">single</span> <span class="w" data-s="35167" data-e="35295">clock,</span> <span class="w" data-s="35636" data-e="35977">he</span> <span class="w" data-s="36020" data-e="36191">had</span> <span class="w" data-s="36233" data-e="36319">to</span> <span class="w target" data-s="36361" data-e="36489" title="(凭长期努力)达到(某目标、地位、标准)；实 现；完成；成功">achieve</span> <span class="w" data-s="36532" data-e="36873">three</span> <span class="w" data-s="36916" data-e="37172">things</span> <span class="w" data-s="37215" data-e="37471">at</span> <span class="w" data-s="37513" data-e="37641">once:</span> <span class="w target" data-s="37940" data-e="38836" title="实现，履行">fulfill</span> <span class="w" data-s="38879" data-e="39049">the</span> <span class="w" data-s="39092" data-e="39220">order,</span> <span class="w" data-s="39433" data-e="40031">keep</span> <span class="w" data-s="40073" data-e="40244">the</span> <span class="w" data-s="40287" data-e="40415">work</span> <span class="w target" data-s="40457" data-e="40969" title="令人满意的;让人感觉有意义的">fulfilling,</span> <span class="w" data-s="41097" data-e="41311">and</span> <span class="w" data-s="41481" data-e="41865">never</span> <span class="w" data-s="41908" data-e="42121">leave</span> <span class="w" data-s="42164" data-e="42335">a</span> <span class="w target" data-s="42377" data-e="42505" title="充满的;大量的；饱的；完全的">full</span> <span class="w" data-s="42548" data-e="42932">drawer</span> <span class="w" data-s="42975" data-e="43145">half</span> <span class="w target" data-s="43188" data-e="43487" title="充满的;大量的；饱的；完全的">full.</span></p><p class="zh">要完成一只钟，他得同时做到三件事：交付订单、让这份工作保持成就感、绝不让一个满抽屉只剩半满。</p></div>
+<div class="pair" data-s0="44093" data-s1="45928"><p class="en"><span class="w" data-s="44093" data-e="44221">An</span> <span class="w target" data-s="44264" data-e="44477" title="空的；空洞的；说话不算数的；空虚的 v. 使变空 (018)">empty</span> <span class="w" data-s="44520" data-e="44776">shelf</span> <span class="w" data-s="44818" data-e="45032">would</span> <span class="w target" data-s="45074" data-e="45202" title="(使)充满；填补；满足n. 填满……的量；吃 饱、喝足的量">fill</span> <span class="w" data-s="45245" data-e="45458">again</span> <span class="w" data-s="45501" data-e="45714">by</span> <span class="w" data-s="45757" data-e="45928">morning.</span></p><p class="zh">空架子到早上又会装满。</p></div>
+<div class="pair" data-s0="46184" data-s1="52669"><p class="en"><span class="w" data-s="46184" data-e="46482">He</span> <span class="w" data-s="46952" data-e="47165">spoke</span> <span class="w" data-s="47208" data-e="47421">about</span> <span class="w target" data-s="47464" data-e="47720" title="真实；现实；事实">reality</span> <span class="w" data-s="47762" data-e="48232">only</span> <span class="w" data-s="48274" data-e="48488">in</span> <span class="w" data-s="48530" data-e="48616">terms</span> <span class="w" data-s="48658" data-e="48829">of</span> <span class="w" data-s="48872" data-e="48957">the</span> <span class="w" data-s="49000" data-e="49085">work</span> <span class="w" data-s="49128" data-e="49298">in</span> <span class="w" data-s="49341" data-e="49426">front</span> <span class="w" data-s="49469" data-e="49597">of</span> <span class="w" data-s="49640" data-e="49768">him,</span> <span class="w" data-s="49938" data-e="49981">and</span> <span class="w" data-s="50024" data-e="50578">he</span> <span class="w" data-s="50621" data-e="50706">did</span> <span class="w" data-s="50749" data-e="50834">not</span> <span class="w target" data-s="50877" data-e="51090" title="使……成真，实现；理解，意识到">realize</span> <span class="w" data-s="51133" data-e="51517">that</span> <span class="w" data-s="51560" data-e="51688">his</span> <span class="w" data-s="51730" data-e="51858">own</span> <span class="w target" data-s="51901" data-e="52200" title="领域；场所；王国">realm</span> <span class="w" data-s="52242" data-e="52328">was</span> <span class="w" data-s="52370" data-e="52669">shrinking.</span></p><p class="zh">他谈起现实，只以眼前这件活计为准；他没意识到自己的天地正在缩小。</p></div>
+<div class="pair" data-s0="53272" data-s1="57837"><p class="en"><span class="w" data-s="53272" data-e="53443">Over</span> <span class="w" data-s="53485" data-e="53571">the</span> <span class="w" data-s="53613" data-e="53741">years</span> <span class="w" data-s="53784" data-e="54083">he</span> <span class="w" data-s="54125" data-e="54211">had</span> <span class="w target" data-s="54253" data-e="54680" title="积累；积聚，堆积">accumulated</span> <span class="w" data-s="54723" data-e="54893">a</span> <span class="w" data-s="54936" data-e="55021">great</span> <span class="w" data-s="55064" data-e="55320">deal,</span> <span class="w" data-s="55533" data-e="55747">and</span> <span class="w" data-s="55960" data-e="56088">he</span> <span class="w" data-s="56131" data-e="56259">could</span> <span class="w target" data-s="56301" data-e="56771" title="计算；估计;推测">calculate</span> <span class="w" data-s="56813" data-e="56941">the</span> <span class="w" data-s="56984" data-e="57112">value</span> <span class="w" data-s="57155" data-e="57411">of</span> <span class="w" data-s="57453" data-e="57624">each</span> <span class="w" data-s="57667" data-e="57837">piece.</span></p><p class="zh">这些年他积累了很多，他能算出每一件的价值。</p></div>
+<div class="pair" data-s0="58093" data-s1="60781"><p class="en"><span class="w" data-s="58093" data-e="58605">He</span> <span class="w" data-s="58819" data-e="59288">marked</span> <span class="w" data-s="59331" data-e="59373">the</span> <span class="w target" data-s="59416" data-e="59800" title="日历;历法">calendar</span> <span class="w" data-s="59843" data-e="59971">by</span> <span class="w" data-s="60013" data-e="60141">the</span> <span class="w" data-s="60184" data-e="60397">clocks</span> <span class="w" data-s="60440" data-e="60568">he</span> <span class="w" data-s="60611" data-e="60781">finished.</span></p><p class="zh">他用做完的钟来标记日历。</p></div>
+<div class="pair" data-s0="61459" data-s1="64787"><p class="en"><span class="w" data-s="61459" data-e="61587">For</span> <span class="w" data-s="61629" data-e="61757">now</span> <span class="w" data-s="61800" data-e="62056">he</span> <span class="w" data-s="62099" data-e="62227">could</span> <span class="w" data-s="62269" data-e="62397">only</span> <span class="w target" data-s="62440" data-e="62824" title="假定，假设；认为；承担(责任)">assume</span> <span class="w" data-s="62867" data-e="62952">the</span> <span class="w" data-s="62995" data-e="63123">best,</span> <span class="w" data-s="63421" data-e="63635">and</span> <span class="w target" data-s="63848" data-e="64189" title="摘要，概述，概要；简历 v. 重新开始；(中断 后)继续">resume</span> <span class="w" data-s="64232" data-e="64445">work</span> <span class="w" data-s="64488" data-e="64787">tomorrow.</span></p><p class="zh">眼下他只能往好处想，明天再继续。</p></div>
+<div class="pair" data-s0="65043" data-s1="67347"><p class="en"><span class="w" data-s="65043" data-e="65299">He</span> <span class="w" data-s="65597" data-e="65725">did</span> <span class="w" data-s="65768" data-e="65853">not</span> <span class="w target" data-s="65896" data-e="66237" title="假设，设想，推定，假定">presume</span> <span class="w" data-s="66280" data-e="66493">to</span> <span class="w" data-s="66536" data-e="66664">know</span> <span class="w" data-s="66707" data-e="66877">how</span> <span class="w" data-s="66920" data-e="67048">it</span> <span class="w" data-s="67091" data-e="67133">would</span> <span class="w" data-s="67176" data-e="67347">end.</span></p><p class="zh">他不敢妄自揣测结局如何。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">currency</span>
+          <span class="ipa">/&#x27;kə:rənsi/</span>
+          <span class="pos"></span>
+          <span class="cn">通货；货币；通用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The shop sold currency from every age</div>          <div class="mnem"><span class="lbl">记</span>current 目前的，现在的；currency 就记成现在的货币→通货。</div>          <div class="root"><span class="lbl">根</span>cur(跑) + rency → 流通的东西</div>          <div class="zt"><span class="lbl">真题</span>The EU faces an acute crisis in its economic core, the 16 countries that use the single currency. 欧盟的经济核心——使用单一货币的 16个国家——面临着严重的危机。</div>          <div class="fam"><span class="lbl">族</span>current adj. 流通的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">modern</span>
+          <span class="ipa">/&#x27;ma:dərn/</span>
+          <span class="pos"></span>
+          <span class="cn">现代的；当代的;近代的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>its clocks were modern</div>          <div class="root"><span class="lbl">根</span>mod(方式) + ern → 新方式的</div>          <div class="zt"><span class="lbl">真题</span>They are as modernized as many cities elsewhere. 它们和其他许多城市一样现代化。</div>          <div class="fam"><span class="lbl">族</span>modernize v. 现代化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">up-to-date</span>
+          <span class="ipa">/Λptə&#x27;deit/</span>
+          <span class="pos"></span>
+          <span class="cn">直到最近的；现代的，最新的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>modern and up-to-date</div>          <div class="root"><span class="lbl">根</span>合成词：跟上日期的</div>          <div class="zt"><span class="lbl">真题</span>However, many complained that their school libraries do not have enough up-to-date interesting books and magazines. 然而，许多人 抱怨说，他们的学校图书馆没有足够的最新的 有趣的书籍和杂志。</div>          <div class="fam"><span class="lbl">族</span>out-of-date 过时的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">fashion</span>
+          <span class="ipa">/&#x27;fæ∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">时尚；时装业；时兴；流行款式</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Fashion changed</div>          <div class="root"><span class="lbl">根</span>fac(做) + ion → 做出的样式</div>          <div class="zt"><span class="lbl">真题</span>Professional fashion models are particularly vulnerable to eating disorders resulting from occupational demands to maintain extreme thinness. 职业时装模特特别容易受到饮食失调 的影响，因为职业要求保持极度苗条。(2016)</div>          <div class="fam"><span class="lbl">族</span>fashionable adj. 时髦的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">temple</span>
+          <span class="ipa">/&#x27;templ/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>once a temple</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“太破”。我们 看电视，是不是荒郊野外看到一个破“庙”？</div>          <div class="root"><span class="lbl">根</span>本义「划出的圣地」→ 庙宇、太阳穴</div>          <div class="fam"><span class="lbl">族</span>temporal adj. 世俗的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">temporary</span>
+          <span class="ipa">/&#x27;temprəri/</span>
+          <span class="pos"></span>
+          <span class="cn">暂时的，临时的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>later a temporary market</div>          <div class="mnem"><span class="lbl">记</span>tempo发音类似“temple（庙 宇，寺院)”。佛乐是很有节奏的，所以tempo意 为“节奏，拍子”。你能一直跟上音乐的节奏跳 舞吗？我还真不能，所以我只能暂时地跟上节 奏→暂时的，临时的。</div>          <div class="root"><span class="lbl">根</span>tempor(时间) + ary → 只在一段时间内的</div>          <div class="zt"><span class="lbl">真题</span>Since being laid off, he has worked a series of part-time, low-wage, temporary positions.下岗后，他从事过一系列兼职、低工 资、临时性的工作。</div>          <div class="fam"><span class="lbl">族</span>contemporary adj. 当代的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">contemporary</span>
+          <span class="ipa">/kən&#x27;temprəri/</span>
+          <span class="pos"></span>
+          <span class="cn">当代的；现在的，目前的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it was a contemporary shop</div>          <div class="mnem"><span class="lbl">记</span>con表示“所有的”，所有的人都 能跟得上什么时候的节奏？→现在的，目前的。</div>          <div class="root"><span class="lbl">根</span>con(共同) + tempor(时间) + ary → 同时代的</div>          <div class="zt"><span class="lbl">真题</span>It is the concern of contemporary economists. 这是当代经济学家所关注的问题。</div>          <div class="fam"><span class="lbl">族</span>temporary adj. 临时的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">abundant</span>
+          <span class="ipa">/ə&#x27;bandənt/</span>
+          <span class="pos"></span>
+          <span class="cn">大量的；充裕的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the space inside was abundant</div>          <div class="mnem"><span class="lbl">记</span>a 表示“一”， bund 发音类似 “帮”，ant意为“蚂蚁”。一帮蚂蚁是不是很多？ →大量的。</div>          <div class="root"><span class="lbl">根</span>ab(向) + und(波浪) + ant → 像波浪一样涌来</div>          <div class="zt"><span class="lbl">真题</span>Abundant information about cooking is available either online or on TV. 网上或电视上 都有丰富的烹饪信息。(2020)</div>          <div class="fam"><span class="lbl">族</span>abundance n. 丰富</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">mass</span>
+          <span class="ipa">/mæs/</span>
+          <span class="pos"></span>
+          <span class="cn">许多，大量；一群，一堆；群众，平民百姓 adj. 民众的;大量的 (017 第一单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A mass of boxes sat in the corner</div>          <div class="mnem"><span class="lbl">记</span>我家养的马死了(mass发音类 似“马死”)，院子里挤满了来看热闹的邻居→大 量的。</div>          <div class="root"><span class="lbl">根</span>本义「一团、一堆」→ 质量、大众</div>          <div class="zt"><span class="lbl">真题</span>It was a rocky mass of land covered with ice.那是一片被冰雪覆盖、遍布岩石的广阔土地。 (2017)</div>          <div class="fam"><span class="lbl">族</span>massive adj. 巨大的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">massive</span>
+          <span class="ipa">/&#x27;mæsiv/</span>
+          <span class="pos"></span>
+          <span class="cn">大量的;大规模的；巨大的;严重的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one massive cabinet leaned against the wall</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“没媳妇”。现 在男女比例失调，娶不到媳妇的大有人在→大 量的，大规模的。</div>          <div class="root"><span class="lbl">根</span>mass(大块) + ive → 巨大的</div>          <div class="zt"><span class="lbl">真题</span>We derive massive economic benefits when we buy the most affordable energy on the world market. 当我们购买世界市场上最便宜 的能源时，我们获得了巨大的经济利益。</div>          <div class="fam"><span class="lbl">族</span>mass n. 大块</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">massage</span>
+          <span class="ipa">/mə&#x27;sa:3/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>gave a short massage to his hands</div>          <div class="mnem"><span class="lbl">记</span>单词解释为：妈妈（ma）杀鸡 (ssage)后，用调料给鸡做“按摩”，使味道渗入到 鸡身体里去，再烹饪会更入味。</div>          <div class="root"><span class="lbl">根</span>注意与 message（消息）只差一个字母</div>          <div class="fam"><span class="lbl">族</span>masseur n. 按摩师</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">numerous</span>
+          <span class="ipa">/&#x27;nu:mərəs/</span>
+          <span class="pos"></span>
+          <span class="cn">众多的；许多的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There were numerous parts on the desk</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词number（数 字)我们很熟悉，numerous是它的形容词。</div>          <div class="root"><span class="lbl">根</span>numer(数) + ous → 数量多的</div>          <div class="zt"><span class="lbl">真题</span>Numerous spacious and pretty courtyards hide in those houses, serving as surprises and waiting to be found by the tourists. 许多宽敞 美丽的庭院隐藏在这些房子里，为游客提供惊 喜，等待他们发现。(2016)</div>          <div class="fam"><span class="lbl">族</span>number n. 数字</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">innumerable</span>
+          <span class="ipa">/ı&#x27;nju:mərəbl/</span>
+          <span class="pos"></span>
+          <span class="cn">无数的，大量的，数不清的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in fact innumerable</div>          <div class="root"><span class="lbl">根</span>in(不) + numerable(可数的) → 数不清的</div>          <div class="zt"><span class="lbl">真题</span>This mountain was the home of innumerable birds. 这座山是无数只鸟的家园。</div>          <div class="fam"><span class="lbl">族</span>numerable adj. 可数的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">multiply</span>
+          <span class="ipa">/&#x27;maltıplai/</span>
+          <span class="pos"></span>
+          <span class="cn">乘，乘以；成倍增加；迅速增加；(使)繁殖； 增殖</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>multiply the numbers in his head</div>          <div class="mnem"><span class="lbl">记</span>multimedia我们很熟悉，是“多 媒体”的意思。那multi就表示“许多的，多的”。 multiply就是“增加；繁殖”。</div>          <div class="root"><span class="lbl">根</span>multi(多) + ply(折) → 成倍增加</div>          <div class="zt"><span class="lbl">真题</span>It revealed the secret of how bacteria multiply in cream and butter.它揭示了细菌如 何在奶油和黄油中繁殖的秘密。</div>          <div class="fam"><span class="lbl">族</span>multiple adj. 多个的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">accomplish</span>
+          <span class="ipa">/ə&#x27;kamplıʃ/</span>
+          <span class="pos"></span>
+          <span class="cn">完成；达到；实现</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To accomplish a single clock</div>          <div class="mnem"><span class="lbl">记</span>ac 表示“一再地”，complish 发 音类似“看破历史”，当你对什么都看透的时候， 你的人生就圆满了，所以该单词的意思就是“完 成；达到；实现”。</div>          <div class="root"><span class="lbl">根</span>ac + com(完全) + plish(填满) → 把事情做圆满</div>          <div class="zt"><span class="lbl">真题</span>One can only teach people to use this or that program and generally that is easily accomplished.一个人只能教人们使用这个或那 个程序，通常那是很容易完成的。</div>          <div class="fam"><span class="lbl">族</span>accomplishment n. 成就</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">achieve</span>
+          <span class="ipa">/ə&#x27;t∫i:v/</span>
+          <span class="pos"></span>
+          <span class="cn">(凭长期努力)达到(某目标、地位、标准)；实 现；完成；成功</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he had to achieve three things at once</div>          <div class="mnem"><span class="lbl">记</span>古代有些人的价值观里，“成 功”就是：一妻一屋(achieve的发音)。</div>          <div class="root"><span class="lbl">根</span>a + chieve(头) → 达到顶点</div>          <div class="zt"><span class="lbl">真题</span>Only through learning ceaselessly can we achieve our potential and live a better life in this rapidly developing society. 只有通过不断 学习，我们才能发挥潜力，在这个快速发展的社 会中过上更好的生活。(2015)</div>          <div class="fam"><span class="lbl">族</span>achievement n. 成就</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">fulfill</span>
+          <span class="ipa">/ful&#x27;f:1/</span>
+          <span class="pos"></span>
+          <span class="cn">实现，履行</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fulfill the order</div>          <div class="root"><span class="lbl">根</span>ful(满) + fill(填) → 填满 → 履行</div>          <div class="zt"><span class="lbl">真题</span>They think it more urgent to fulfill their social obligations. 他们认为履行社会责任更加 紧迫。(2019)</div>          <div class="fam"><span class="lbl">族</span>fulfillment n. 满足</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">fulfilling</span>
+          <span class="ipa">/ful&#x27;filı/</span>
+          <span class="pos"></span>
+          <span class="cn">令人满意的;让人感觉有意义的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>keep the work fulfilling</div>          <div class="root"><span class="lbl">根</span>fulfill + ing → 让人有成就感的</div>          <div class="zt"><span class="lbl">真题</span>The pursuit of a fulfilling career involves personal sacrifice. 追求令人满意的事业需要个 人的牺牲。(2020)</div>          <div class="fam"><span class="lbl">族</span>fulfill v. 履行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">full</span>
+          <span class="ipa">/ful/</span>
+          <span class="pos"></span>
+          <span class="cn">充满的;大量的；饱的；完全的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never leave a full drawer half full</div>          <div class="root"><span class="lbl">根</span>最基础的「满」</div>          <div class="zt"><span class="lbl">真题</span>The agents were able to utilize their full potential and experiences to build up the company. 这些代理人能够充分利用他们的潜 力和经验来建立公司。 例 My suitcase was full of books. 我的手提箱 装满了书。</div>          <div class="fam"><span class="lbl">族</span>fully adv. 完全地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">fill</span>
+          <span class="ipa">/fxl/</span>
+          <span class="pos"></span>
+          <span class="cn">(使)充满；填补；满足n. 填满……的量；吃 饱、喝足的量</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>An empty shelf would fill again</div>          <div class="root"><span class="lbl">根</span>full 的动词形式</div>          <div class="zt"><span class="lbl">真题</span>Factories are being digitalised, filled with new sensors and new computers to make them quicker.工厂正在被数字化，充满了新的传 感器和新的计算机，以加快生产速度。(2020)</div>          <div class="fam"><span class="lbl">族</span>filling n. 填充物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">empty</span>
+          <span class="ipa">/&#x27;empti/</span>
+          <span class="pos"></span>
+          <span class="cn">空的；空洞的；说话不算数的；空虚的 v. 使变空 (018)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>An empty shelf would fill again by morning</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：俺妹（em)扑 (p)他(t),结果扑了个空→空的。</div>          <div class="root"><span class="lbl">根</span>与 full 相对</div>          <div class="zt"><span class="lbl">真题</span>It gets one into the habit of making empty promises. 这会让人养成许下空头承诺 的习惯。</div>          <div class="fam"><span class="lbl">族</span>emptiness n. 空虚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">reality</span>
+          <span class="ipa">/ri&#x27;æləti/</span>
+          <span class="pos"></span>
+          <span class="cn">真实；现实；事实</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He spoke about reality</div>          <div class="mnem"><span class="lbl">记</span>这个单词的形容词real我们很 熟悉，reality就是“real(真的)”的名词，那就是 “现实”。</div>          <div class="root"><span class="lbl">根</span>real(真实) + ity</div>          <div class="zt"><span class="lbl">真题</span>You should try to restrain your ambition and be more realistic. 你应该努力抑制你的野 心，而且要更现实一些。</div>          <div class="fam"><span class="lbl">族</span>real adj. 真实的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">realize</span>
+          <span class="ipa">/&#x27;ri:əlaiz/</span>
+          <span class="pos"></span>
+          <span class="cn">使……成真，实现；理解，意识到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he did not realize that his own realm was shrinking</div>          <div class="root"><span class="lbl">根</span>real + ize(使动) → 使成为现实、意识到</div>          <div class="zt"><span class="lbl">真题</span>I came to realize online classes were merely a means to fulfil course requirements. 我开始意识到网络课程仅仅是满足课程要求的 一种手段。(2022)</div>          <div class="fam"><span class="lbl">族</span>realization n. 认识</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">realm</span>
+          <span class="ipa">/relm/</span>
+          <span class="pos"></span>
+          <span class="cn">领域；场所；王国</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his own realm was shrinking</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以解释为真（real) 男人(m 想成 man)。真正的男人就应该是在某 个“领域”做出成绩的人。 (019) 第一单元</div>          <div class="root"><span class="lbl">根</span>本义「王国」→ 领域、范围</div>          <div class="zt"><span class="lbl">真题</span>The precise function of sleep and its different stages remain largely in the realm of assumption.睡眠的确切功能及其不同的阶段 在很大程度上仍属于假设的领域。</div>          <div class="fam"><span class="lbl">族</span>kingdom n. 王国</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">accumulate</span>
+          <span class="ipa">/ə&#x27;kju:mjəleit/</span>
+          <span class="pos"></span>
+          <span class="cn">积累；积聚，堆积</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he had accumulated a great deal</div>          <div class="mnem"><span class="lbl">记</span>一再地（ac）可莫（cumu）晚了 (late)，四六级考试可莫准备晚了，要提前“积 累”词汇啊！</div>          <div class="root"><span class="lbl">根</span>ac + cumul(堆) + ate → 一点点堆积</div>          <div class="zt"><span class="lbl">真题</span>His goal was to reach the top, accumulate wealth and retire to a life of ease. 他的 目标是 到达高位，积累财富，然后退休过上安逸的生活。</div>          <div class="fam"><span class="lbl">族</span>accumulation n. 积累</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">calculate</span>
+          <span class="ipa">/&#x27;kælkjuleit/</span>
+          <span class="pos"></span>
+          <span class="cn">计算；估计;推测</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could calculate the value</div>          <div class="mnem"><span class="lbl">记</span>cal 发音类似“开”，cu 发音类似 “可”，在河南方言中相当于“很”(你长得可漂亮 了，即你长得很漂亮。)，late晚的。你准备在网 上相亲，6点开始QQ聊天，但是你开电脑晚了， 算错时间了→计算；估计。</div>          <div class="root"><span class="lbl">根</span>calcul(石子，古人用石子计数) + ate</div>          <div class="zt"><span class="lbl">真题</span>Restaurants should calculate the tips for customers. 餐馆应该为顾客计算小费。(2016)</div>          <div class="fam"><span class="lbl">族</span>calculation n. 计算</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">calendar</span>
+          <span class="ipa">/&#x27;kælındər/</span>
+          <span class="pos"></span>
+          <span class="cn">日历;历法</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He marked the calendar</div>          <div class="mnem"><span class="lbl">记</span>calendar 很像 calculate,“日历” 不就是计算年月日的东西吗？</div>          <div class="root"><span class="lbl">根</span>calend(每月第一天) + ar → 记日子的东西</div>          <div class="zt"><span class="lbl">真题</span>Chinese New Year is one of the most celebrated holidays on the Chinese calendar. 中 国的新年是中国日历上最著名的节日之一。</div>          <div class="fam"><span class="lbl">族</span>calendrical adj. 历法的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">assume</span>
+          <span class="ipa">/ə&#x27;suim/</span>
+          <span class="pos"></span>
+          <span class="cn">假定，假设；认为；承担(责任)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could only assume the best</div>          <div class="mnem"><span class="lbl">记</span>检察院一再地(as)起诉(su的 谐音)我(me)，为什么？他们“假设，认为”我有 罪啊。</div>          <div class="root"><span class="lbl">根</span>as(向) + sume(拿) → 先拿过来当真 → 假定</div>          <div class="zt"><span class="lbl">真题</span>Sleep may be more important than people assumed. 睡眠可能比人们想象的更重要。(2023)</div>          <div class="fam"><span class="lbl">族</span>assumption n. 假设</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">resume</span>
+          <span class="ipa">/&#x27;rezjuimei,rı&#x27;zu:m/</span>
+          <span class="pos"></span>
+          <span class="cn">摘要，概述，概要；简历 v. 重新开始；(中断 后)继续</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>resume work tomorrow</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：阿姨(re字母 谐音)输(su)给了我(me)。阿姨什么输给了我？ “简历”啊。我的简历写了五页，面试人都汗颜， 何况阿姨呢？阿姨是个不服输的人，输给我以 后，又“重新开始”了。</div>          <div class="root"><span class="lbl">根</span>re(再) + sume(拿) → 重新拿起 → 继续</div>          <div class="zt"><span class="lbl">真题</span>His resume lists jobs at companies like American Express, Disney and USA Networks. 他的简历中列出了在美国运通、迪士尼和美国 网络等公司的工作经历。</div>          <div class="fam"><span class="lbl">族</span>resumption n. 恢复</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">presume</span>
+          <span class="ipa">/prı&#x27;zju:m/</span>
+          <span class="pos"></span>
+          <span class="cn">假设，设想，推定，假定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He did not presume to know how it would end</div>          <div class="mnem"><span class="lbl">记</span>提前（pre）就输（su）给了我 (me)，比赛还没开始，你怎么可能就输给了我？ 只能是“假设，假定”。</div>          <div class="root"><span class="lbl">根</span>pre(预先) + sume(拿) → 预先认定 → 擅自</div>          <div class="fam"><span class="lbl">族</span>presumption n. 推测</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4~5 · Day 05</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

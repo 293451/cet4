@@ -1,0 +1,709 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 03 · The Rules of the Workshop</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 03 · 10/15 · Unit 3 第 61-90 词</div>
+  <h1>The Rules of the Workshop<span class="cn">车间的规矩</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-03.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2219"><p class="en"><span class="w" data-s="43" data-e="128">A</span> <span class="w" data-s="171" data-e="341">short</span> <span class="w target" data-s="384" data-e="768" title="军队，士兵,部队 v. 列队行进">troop</span> <span class="w" data-s="811" data-e="896">of</span> <span class="w" data-s="939" data-e="1280">workers</span> <span class="w" data-s="1323" data-e="1792">gathered</span> <span class="w" data-s="1835" data-e="1920">at</span> <span class="w" data-s="1963" data-e="2048">the</span> <span class="w" data-s="2091" data-e="2219">gate.</span></p><p class="zh">一小队工人聚集在门口。</p></div>
+<div class="pair" data-s0="2389" data-s1="5931"><p class="en"><span class="w" data-s="2389" data-e="3072">What</span> <span class="w" data-s="3115" data-e="3285">would</span> <span class="w target" data-s="3328" data-e="3883" title="">precede</span> <span class="w" data-s="3925" data-e="4096">the</span> <span class="w" data-s="4139" data-e="4224">morning</span> <span class="w" data-s="4267" data-e="4693">shift</span> <span class="w" data-s="4736" data-e="4992">were</span> <span class="w" data-s="5077" data-e="5205">a</span> <span class="w" data-s="5248" data-e="5333">few</span> <span class="w" data-s="5376" data-e="5589">simple</span> <span class="w" data-s="5632" data-e="5931">rules.</span></p><p class="zh">早班之前，是几条简单的规矩。</p></div>
+<div class="pair" data-s0="6229" data-s1="11819"><p class="en"><span class="w" data-s="6229" data-e="6869">The</span> <span class="w" data-s="6912" data-e="7083">whole</span> <span class="w target" data-s="7125" data-e="7467" title="">process</span> <span class="w" data-s="7509" data-e="7936">was</span> <span class="w" data-s="7979" data-e="8192">written</span> <span class="w" data-s="8235" data-e="8405">down</span> <span class="w" data-s="8448" data-e="8661">on</span> <span class="w" data-s="8704" data-e="8747">a</span> <span class="w" data-s="8789" data-e="8917">board,</span> <span class="w" data-s="9173" data-e="9429">and</span> <span class="w" data-s="9472" data-e="9771">the</span> <span class="w target" data-s="9813" data-e="10240" title="程序，步骤">procedure</span> <span class="w" data-s="10283" data-e="10496">had</span> <span class="w" data-s="10539" data-e="10667">not</span> <span class="w" data-s="10709" data-e="10923">changed</span> <span class="w" data-s="10965" data-e="11307">in</span> <span class="w" data-s="11349" data-e="11477">twenty</span> <span class="w" data-s="11520" data-e="11819">years.</span></p><p class="zh">整个过程写在一块板上，这套流程二十年没变过。</p></div>
+<div class="pair" data-s0="12681" data-s1="16265"><p class="en"><span class="w target" data-s="12681" data-e="12980" title="接近；进入；使用n.通道，通路，入径；(使 用或见到的)机会；权利">Access</span> <span class="w" data-s="13023" data-e="13193">to</span> <span class="w" data-s="13236" data-e="13321">the</span> <span class="w" data-s="13364" data-e="13449">tools</span> <span class="w" data-s="13492" data-e="13791">was</span> <span class="w" data-s="13833" data-e="14089">free,</span> <span class="w" data-s="14303" data-e="14559">but</span> <span class="w" data-s="14857" data-e="15071">only</span> <span class="w" data-s="15113" data-e="15284">to</span> <span class="w" data-s="15327" data-e="15412">those</span> <span class="w" data-s="15455" data-e="15711">who</span> <span class="w" data-s="15753" data-e="16009">signed</span> <span class="w" data-s="16052" data-e="16137">the</span> <span class="w" data-s="16180" data-e="16265">book.</span></p><p class="zh">工具是随便用的，但只有签名登记的人才能用。</p></div>
+<div class="pair" data-s0="16521" data-s1="20575"><p class="en"><span class="w" data-s="16521" data-e="17375">Anyone</span> <span class="w" data-s="17417" data-e="17545">who</span> <span class="w" data-s="17588" data-e="17673">tried</span> <span class="w" data-s="17716" data-e="17887">to</span> <span class="w target" data-s="17929" data-e="18143" title="超过，胜过">exceed</span> <span class="w" data-s="18185" data-e="18356">the</span> <span class="w" data-s="18399" data-e="18484">daily</span> <span class="w" data-s="18527" data-e="18868">limit</span> <span class="w" data-s="18911" data-e="19124">would</span> <span class="w" data-s="19167" data-e="19508">find</span> <span class="w" data-s="19551" data-e="19679">a</span> <span class="w" data-s="19721" data-e="19807">small</span> <span class="w" data-s="19849" data-e="20148">fine</span> <span class="w" data-s="20191" data-e="20575">instead.</span></p><p class="zh">谁想超出每日限额，换来的是一笔小额罚款。</p></div>
+<div class="pair" data-s0="21001" data-s1="24415"><p class="en"><span class="w target" data-s="21001" data-e="21257" title="超出，在……的那边 adv. 在另一边">Beyond</span> <span class="w" data-s="21300" data-e="21471">that</span> <span class="w" data-s="21513" data-e="21641">first</span> <span class="w" data-s="21684" data-e="22111">warning,</span> <span class="w" data-s="22239" data-e="22409">there</span> <span class="w" data-s="22751" data-e="22879">was</span> <span class="w" data-s="22921" data-e="23049">an</span> <span class="w target" data-s="23092" data-e="23348" title="超过；过度；过分；多余的量 adj. 额外的； 过量的">excess</span> <span class="w" data-s="23391" data-e="23604">charge</span> <span class="w" data-s="23647" data-e="23945">on</span> <span class="w" data-s="23988" data-e="24073">the</span> <span class="w" data-s="24116" data-e="24159">pay</span> <span class="w" data-s="24201" data-e="24415">slip.</span></p><p class="zh">越过第一次警告之后，工资单上会多一笔超额费用。</p></div>
+<div class="pair" data-s0="24585" data-s1="28596"><p class="en"><span class="w" data-s="24585" data-e="25183">Old</span> <span class="w" data-s="25225" data-e="25567">habits</span> <span class="w" data-s="25609" data-e="25695">had</span> <span class="w" data-s="25737" data-e="25823">to</span> <span class="w target" data-s="25865" data-e="26249" title="逐渐减弱；逐渐远离，逐渐远去；(头顶前部) 头发停止生长，变秃">recede,</span> <span class="w" data-s="26420" data-e="26548">and</span> <span class="w" data-s="26719" data-e="26975">the</span> <span class="w" data-s="27017" data-e="27316">manager</span> <span class="w" data-s="27359" data-e="27529">was</span> <span class="w" data-s="27572" data-e="27700">not</span> <span class="w" data-s="27743" data-e="27913">willing</span> <span class="w" data-s="27956" data-e="28127">to</span> <span class="w target" data-s="28169" data-e="28596" title="承认;让步；让与">concede.</span></p><p class="zh">旧习惯必须退去，而经理不愿意让步。</p></div>
+<div class="pair" data-s0="29419" data-s1="31595"><p class="en"><span class="w" data-s="29419" data-e="29547">So</span> <span class="w" data-s="29589" data-e="29717">they</span> <span class="w" data-s="29760" data-e="29888">reached</span> <span class="w" data-s="29931" data-e="30101">a</span> <span class="w target" data-s="30144" data-e="30528" title="妥协，折中 v. 妥协，折中；危及(安全等)">compromise</span> <span class="w" data-s="30571" data-e="30827">between</span> <span class="w" data-s="30869" data-e="31168">speed</span> <span class="w" data-s="31211" data-e="31424">and</span> <span class="w" data-s="31467" data-e="31595">care.</span></p><p class="zh">于是他们在速度与谨慎之间达成了折中。</p></div>
+<div class="pair" data-s0="31851" data-s1="35605"><p class="en"><span class="w target" data-s="31851" data-e="32789" title="成功，胜利；发财；成功的人(或事物)">Success,</span> <span class="w" data-s="33045" data-e="33344">he</span> <span class="w" data-s="33387" data-e="33557">said,</span> <span class="w" data-s="33813" data-e="33941">would</span> <span class="w" data-s="34283" data-e="34411">not</span> <span class="w" data-s="34453" data-e="34624">come</span> <span class="w" data-s="34667" data-e="34923">from</span> <span class="w" data-s="34965" data-e="35093">one</span> <span class="w" data-s="35136" data-e="35307">big</span> <span class="w" data-s="35349" data-e="35605">push.</span></p><p class="zh">他说，成功不会来自一次猛冲。</p></div>
+<div class="pair" data-s0="35819" data-s1="39104"><p class="en"><span class="w target" data-s="35819" data-e="36800" title="达到目的；成功；接替，继任；随后出现">Succeeding</span> <span class="w" data-s="36843" data-e="37013">meant</span> <span class="w" data-s="37056" data-e="37397">repeating</span> <span class="w" data-s="37440" data-e="37653">small</span> <span class="w" data-s="37696" data-e="38208">acts</span> <span class="w" data-s="38251" data-e="38677">until</span> <span class="w" data-s="38720" data-e="38891">they</span> <span class="w" data-s="38933" data-e="39104">stuck.</span></p><p class="zh">所谓成功，就是重复小的动作，直到它们固定下来。</p></div>
+<div class="pair" data-s0="39793" data-s1="42268"><p class="en"><span class="w" data-s="39793" data-e="39879">In</span> <span class="w" data-s="39921" data-e="40092">quick</span> <span class="w target" data-s="40135" data-e="40647" title="连续；继位">succession,</span> <span class="w" data-s="40817" data-e="41031">the</span> <span class="w" data-s="41159" data-e="41457">workers</span> <span class="w" data-s="41500" data-e="41671">learned</span> <span class="w" data-s="41713" data-e="41927">each</span> <span class="w" data-s="41969" data-e="42268">task.</span></p><p class="zh">工人们一个接一个地迅速学会了每项任务。</p></div>
+<div class="pair" data-s0="42567" data-s1="48924"><p class="en"><span class="w" data-s="42567" data-e="43335">Each</span> <span class="w" data-s="43377" data-e="43548">young</span> <span class="w target" data-s="43591" data-e="44060" title="继承者，接任者；后续的事物">successor</span> <span class="w" data-s="44103" data-e="44273">to</span> <span class="w" data-s="44316" data-e="44401">an</span> <span class="w" data-s="44444" data-e="44529">older</span> <span class="w" data-s="44572" data-e="44785">hand</span> <span class="w" data-s="44828" data-e="45212">was</span> <span class="w" data-s="45468" data-e="45724">paired</span> <span class="w" data-s="45767" data-e="45895">with</span> <span class="w" data-s="45937" data-e="46023">a</span> <span class="w" data-s="46065" data-e="46279">teacher,</span> <span class="w" data-s="46449" data-e="46663">and</span> <span class="w" data-s="46833" data-e="47004">those</span> <span class="w" data-s="47047" data-e="47217">who</span> <span class="w target" data-s="47260" data-e="47516" title="擅长,善于；突出">excel</span> <span class="w" data-s="47559" data-e="47687">at</span> <span class="w" data-s="47729" data-e="47772">their</span> <span class="w" data-s="47815" data-e="47943">craft</span> <span class="w" data-s="47985" data-e="48583">taught</span> <span class="w" data-s="48625" data-e="48753">the</span> <span class="w" data-s="48796" data-e="48924">rest.</span></p><p class="zh">每个接替老师傅的年轻继任者都配了一位师傅，而那些手艺出众的人则去教其余的人。</p></div>
+<div class="pair" data-s0="49137" data-s1="50844"><p class="en"><span class="w" data-s="49137" data-e="49820">Then</span> <span class="w" data-s="49863" data-e="50076">came</span> <span class="w" data-s="50119" data-e="50332">the</span> <span class="w" data-s="50375" data-e="50631">hardest</span> <span class="w" data-s="50673" data-e="50844">part.</span></p><p class="zh">接下来是最难的部分。</p></div>
+<div class="pair" data-s0="51492" data-s1="52687"><p class="en"><span class="w" data-s="51492" data-e="51577">The</span> <span class="w" data-s="51620" data-e="51748">floor</span> <span class="w" data-s="51791" data-e="52047">was</span> <span class="w" data-s="52089" data-e="52217">not</span> <span class="w target" data-s="52260" data-e="52687" title="静止的，静态的n.静电">static.</span></p><p class="zh">地面不是静止的。</p></div>
+<div class="pair" data-s0="52857" data-s1="54948"><p class="en"><span class="w" data-s="52857" data-e="53028">A</span> <span class="w" data-s="53412" data-e="53753">machine</span> <span class="w" data-s="53796" data-e="54052">does</span> <span class="w" data-s="54095" data-e="54223">not</span> <span class="w target" data-s="54265" data-e="54393" title="行动；移动；活动；改变v.(使)改变位置，移 动；进步，进展；感动">move</span> <span class="w" data-s="54436" data-e="54649">on</span> <span class="w" data-s="54692" data-e="54777">its</span> <span class="w" data-s="54820" data-e="54948">own.</span></p><p class="zh">机器不会自己动。</p></div>
+<div class="pair" data-s0="55204" data-s1="60751"><p class="en"><span class="w target" data-s="55204" data-e="56057" title="运动；移动v.(以头或手)做动作，示意">Motion</span> <span class="w" data-s="56100" data-e="56228">needs</span> <span class="w" data-s="56271" data-e="56441">a</span> <span class="w target" data-s="56484" data-e="56740" title="动机；原因；目的">motive,</span> <span class="w" data-s="56911" data-e="57167">and</span> <span class="w" data-s="57295" data-e="57593">a</span> <span class="w" data-s="57636" data-e="57807">wage</span> <span class="w" data-s="57849" data-e="58063">alone</span> <span class="w" data-s="58105" data-e="58660">rarely</span> <span class="w target" data-s="58703" data-e="59087" title="达到目的；成功；接替，继任；随后出现">succeeds</span> <span class="w" data-s="59129" data-e="59343">in</span> <span class="w target" data-s="59385" data-e="59769" title="激发；激励；成为……的动机">motivating</span> <span class="w" data-s="59812" data-e="60153">anyone</span> <span class="w" data-s="60196" data-e="60495">for</span> <span class="w" data-s="60537" data-e="60751">long.</span></p><p class="zh">运动需要动机，而单靠工资很少能长久地激励任何人。</p></div>
+<div class="pair" data-s0="61351" data-s1="66001"><p class="en"><span class="w" data-s="61351" data-e="61479">So</span> <span class="w" data-s="61521" data-e="61692">he</span> <span class="w" data-s="61735" data-e="61820">began</span> <span class="w" data-s="61863" data-e="62076">to</span> <span class="w target" data-s="62119" data-e="62375" title="移开；拿开；排除(污渍、不愉快的事物等)；使 消失；脱去(衣服等);摘下；免除，解除(职务等)">remove</span> <span class="w" data-s="62417" data-e="62588">the</span> <span class="w" data-s="62631" data-e="62801">dull</span> <span class="w" data-s="62844" data-e="62929">parts,</span> <span class="w" data-s="63228" data-e="63484">and</span> <span class="w" data-s="63697" data-e="63825">used</span> <span class="w target" data-s="63868" data-e="64252" title="情感，感情；情绪">emotion</span> <span class="w" data-s="64295" data-e="64508">as</span> <span class="w" data-s="64551" data-e="64636">a</span> <span class="w" data-s="64679" data-e="64764">tool</span> <span class="w" data-s="64807" data-e="65276">rather</span> <span class="w" data-s="65404" data-e="65703">than</span> <span class="w" data-s="65745" data-e="65831">a</span> <span class="w" data-s="65873" data-e="66001">problem.</span></p><p class="zh">于是他开始去掉那些枯燥的环节，把情绪当作工具而不是问题。</p></div>
+<div class="pair" data-s0="66343" data-s1="71548"><p class="en"><span class="w" data-s="66343" data-e="66556">It</span> <span class="w" data-s="66897" data-e="67111">was</span> <span class="w target" data-s="67153" data-e="67409" title="合理的;理性的;明智的">rational</span> <span class="w" data-s="67452" data-e="67665">to</span> <span class="w" data-s="67708" data-e="67836">do</span> <span class="w" data-s="67879" data-e="68007">so,</span> <span class="w" data-s="68177" data-e="68391">and</span> <span class="w" data-s="68476" data-e="68817">the</span> <span class="w target" data-s="68860" data-e="69116" title="比；比率；比例">ratio</span> <span class="w" data-s="69159" data-e="69415">of</span> <span class="w" data-s="69457" data-e="69585">finished</span> <span class="w" data-s="69628" data-e="69841">work</span> <span class="w" data-s="69884" data-e="70097">to</span> <span class="w" data-s="70140" data-e="70439">wasted</span> <span class="w" data-s="70481" data-e="70609">time</span> <span class="w" data-s="70652" data-e="71036">rose</span> <span class="w" data-s="71079" data-e="71548">sharply.</span></p><p class="zh">这样做是理性的，成品与浪费时间的比率大幅上升。</p></div>
+<div class="pair" data-s0="72202" data-s1="74762"><p class="en"><span class="w" data-s="72202" data-e="72287">He</span> <span class="w" data-s="72330" data-e="72458">kept</span> <span class="w" data-s="72500" data-e="72628">a</span> <span class="w target" data-s="72671" data-e="72884" title="遥远的；疏远的；远程的；偏远的">remote</span> <span class="w" data-s="72927" data-e="73098">corner</span> <span class="w" data-s="73140" data-e="73396">of</span> <span class="w" data-s="73439" data-e="73482">the</span> <span class="w" data-s="73524" data-e="73823">workshop</span> <span class="w" data-s="73866" data-e="74122">as</span> <span class="w" data-s="74164" data-e="74250">a</span> <span class="w" data-s="74292" data-e="74378">place</span> <span class="w" data-s="74420" data-e="74591">to</span> <span class="w" data-s="74634" data-e="74762">think.</span></p><p class="zh">他把车间一个偏僻的角落留作思考的地方。</p></div>
+<div class="pair" data-s0="75060" data-s1="77919"><p class="en"><span class="w target" data-s="75060" data-e="76127" title="促进，提升；促销；推动">Promote</span> <span class="w" data-s="76170" data-e="76298">one</span> <span class="w" data-s="76340" data-e="76468">of</span> <span class="w" data-s="76511" data-e="76596">them,</span> <span class="w" data-s="76810" data-e="76980">and</span> <span class="w" data-s="77066" data-e="77236">the</span> <span class="w" data-s="77279" data-e="77364">others</span> <span class="w" data-s="77407" data-e="77663">would</span> <span class="w" data-s="77706" data-e="77919">follow.</span></p><p class="zh">提拔他们中的一个，其余的人就会跟上。</p></div>
+<div class="pair" data-s0="78175" data-s1="81418"><p class="en"><span class="w target" data-s="78175" data-e="79199" title="行为，行动；功能，作用">Action,</span> <span class="w" data-s="79370" data-e="79540">he</span> <span class="w" data-s="79626" data-e="79796">said,</span> <span class="w" data-s="80010" data-e="80650">always</span> <span class="w" data-s="80692" data-e="81204">beats</span> <span class="w" data-s="81247" data-e="81418">talk.</span></p><p class="zh">他说，行动永远胜过空谈。</p></div>
+<div class="pair" data-s0="81716" data-s1="84575"><p class="en"><span class="w target" data-s="81716" data-e="82399" title="表现，举止">Behave</span> <span class="w" data-s="82442" data-e="82698">as</span> <span class="w" data-s="82740" data-e="82783">if</span> <span class="w" data-s="82826" data-e="82954">the</span> <span class="w" data-s="82996" data-e="83082">work</span> <span class="w" data-s="83124" data-e="83551">matters,</span> <span class="w" data-s="83679" data-e="83892">and</span> <span class="w" data-s="84063" data-e="84234">stay</span> <span class="w target" data-s="84276" data-e="84575" title="积极的">active.</span></p><p class="zh">表现得像这份工作很重要，并保持主动。</p></div>
+<div class="pair" data-s0="84959" data-s1="87391"><p class="en"><span class="w" data-s="84959" data-e="85087">Then</span> <span class="w target" data-s="85130" data-e="86026" title="使活动，激活">activate</span> <span class="w" data-s="86068" data-e="86196">the</span> <span class="w" data-s="86239" data-e="86324">same</span> <span class="w" data-s="86367" data-e="86666">rule</span> <span class="w" data-s="86708" data-e="86922">in</span> <span class="w" data-s="86964" data-e="87050">your</span> <span class="w" data-s="87092" data-e="87220">own</span> <span class="w" data-s="87263" data-e="87391">head.</span></p><p class="zh">然后，把同一条规则在你自己的脑子里激活。</p></div></div>
+
+<h2>今日单词 · 31</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">troop</span>
+          <span class="ipa">/tru:p/</span>
+          <span class="pos"></span>
+          <span class="cn">军队，士兵,部队 v. 列队行进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A short troop of workers gathered</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“true（真的）p (趴)”。想象一群蚂蚁，真的趴在地上→列队 行进。</div>          <div class="root"><span class="lbl">根</span>本义「一群」→ 部队、一群</div>          <div class="zt"><span class="lbl">真题</span>The Olympic went on to serve as a hospital ship and troop transport in World War I. 在第一次世界大战中，奥林匹克号继续 充当一艘医疗船和军队运输船。</div>          <div class="fam"><span class="lbl">族</span>troops n. 军队</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">precede</span>
+          <span class="ipa">/pri&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>What would precede the morning shift</div>          <div class="mnem"><span class="lbl">记</span>pre(在前面)+ced(走)十e→在 前面走→领先，在……之前发生。</div>          <div class="root"><span class="lbl">根</span>pre(前) + cede(走) → 走在前面</div>          <div class="zt"><span class="lbl">真题</span>The hotel bust(不景气)，like most busts， was preceded by a breathtaking boom. 就像大 多数破产一样，酒店破产之前也出现了惊人的 繁荣。</div>          <div class="fam"><span class="lbl">族</span>precedent n. 先例</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">process</span>
+          <span class="ipa">/&#x27;pra:ses/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The whole process was written down</div>          <div class="root"><span class="lbl">根</span>pro(向前) + cess(走) → 一步步往前走</div>          <div class="zt"><span class="lbl">真题</span>It has a chemical processing plant. 它有 一个化学加工厂。</div>          <div class="fam"><span class="lbl">族</span>proceed v. 行进</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">procedure</span>
+          <span class="ipa">/prə&#x27;si:dzə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">程序，步骤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the procedure had not changed</div>          <div class="mnem"><span class="lbl">记</span>pro(向前，在前)+ ced(走)+ ure(名词后缀)→在前面走的过程→那走过的 过程，走过的每一步不就是“程序，步骤”的意 思吗？</div>          <div class="root"><span class="lbl">根</span>pro + ced(走) + ure → 走法、步骤</div>          <div class="zt"><span class="lbl">真题</span>The proposal may include the topic, aim, procedure and selection of contestants. 提 案可能包括主题、目标、程序和选手的选拔。 (2021)</div>          <div class="fam"><span class="lbl">族</span>procedural adj. 程序性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">access</span>
+          <span class="ipa">/&#x27;ækses/</span>
+          <span class="pos"></span>
+          <span class="cn">接近；进入；使用n.通道，通路，入径；(使 用或见到的)机会；权利</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Access to the tools was free</div>          <div class="root"><span class="lbl">根</span>ac(向) + cess(走) → 走近 → 进入的权利</div>          <div class="zt"><span class="lbl">真题</span>Human development is based not only on innate(天生的) biological states,but also on patterns of access to social knowledge. 人类的 发展不仅基于先天的生物状态，也基于获取社 会知识的模式。</div>          <div class="fam"><span class="lbl">族</span>accessible adj. 可进入的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">exceed</span>
+          <span class="ipa">/ık&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn">超过，胜过</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to exceed the daily limit</div>          <div class="mnem"><span class="lbl">记</span>ex表示“往外”，ceed 表示 “走”。往外走就是青出于蓝而胜于蓝啊→超</div>          <div class="root"><span class="lbl">根</span>ex(出) + ceed(走) → 走出界限</div>          <div class="zt"><span class="lbl">真题</span>Foreign students holding F visa can extend it for three months one time, but the total extension cannot exceed one year. 留学生 持F签证，一次只能延长三个月，但累计不能超 过一年。</div>          <div class="fam"><span class="lbl">族</span>excess n. 过量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">beyond</span>
+          <span class="ipa">/br&#x27;ja:nd/</span>
+          <span class="pos"></span>
+          <span class="cn">超出，在……的那边 adv. 在另一边</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Beyond that first warning</div>          <div class="mnem"><span class="lbl">记</span>Beyond 乐队我们还是很熟悉的。</div>          <div class="root"><span class="lbl">根</span>be + yond(那边) → 在……那一边</div>          <div class="zt"><span class="lbl">真题</span>They&#x27;re beyond frustrated and hoping for a solution soon. 他们非常沮丧，希望尽快找到 解决方案。(2018)</div>          <div class="fam"><span class="lbl">族</span>常用搭配 beyond doubt</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">excess</span>
+          <span class="ipa">/ık&#x27;ses, &#x27;ekses/</span>
+          <span class="pos"></span>
+          <span class="cn">超过；过度；过分；多余的量 adj. 额外的； 过量的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was an excess charge</div>          <div class="mnem"><span class="lbl">记</span>ex表示“往外”，ce表示“走”， 那就是往外走。吃过自助餐吗？吃到往外走为 止，那就是“过多的，过量的”。</div>          <div class="root"><span class="lbl">根</span>exceed 的名词 → 超出部分</div>          <div class="zt"><span class="lbl">真题</span>If they generate more power than the home is using, the excess flows into the utility&#x27;s power grid(电网). 如果它们产生的电力超过家 庭使用的电力，多余的电力就会流入公用事业 公司的电网。</div>          <div class="fam"><span class="lbl">族</span>excessive adj. 过度的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">recede</span>
+          <span class="ipa">/rr&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn">逐渐减弱；逐渐远离，逐渐远去；(头顶前部) 头发停止生长，变秃</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Old habits had to recede</div>          <div class="mnem"><span class="lbl">记</span>re表示“回去”;ce(撤)走；ssion 是名词后缀。连在一起理解为：往回走。经济 形势往回走，什么意思？→衰退。</div>          <div class="root"><span class="lbl">根</span>re(回) + cede(走) → 往回走、退去</div>          <div class="zt"><span class="lbl">真题</span>They give priority to relationships, as careers often recede. 他们优先考虑人际关系， 职业往往退居其次。(2017) 表示“回去”，比如说return)十走(ce)+的(de)。 往回走的，渐行渐远，那就是“逐渐远去，逐 渐远离”。</div>          <div class="fam"><span class="lbl">族</span>recession n. 衰退</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">concede</span>
+          <span class="ipa">/kən&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn">承认;让步；让与</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not willing to concede</div>          <div class="mnem"><span class="lbl">记</span>con 表示“一起，都”；ce发音似 “撤(走)”。都撤退了，也就是“让步”。</div>          <div class="root"><span class="lbl">根</span>con(一起) + cede(走) → 让一步</div>          <div class="zt"><span class="lbl">真题</span>Even the strongest supporters of the reform movement concede that the task of raising achievement among disadvantaged students is hard work. 即使是改革运动最坚定的支持者 也承认，提高弱势学生的成绩是艰巨的任务。</div>          <div class="fam"><span class="lbl">族</span>concession n. 让步</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">compromise</span>
+          <span class="ipa">/&#x27;kpmprəmaiz/</span>
+          <span class="pos"></span>
+          <span class="cn">妥协，折中 v. 妥协，折中；危及(安全等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they reached a compromise</div>          <div class="mnem"><span class="lbl">记</span>所有的(com)都许诺（promise) 给你。要双方都“妥协”才能达成共同的许诺。</div>          <div class="root"><span class="lbl">根</span>com(共同) + promise(承诺) → 双方各自承诺让步</div>          <div class="zt"><span class="lbl">真题</span>There are a couple of ways to compromise on the issue. 在这个问题上有几种折中的方法。 (2023)</div>          <div class="fam"><span class="lbl">族</span>compromising adj. 有损名誉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">success</span>
+          <span class="ipa">/sək&#x27;ses/</span>
+          <span class="pos"></span>
+          <span class="cn">成功，胜利；发财；成功的人(或事物)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Success would not come from one big push</div>          <div class="root"><span class="lbl">根</span>suc(下面) + cess(走) → 跟在后面走出来的结果</div>          <div class="zt"><span class="lbl">真题</span>Her way to success was full of pains and frustrations. 她的成功之路中充满了痛苦和沮丧。</div>          <div class="fam"><span class="lbl">族</span>succeed v. 成功</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">succeed</span>
+          <span class="ipa">/sək&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn">达到目的；成功；接替，继任；随后出现</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>succeeds in motivating anyone</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以拆分为：往回(re excellence will allow their children equal chances to succeed in the future. 移民父母认为，优秀的 学术成绩将使他们的孩子在未来拥有平等的成 功机会。(2018)</div>          <div class="root"><span class="lbl">根</span>suc + ceed(走) → 接着走 → 成功、继任</div>          <div class="zt"><span class="lbl">真题</span>Immigrant parents believe that academic</div>          <div class="fam"><span class="lbl">族</span>success n. 成功</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">succession</span>
+          <span class="ipa">/sək&#x27;se∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">连续；继位</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In quick succession</div>          <div class="mnem"><span class="lbl">记</span>suc表示“往上”；ce表示“走”； ssion是名词后缀，连到一起就是往上走；是不 是“连续”？该单词也可以从成功(success)来记 忆。作为一个王子，最成功的事情就是能够继 承王位，所以 succession 就是“继位”。</div>          <div class="root"><span class="lbl">根</span>succeed 的名词 → 一个接一个</div>          <div class="fam"><span class="lbl">族</span>successive adj. 连续的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">successor</span>
+          <span class="ipa">/sək&#x27;sesə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">继承者，接任者；后续的事物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Each young successor to an older hand</div>          <div class="root"><span class="lbl">根</span>succeed + or(人) → 接任的人</div>          <div class="zt"><span class="lbl">真题</span>This “successor principle” is part of the foundation of our numerical(数字的)cognition， but requires extensive practice to understand. 这个“继承者原则”是我们数字认知基础的一部 分，但需要广泛的实践才能理解。</div>          <div class="fam"><span class="lbl">族</span>predecessor n. 前任</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">excel</span>
+          <span class="ipa">/ık&#x27;sel/</span>
+          <span class="pos"></span>
+          <span class="cn">擅长,善于；突出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>those who excel at their craft</div>          <div class="mnem"><span class="lbl">记</span>这个单词的形容词我们非常熟 悉，是 excellent(极好的，杰出的);excel 是它的 动词，那就是“擅长，善于”的意思；常见的搭配 是 excel in。</div>          <div class="root"><span class="lbl">根</span>ex(出) + cel(高) → 高出众人</div>          <div class="zt"><span class="lbl">真题</span>So what they believe is that their children must excel and beat their white peers in academic settings so they have the same chances to excel later.所以他们相信，他们的孩子必须在学术环 境中表现出色，打败白人同龄人，这样他们以后 才有同样的机会出类拔萃。(2018)</div>          <div class="fam"><span class="lbl">族</span>excellent adj. 优秀的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">move</span>
+          <span class="ipa">/mu:v/</span>
+          <span class="pos"></span>
+          <span class="cn">行动；移动；活动；改变v.(使)改变位置，移 动；进步，进展；感动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A machine does not move on its own</div>          <div class="root"><span class="lbl">根</span>最基础的「动」</div>          <div class="zt"><span class="lbl">真题</span>This is how society moves forward. 这就 是社会进步的方式。(2018)</div>          <div class="fam"><span class="lbl">族</span>motion n. 运动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">motion</span>
+          <span class="ipa">/&#x27;məu∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">运动；移动v.(以头或手)做动作，示意</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Motion needs a motive</div>          <div class="root"><span class="lbl">根</span>mot(动) + ion(名词)</div>          <div class="zt"><span class="lbl">真题</span>The shaking is caused by the motion of two plates. 震动是由两个板块的运动引起的。 第一单元</div>          <div class="fam"><span class="lbl">族</span>move v. 移动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">static</span>
+          <span class="ipa">/&#x27;stætık/</span>
+          <span class="pos"></span>
+          <span class="cn">静止的，静态的n.静电</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The floor was not static.</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分（sta）类似stay (待着)，那待在那里，就是“静止的”。</div>          <div class="root"><span class="lbl">根</span>stat(站) + ic → 站着不动的</div>          <div class="fam"><span class="lbl">族</span>stationary adj. 静止的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">motive</span>
+          <span class="ipa">/&#x27;məutiv/</span>
+          <span class="pos"></span>
+          <span class="cn">动机；原因；目的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Motion needs a motive</div>          <div class="mnem"><span class="lbl">记</span>使你动(move)起来的东西是什 么？→动机。</div>          <div class="root"><span class="lbl">根</span>mot(动) + ive → 让人动起来的东西</div>          <div class="zt"><span class="lbl">真题</span>You have drawn hostile conclusions about unseen people and their motives. 你对看不见的 人及其动机得出了充满敌意的结论。</div>          <div class="fam"><span class="lbl">族</span>motivate v. 激发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">motivate</span>
+          <span class="ipa">/&#x27;məutiveit/</span>
+          <span class="pos"></span>
+          <span class="cn">激发；激励；成为……的动机</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rarely succeeds in motivating anyone</div>          <div class="root"><span class="lbl">根</span>motive + ate(动词)</div>          <div class="zt"><span class="lbl">真题</span>Effective measures should be taken to motivate employees to set up offices at home. 应采取有效措施激励员工居家办公。(2021)</div>          <div class="fam"><span class="lbl">族</span>motivation n. 动机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">remove</span>
+          <span class="ipa">/rı&#x27;mu:v/</span>
+          <span class="pos"></span>
+          <span class="cn">移开；拿开；排除(污渍、不愉快的事物等)；使 消失；脱去(衣服等);摘下；免除，解除(职务等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he began to remove the dull parts</div>          <div class="root"><span class="lbl">根</span>re(回) + move(动) → 移走</div>          <div class="zt"><span class="lbl">真题</span>How boundaries can be removed between arts and science disciplines？如何消除艺术和科 学学科之间的界限？(2021)</div>          <div class="fam"><span class="lbl">族</span>removal n. 移除</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">emotion</span>
+          <span class="ipa">/r&#x27;məu∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">情感，感情；情绪</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>used emotion as a tool</div>          <div class="mnem"><span class="lbl">记</span>e(出去)十 motion(运动)→把 你内心的运动表示出来。通过什么表示出来？ →情感，情绪。</div>          <div class="root"><span class="lbl">根</span>e(向外) + motion(动) → 内心向外涌动的</div>          <div class="zt"><span class="lbl">真题</span>Above all, it&#x27;s the emotions one experiences in teaching that facilitate learning. 最重要的是，人 们在教学中体验到的情感促进了学习。(2018) (011)</div>          <div class="fam"><span class="lbl">族</span>emotional adj. 情绪的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">rational</span>
+          <span class="ipa">/&#x27;ræ∫nəl/</span>
+          <span class="pos"></span>
+          <span class="cn">合理的;理性的;明智的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was rational to do so</div>          <div class="mnem"><span class="lbl">记</span>一个人总用比例（ratio）来说 话，是不是很“理性的”？</div>          <div class="root"><span class="lbl">根</span>ratio(计算) + nal → 能算得清的</div>          <div class="fam"><span class="lbl">族</span>rationale n. 理由</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">ratio</span>
+          <span class="ipa">/&#x27;rerʃiəu/</span>
+          <span class="pos"></span>
+          <span class="cn">比；比率；比例</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ratio of finished work to wasted time</div>          <div class="root"><span class="lbl">根</span>本义「计算」→ 比率</div>          <div class="zt"><span class="lbl">真题</span>The ratio of the hottest position can arrive at 5,000：1. 最热门职位的(报录)比例 可以达到5000：1。</div>          <div class="fam"><span class="lbl">族</span>rate n. 比率</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">remote</span>
+          <span class="ipa">/ri&#x27;məut/</span>
+          <span class="pos"></span>
+          <span class="cn">遥远的；疏远的；远程的；偏远的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He kept a remote corner</div>          <div class="mnem"><span class="lbl">记</span>re前缀意思是“重复，回去”， mote相当于move(移动)，往回移动，那就越来 越远了→遥远的；疏远的。</div>          <div class="root"><span class="lbl">根</span>re(回) + mote(动) → 退到远处</div>          <div class="zt"><span class="lbl">真题</span>Your university is selecting some students to teach kids in remote rural areas during the coming vacation. 你们大学正在选拔 一些学生，在即将到来的假期去偏远的农村地 区教孩子们。(2022)</div>          <div class="fam"><span class="lbl">族</span>remotely adv. 遥远地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">promote</span>
+          <span class="ipa">/prə&#x27;məut/</span>
+          <span class="pos"></span>
+          <span class="cn">促进，提升；促销；推动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Promote one of them</div>          <div class="mnem"><span class="lbl">记</span>pro往前，mote相当于 move (移动)，使你往前移动→促进，提升。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + mote(动) → 往前推 → 提升、促进</div>          <div class="zt"><span class="lbl">真题</span>More universities will be seeking heads with international experience to promote international programs.更多大学将寻找具有 国际经验的负责人来推广国际项目。</div>          <div class="fam"><span class="lbl">族</span>promotion n. 提升</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">action</span>
+          <span class="ipa">/&#x27;æk∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">行为，行动；功能，作用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Action always beats talk</div>          <div class="root"><span class="lbl">根</span>act(做) + ion</div>          <div class="zt"><span class="lbl">真题</span>Watching the agent solve problems allows them to see their knowledge put into action.观看代理解决问题，使他们得以见证其 知识付诸实践。</div>          <div class="fam"><span class="lbl">族</span>act v. 行动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">behave</span>
+          <span class="ipa">/bi&#x27;heiv/</span>
+          <span class="pos"></span>
+          <span class="cn">表现，举止</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Behave as if the work matters</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：是（be）有 (have)，一个人原本就拥有的，本身固有的，比 如我们常说“人之初，性本善，性相近，习相远。” 保持善良，远离恶习，君子气度，行为得体，就是 behave的本原→表现，举止。</div>          <div class="root"><span class="lbl">根</span>be(使) + have(持有) → 使自己持有某种举止</div>          <div class="zt"><span class="lbl">真题</span>During deep sleep, the participants&#x27; brains behaved in a similar manner seen in birds and dolphins. 在深度睡眠期间，参与者的 大脑表现出类似于鸟类和海豚的行为。(2017)</div>          <div class="fam"><span class="lbl">族</span>behaviour n. 行为</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">active</span>
+          <span class="ipa">/&#x27;æktiv/</span>
+          <span class="pos"></span>
+          <span class="cn">积极的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stay active</div>          <div class="mnem"><span class="lbl">记</span>act 行动，ive 是形容词后缀，表 示“……的”，行动的就是“积极的”。</div>          <div class="root"><span class="lbl">根</span>act(做) + ive → 在做的</div>          <div class="zt"><span class="lbl">真题</span>Keep your brain busy and working, and also get physically active, because exercise is a known brain booster.让你的大脑保持忙碌和 工作的同时，也要积极锻炼身体，因为众所周 知，体育锻炼是大脑的助推器。</div>          <div class="fam"><span class="lbl">族</span>activity n. 活动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">31</span>
+          <span class="word">activate</span>
+          <span class="ipa">/&#x27;æktiveit/</span>
+          <span class="pos"></span>
+          <span class="cn">使活动，激活</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>activate the same rule in your own head</div>          <div class="mnem"><span class="lbl">记</span>activity n. 活动，活跃；activate 可以理解为“使活动，激活”。</div>          <div class="root"><span class="lbl">根</span>active + ate(使动) → 使活跃起来</div>          <div class="zt"><span class="lbl">真题</span>Wireless devices will transmit signals so as to activate the alarm once something wrong is detected. 一旦检测到异常情况，无线设备将 发送信号以激活警报。(2016) (012)</div>          <div class="fam"><span class="lbl">族</span>activation n. 激活</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 03</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

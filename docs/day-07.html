@@ -1,0 +1,685 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 07 · The Lighthouse Keeper</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 07 · 10/19 · Unit 6~7 第 181-210 词</div>
+  <h1>The Lighthouse Keeper<span class="cn">守灯塔的人</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-07.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2475"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="384">keeper</span> <span class="w" data-s="427" data-e="555">had</span> <span class="w" data-s="597" data-e="725">to</span> <span class="w target" data-s="768" data-e="939" title="收养；采纳；接受">adopt</span> <span class="w" data-s="981" data-e="1152">a</span> <span class="w" data-s="1195" data-e="1451">routine</span> <span class="w" data-s="1493" data-e="1792">no</span> <span class="w" data-s="1835" data-e="1963">one</span> <span class="w" data-s="2005" data-e="2091">else</span> <span class="w" data-s="2133" data-e="2261">would</span> <span class="w" data-s="2304" data-e="2475">want.</span></p><p class="zh">守塔人不得不养成一种别人不愿要的作息。</p></div>
+<div class="pair" data-s0="2688" data-s1="8576"><p class="en"><span class="w" data-s="2688" data-e="3029">In</span> <span class="w" data-s="3328" data-e="3456">his</span> <span class="w" data-s="3499" data-e="3627">free</span> <span class="w" data-s="3669" data-e="3925">hours</span> <span class="w" data-s="3968" data-e="4267">he</span> <span class="w" data-s="4309" data-e="4437">had</span> <span class="w" data-s="4480" data-e="4608">little</span> <span class="w" data-s="4651" data-e="4821">to</span> <span class="w target" data-s="4864" data-e="5077" title="娱乐；逗乐，逗笑">amuse</span> <span class="w" data-s="5120" data-e="5333">him,</span> <span class="w" data-s="5504" data-e="5632">and</span> <span class="w" data-s="5760" data-e="6016">the</span> <span class="w" data-s="6059" data-e="6144">sea</span> <span class="w" data-s="6187" data-e="6357">could</span> <span class="w" data-s="6400" data-e="6571">still</span> <span class="w target" data-s="6613" data-e="6997" title="使吃惊">amaze</span> <span class="w" data-s="7040" data-e="7125">a</span> <span class="w" data-s="7168" data-e="7211">man</span> <span class="w" data-s="7253" data-e="7424">who</span> <span class="w" data-s="7467" data-e="7595">had</span> <span class="w" data-s="7637" data-e="7723">watched</span> <span class="w" data-s="7765" data-e="7979">it</span> <span class="w" data-s="8021" data-e="8149">for</span> <span class="w" data-s="8192" data-e="8448">forty</span> <span class="w" data-s="8491" data-e="8576">years.</span></p><p class="zh">空闲时没什么能让他消遣，而大海仍能让一个看了它四十年的人惊叹。</p></div>
+<div class="pair" data-s0="9003" data-s1="13312"><p class="en"><span class="w" data-s="9003" data-e="9088">A</span> <span class="w" data-s="9131" data-e="9301">sudden</span> <span class="w" data-s="9344" data-e="9643">wave</span> <span class="w" data-s="9685" data-e="9899">might</span> <span class="w target" data-s="9941" data-e="10283" title="使惊吓；使吓一跳；使大吃一惊">startle</span> <span class="w" data-s="10325" data-e="10411">him,</span> <span class="w" data-s="10581" data-e="10709">but</span> <span class="w" data-s="11008" data-e="11136">that</span> <span class="w" data-s="11179" data-e="11264">was</span> <span class="w" data-s="11307" data-e="11392">his</span> <span class="w" data-s="11435" data-e="11563">only</span> <span class="w target" data-s="11605" data-e="12032" title="消遣；休闲活动">pastime</span> <span class="w" data-s="12075" data-e="12288">and</span> <span class="w" data-s="12331" data-e="12715">his</span> <span class="w" data-s="12757" data-e="12843">only</span> <span class="w target" data-s="12885" data-e="13312" title="消遣，娱乐">recreation.</span></p><p class="zh">一个突如其来的浪头也许能吓他一跳，但那是他唯一的消遣，也是唯一的娱乐。</p></div>
+<div class="pair" data-s0="14155" data-s1="16971"><p class="en"><span class="w" data-s="14155" data-e="14283">His</span> <span class="w" data-s="14325" data-e="14667">choices</span> <span class="w" data-s="14709" data-e="14837">were</span> <span class="w" data-s="14880" data-e="15008">not</span> <span class="w target" data-s="15051" data-e="15477" title="">randomly</span> <span class="w" data-s="15520" data-e="15648">made,</span> <span class="w" data-s="15947" data-e="16075">and</span> <span class="w" data-s="16245" data-e="16416">never</span> <span class="w target" data-s="16459" data-e="16971" title="武断的，任意的；专制的">arbitrary.</span></p><p class="zh">他的选择不是随便做的，也从不随心所欲。</p></div>
+<div class="pair" data-s0="17141" data-s1="23029"><p class="en"><span class="w" data-s="17141" data-e="17312">He</span> <span class="w" data-s="17739" data-e="18080">could</span> <span class="w target" data-s="18123" data-e="18336" title="改变，改动">alter</span> <span class="w" data-s="18379" data-e="18464">the</span> <span class="w" data-s="18507" data-e="18720">lamp,</span> <span class="w" data-s="18891" data-e="19147">or</span> <span class="w" data-s="19189" data-e="19488">he</span> <span class="w" data-s="19531" data-e="19573">could</span> <span class="w" data-s="19616" data-e="19701">find</span> <span class="w" data-s="19744" data-e="19957">an</span> <span class="w target" data-s="20000" data-e="20384" title="可供选择的事物 adj. 可供替代的；备选 的；另类的">alternative:</span> <span class="w" data-s="20640" data-e="21067">to</span> <span class="w target" data-s="21109" data-e="21365" title="">shift</span> <span class="w" data-s="21408" data-e="21493">the</span> <span class="w" data-s="21536" data-e="21664">lens</span> <span class="w" data-s="21707" data-e="21792">a</span> <span class="w" data-s="21835" data-e="21920">little</span> <span class="w" data-s="21963" data-e="22133">and</span> <span class="w" data-s="22176" data-e="22517">let</span> <span class="w" data-s="22560" data-e="22688">the</span> <span class="w" data-s="22731" data-e="22859">beam</span> <span class="w" data-s="22901" data-e="23029">turn.</span></p><p class="zh">他可以把灯改一改，或者找另一种办法：把镜片挪一点，让光柱转起来。</p></div>
+<div class="pair" data-s0="23285" data-s1="24779"><p class="en"><span class="w" data-s="23285" data-e="23968">The</span> <span class="w" data-s="24011" data-e="24096">change</span> <span class="w" data-s="24139" data-e="24395">was</span> <span class="w target" data-s="24437" data-e="24779" title="快速的，敏捷的；迅即发生的">swift.</span></p><p class="zh">这个变化很迅速。</p></div>
+<div class="pair" data-s0="25243" data-s1="30405"><p class="en"><span class="w" data-s="25243" data-e="25456">Weather</span> <span class="w" data-s="25499" data-e="25627">in</span> <span class="w" data-s="25669" data-e="25755">these</span> <span class="w" data-s="25797" data-e="25968">parts</span> <span class="w" data-s="26011" data-e="26224">will</span> <span class="w target" data-s="26267" data-e="26480" title="改变；使多样化；相异，不同">vary,</span> <span class="w" data-s="26693" data-e="26864">and</span> <span class="w" data-s="27035" data-e="27376">one</span> <span class="w" data-s="27419" data-e="27589">thing</span> <span class="w" data-s="27632" data-e="27760">was</span> <span class="w target" data-s="27803" data-e="28187" title="变化的;可变的 n. 变量">variable</span> <span class="w" data-s="28229" data-e="28571">while</span> <span class="w" data-s="28784" data-e="29040">another</span> <span class="w" data-s="29083" data-e="29467">stayed</span> <span class="w target" data-s="29509" data-e="30021" title="始终如一地；一贯地">invariably</span> <span class="w" data-s="30064" data-e="30235">the</span> <span class="w" data-s="30277" data-e="30405">same.</span></p><p class="zh">这一带天气会变，有一样可变，另一样却始终不变。</p></div>
+<div class="pair" data-s0="30661" data-s1="36293"><p class="en"><span class="w" data-s="30661" data-e="31387">The</span> <span class="w" data-s="31429" data-e="31557">little</span> <span class="w target" data-s="31600" data-e="31771" title="做模特儿；将……做成模型">model</span> <span class="w" data-s="31813" data-e="32069">boat</span> <span class="w" data-s="32112" data-e="32283">on</span> <span class="w" data-s="32325" data-e="32453">his</span> <span class="w" data-s="32496" data-e="32752">shelf</span> <span class="w" data-s="32795" data-e="33093">was</span> <span class="w" data-s="33307" data-e="33435">the</span> <span class="w" data-s="33477" data-e="33605">only</span> <span class="w" data-s="33648" data-e="33861">thing</span> <span class="w" data-s="33904" data-e="34032">he</span> <span class="w" data-s="34075" data-e="34203">would</span> <span class="w target" data-s="34245" data-e="34587" title="调整；修改；使更适合">modify,</span> <span class="w" data-s="34800" data-e="35056">and</span> <span class="w" data-s="35141" data-e="35440">his</span> <span class="w" data-s="35483" data-e="35653">needs</span> <span class="w" data-s="35696" data-e="35952">were</span> <span class="w target" data-s="35995" data-e="36293" title="适中的；谦虚的；保守的；端庄的">modest.</span></p><p class="zh">架子上那只小船模型是他唯一会改动的东西，而他的需求很有限。</p></div>
+<div class="pair" data-s0="36835" data-s1="42253"><p class="en"><span class="w" data-s="36835" data-e="36920">He</span> <span class="w" data-s="36963" data-e="37091">was</span> <span class="w target" data-s="37133" data-e="37432" title="认真的，诚挚的">earnest</span> <span class="w" data-s="37475" data-e="37645">about</span> <span class="w" data-s="37688" data-e="37859">the</span> <span class="w" data-s="37901" data-e="37987">work,</span> <span class="w" data-s="38200" data-e="38413">and</span> <span class="w target" data-s="38669" data-e="39096" title="缓和；使适中 adj. 适度的；中等的；温和的">moderate</span> <span class="w" data-s="39139" data-e="39267">in</span> <span class="w" data-s="39309" data-e="39352">his</span> <span class="w" data-s="39395" data-e="39779">habits,</span> <span class="w" data-s="39907" data-e="40333">ready</span> <span class="w" data-s="40376" data-e="40589">to</span> <span class="w target" data-s="40632" data-e="41016" title="允许；忍受，容许">tolerate</span> <span class="w" data-s="41059" data-e="41315">anything</span> <span class="w" data-s="41357" data-e="41656">but</span> <span class="w" data-s="41699" data-e="41784">a</span> <span class="w" data-s="41827" data-e="42040">lazy</span> <span class="w" data-s="42083" data-e="42253">hand.</span></p><p class="zh">他对这份活计很认真，起居有节制，什么都能忍，就是忍不了一双懒手。</p></div>
+<div class="pair" data-s0="42552" data-s1="45752"><p class="en"><span class="w target" data-s="42552" data-e="43235" title="光线；电灯 adj. 充满亮光的；程度轻的 v. 使明亮">Light</span> <span class="w" data-s="43277" data-e="43405">can</span> <span class="w" data-s="43448" data-e="43533">be</span> <span class="w target" data-s="43576" data-e="43704" title="轻微的，少量的">slight,</span> <span class="w" data-s="44003" data-e="44344">or</span> <span class="w" data-s="44387" data-e="44643">it</span> <span class="w" data-s="44685" data-e="44728">can</span> <span class="w target" data-s="44771" data-e="45112" title="启发；教导;启迪">enlighten</span> <span class="w" data-s="45155" data-e="45283">a</span> <span class="w" data-s="45325" data-e="45411">whole</span> <span class="w" data-s="45453" data-e="45752">coast.</span></p><p class="zh">光可以很微弱，也可以照亮整条海岸。</p></div>
+<div class="pair" data-s0="46339" data-s1="50861"><p class="en"><span class="w" data-s="46339" data-e="46595">During</span> <span class="w target" data-s="46637" data-e="46936" title="闪电 adj. 闪电般的；飞快的">lightning</span> <span class="w" data-s="46979" data-e="47107">and</span> <span class="w target" data-s="47149" data-e="47363" title="">thunder</span> <span class="w" data-s="47405" data-e="47619">he</span> <span class="w" data-s="47661" data-e="47747">would</span> <span class="w" data-s="47789" data-e="47917">stay</span> <span class="w" data-s="47960" data-e="48088">at</span> <span class="w" data-s="48131" data-e="48173">the</span> <span class="w" data-s="48216" data-e="48344">window</span> <span class="w" data-s="48387" data-e="48600">with</span> <span class="w target" data-s="48643" data-e="48941" title="高兴 v. (使)高兴">delight,</span> <span class="w" data-s="49112" data-e="49496">never</span> <span class="w" data-s="49539" data-e="49709">in</span> <span class="w target" data-s="49752" data-e="49923" title="困境；境况">plight,</span> <span class="w" data-s="50093" data-e="50435">never</span> <span class="w" data-s="50477" data-e="50605">with</span> <span class="w target" data-s="50648" data-e="50861" title="">blight.</span></p><p class="zh">电闪雷鸣时他会欣喜地守在窗前，从不陷入困境，也从不消沉。</p></div>
+<div class="pair" data-s0="51032" data-s1="53336"><p class="en"><span class="w" data-s="51032" data-e="51629">At</span> <span class="w" data-s="51672" data-e="51971">dawn</span> <span class="w" data-s="52013" data-e="52269">the</span> <span class="w" data-s="52312" data-e="52483">lamp</span> <span class="w" data-s="52525" data-e="52653">would</span> <span class="w target" data-s="52696" data-e="52909" title="烧着的；点亮的">alight</span> <span class="w" data-s="52952" data-e="53080">once</span> <span class="w" data-s="53123" data-e="53336">more.</span></p><p class="zh">天亮时，灯又会亮起。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">adopt</span>
+          <span class="ipa">/ə&#x27;dopt/</span>
+          <span class="pos"></span>
+          <span class="cn">收养；采纳；接受</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to adopt a routine</div>          <div class="root"><span class="lbl">根</span>ad(向) + opt(选) → 选取过来 → 采用、收养</div>          <div class="zt"><span class="lbl">真题</span>A bride will in most cases adopt a name that combines the couple&#x27;s last names. 在大多 数情况下，新娘会采用一个结合夫妻姓氏的名 字。(2023)</div>          <div class="fam"><span class="lbl">族</span>adoption n. 采用</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">amuse</span>
+          <span class="ipa">/ə&#x27;mju:z/</span>
+          <span class="pos"></span>
+          <span class="cn">娱乐；逗乐，逗笑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>little to amuse him</div>          <div class="mnem"><span class="lbl">记</span>a 表示“一个”；muse特别像“缪 斯”的发音，那就是一个缪斯。缪斯是主管乐器 的神→娱乐。</div>          <div class="root"><span class="lbl">根</span>a + muse(缪斯，艺术女神) → 使开心</div>          <div class="zt"><span class="lbl">真题</span>At yesterday&#x27;s party, Elizabeth&#x27;s boyfriend amused us by imitating Charlie Chaplin. 在昨 天的聚会上，伊丽莎白的男朋友模仿查理·卓 别林逗我们开心。</div>          <div class="fam"><span class="lbl">族</span>amusement n. 娱乐</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">amaze</span>
+          <span class="ipa">/ə&#x27;meiz/</span>
+          <span class="pos"></span>
+          <span class="cn">使吃惊</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sea could still amaze a man</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“啊，妹子”。你 的妹妹远嫁他乡，结婚五年后才第一次回家，你 去机场接她，见到她的第一句话就是：“啊，妹 子，你变化好大啊！”表示“吃惊”之意。</div>          <div class="root"><span class="lbl">根</span>a + maze(迷宫) → 让人迷路般的惊讶</div>          <div class="zt"><span class="lbl">真题</span>He spoke perfect Korean—I was really adv. 任意地 amazed.他韩语说得很好——我真的很惊讶。</div>          <div class="fam"><span class="lbl">族</span>amazing adj. 惊人的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">startle</span>
+          <span class="ipa">/&#x27;sta:rtl/</span>
+          <span class="pos"></span>
+          <span class="cn">使惊吓；使吓一跳；使大吃一惊</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A sudden wave might startle him</div>          <div class="mnem"><span class="lbl">记</span>悠悠是一个做事情很喜欢拖拉 的孩子，以为期末考试还很久远呢，所以什么都 没复习。结果今天到了学校，班主任说考试开 始(start)了(le)，把悠悠同学“吓了一跳”。</div>          <div class="root"><span class="lbl">根</span>start(惊起) + le → 使吓一跳</div>          <div class="zt"><span class="lbl">真题</span>The sound of the explosion startled me. 爆炸声把我吓了一跳。</div>          <div class="fam"><span class="lbl">族</span>startling adj. 令人吃惊的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">pastime</span>
+          <span class="ipa">/&#x27;pæstaim/</span>
+          <span class="pos"></span>
+          <span class="cn">消遣；休闲活动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his only pastime</div>          <div class="mnem"><span class="lbl">记</span>很多同学后悔大学三年过去的 (past)时光(time)，用一个字来说就是“玩”，用 两个字来说就是“消遣”。</div>          <div class="root"><span class="lbl">根</span>pass(度过) + time → 消磨时间的事</div>          <div class="zt"><span class="lbl">真题</span>By nature, Americans are enthusiastic and energetic about hobbies or pastimes. 美国 人天生对自己的爱好和休闲活动充满热情和 活力。</div>          <div class="fam"><span class="lbl">族</span>hobby n. 爱好</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">recreation</span>
+          <span class="ipa">/irekri&#x27;ei∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">消遣，娱乐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his only recreation</div>          <div class="mnem"><span class="lbl">记</span>create 意为“创造，创作”，re表 示“再，重复”，连在一起就是：你已经很累了，让 自己再次充满活力，也就是再创造一下自己啊， 你需要“娱乐，消遣”一下。</div>          <div class="root"><span class="lbl">根</span>re(再) + creation(创造) → 重新创造精力 → 娱乐</div>          <div class="zt"><span class="lbl">真题</span>But the club also acts as a recreation center and safe haven(庇护所)for teenagers, with video games readily available. 但俱乐部同 时也是青少年的娱乐中心和避风港，随时可以 玩电子游戏。(2023)</div>          <div class="fam"><span class="lbl">族</span>recreational adj. 娱乐的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">randomly</span>
+          <span class="ipa">/&#x27;rændəmli/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His choices were not randomly made</div>          <div class="mnem"><span class="lbl">记</span>辛巴在自己的王国里（dom想 成 kingdom)“任意地”跑(ran)。</div>          <div class="root"><span class="lbl">根</span>random(乱跑) + ly</div>          <div class="zt"><span class="lbl">真题</span>In her study, participants were randomly assigned to two groups. 在她的研究中，参与者 被随机分配到两组。(2017)</div>          <div class="fam"><span class="lbl">族</span>random adj. 随机的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">arbitrary</span>
+          <span class="ipa">/&#x27;a:bitrəri/</span>
+          <span class="pos"></span>
+          <span class="cn">武断的，任意的；专制的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and never arbitrary</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“啊，别踹瑞（人 名)”→你总是动不动就踹瑞，你就是一个“专制 的；武断的”人。</div>          <div class="root"><span class="lbl">根</span>arbitr(裁决) + ary → 凭个人裁断的 → 任意的</div>          <div class="zt"><span class="lbl">真题</span>These scientists, for reasons that are mostly arbitrary, either just missed getting a research grant or just barely made it. 这些科学 家，由于一些很武断的原因，要么错过了获得研 究资助的机会，要么勉强获得了经费。</div>          <div class="fam"><span class="lbl">族</span>arbitrarily adv. 任意地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">alter</span>
+          <span class="ipa">/&#x27;o:ltə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">改变，改动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could alter the lamp</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“all(都)特(ter 发音类似‘特’)”。都很特别，只有一个缺点了， 那这个缺点就需要“改变”。</div>          <div class="root"><span class="lbl">根</span>alter(其他的) → 变成另一个 → 改变</div>          <div class="zt"><span class="lbl">真题</span>We can&#x27;t do much to alter sedentary lifestyles, but we can provide consumers with great-tasting products, low in salt, sugar and fat. 我们无法改变久坐不动的生活方式，但我们 可以为消费者提供美味、低盐、低糖和低脂的 产品。</div>          <div class="fam"><span class="lbl">族</span>alteration n. 改变</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">alternative</span>
+          <span class="ipa">/:l&#x27;t3:nətiv/</span>
+          <span class="pos"></span>
+          <span class="cn">可供选择的事物 adj. 可供替代的；备选 的；另类的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could find an alternative</div>          <div class="root"><span class="lbl">根</span>alter + native → 另一个可选项</div>          <div class="zt"><span class="lbl">真题</span>When I apologize, I usually choose in- person first, or a phone conversation as my top alternative, and maybe a handwritten note next.当我道歉时，我通常会首选面对面或电话 交谈，其次可能是手写便条。(2018)</div>          <div class="fam"><span class="lbl">族</span>alternate v. 交替</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">shift</span>
+          <span class="ipa">/∫rft/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to shift the lens a little</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“洗福特”。洗 车是不是要“挪动”下位置？这样才能方便别人 洗车啊。</div>          <div class="root"><span class="lbl">根</span>本义「转移、挪动」→ 轮班</div>          <div class="zt"><span class="lbl">真题</span>That doesn&#x27;t control the cost of education; it just shifts it to taxpayers. 那并不能控制教育 的成本；它只是把它转移给了纳税人。</div>          <div class="fam"><span class="lbl">族</span>shifting adj. 变化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">swift</span>
+          <span class="ipa">/swift/</span>
+          <span class="pos"></span>
+          <span class="cn">快速的，敏捷的；迅即发生的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The change was swift</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“四维福特”。 福特是小汽车的牌子，小汽车行驶得很快，四维 福特那肯定更快了。所以四维福特就是“快速的”。</div>          <div class="root"><span class="lbl">根</span>注意与 shift 只差一个字母：快得能挪走</div>          <div class="fam"><span class="lbl">族</span>swiftly adv. 迅速地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">vary</span>
+          <span class="ipa">/&#x27;veri/</span>
+          <span class="pos"></span>
+          <span class="cn">改变；使多样化；相异，不同</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Weather in these parts will vary</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“very”。啊 (a),非常多样化。</div>          <div class="root"><span class="lbl">根</span>var(不同) + y → 变得不同</div>          <div class="zt"><span class="lbl">真题</span>Parents were asked about various aspects of early childhood education. 家长们被问及儿 童早期教育的各个方面。</div>          <div class="fam"><span class="lbl">族</span>various adj. 各种各样的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">variable</span>
+          <span class="ipa">/&#x27;veriəbl/</span>
+          <span class="pos"></span>
+          <span class="cn">变化的;可变的 n. 变量</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one thing was variable</div>          <div class="root"><span class="lbl">根</span>vary + able → 会变的</div>          <div class="fam"><span class="lbl">族</span>vary v. 变化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">invariably</span>
+          <span class="ipa">/ın&#x27;veriəbli/</span>
+          <span class="pos"></span>
+          <span class="cn">始终如一地；一贯地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>another stayed invariably the same</div>          <div class="mnem"><span class="lbl">记</span>该单词源于vary(改变，变化)。 invariably 可以解释为：不(in)变(vari)地(ably) →一贯地。</div>          <div class="root"><span class="lbl">根</span>in(不) + variably(可变地) → 始终不变地</div>          <div class="zt"><span class="lbl">真题</span>Children&#x27;s personality characteristics are (025) invariably determined by their mothers. 孩子的 性格特点总是由其母亲决定。</div>          <div class="fam"><span class="lbl">族</span>invariable adj. 不变的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">model</span>
+          <span class="ipa">/&#x27;ma:dl/</span>
+          <span class="pos"></span>
+          <span class="cn">做模特儿；将……做成模型</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The little model boat on his shelf</div>          <div class="root"><span class="lbl">根</span>mod(方式) + el → 按样子做的东西</div>          <div class="zt"><span class="lbl">真题</span>Trying to live up to the images of &quot;perfect&quot; models and movie heroes has a dark side.试图追求“完美”模范和电影英雄的形象有 其阴暗面。(2020)</div>          <div class="fam"><span class="lbl">族</span>mode n. 方式</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">modify</span>
+          <span class="ipa">/&#x27;ma:dıfai/</span>
+          <span class="pos"></span>
+          <span class="cn">调整；修改；使更适合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the only thing he would modify</div>          <div class="root"><span class="lbl">根</span>mod(方式) + ify(使动) → 改方式 → 修改</div>          <div class="zt"><span class="lbl">真题</span>We also find, always, very important environmental influences that we can only class as &quot;cultural&quot;, which modify the physical and biological factors.我们还发现，通常我们只能 将非常重要的环境影响归为“与文化有关的”， 它改变了物理和生物因素。 表示动词的后缀，意为“使……化”，连在一起就 是“使模式化”。要写出好的文章，不可以太过 “模式化”，要随着时代的发展做出改变和调整 →调整；修改。</div>          <div class="fam"><span class="lbl">族</span>modification n. 修改</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">modest</span>
+          <span class="ipa">/&#x27;ma:dist/</span>
+          <span class="pos"></span>
+          <span class="cn">适中的；谦虚的；保守的；端庄的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his needs were modest</div>          <div class="mnem"><span class="lbl">记</span>mod 模式，把 est 想成形容词 最高级，连在一起就是：最好的模式。在一些人 眼中，做人最好的模式是什么？低调啊，所以该 单词是“谦虚的，低调的”之意。</div>          <div class="root"><span class="lbl">根</span>mod(尺度) + est → 有分寸的 → 谦虚的、朴素的</div>          <div class="zt"><span class="lbl">真题</span>In Lagos, foreign oil workers can pay as much as $ 65,000 per year in rent for a modest apartment in a safe part of town. 在拉各斯，外 国石油工人每年可以支付高达 65 000 美元的租 金，租一个位于城市安全区的简朴公寓。(2017)</div>          <div class="fam"><span class="lbl">族</span>modesty n. 谦虚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">earnest</span>
+          <span class="ipa">/&#x27;3:rnist/</span>
+          <span class="pos"></span>
+          <span class="cn">认真的，诚挚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was earnest about the work</div>          <div class="mnem"><span class="lbl">记</span>earn 挣钱，把 est 想成形容词 最高级，连到一起就是：挣钱最好的模式，就是 “认真的”。</div>          <div class="root"><span class="lbl">根</span>本义「押金」（认真才付押金）</div>          <div class="fam"><span class="lbl">族</span>earnestly adv. 认真地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">moderate</span>
+          <span class="ipa">/&#x27;mpdəreit, &#x27;mpdərət/</span>
+          <span class="pos"></span>
+          <span class="cn">缓和；使适中 adj. 适度的；中等的；温和的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>moderate in his habits</div>          <div class="mnem"><span class="lbl">记</span>modi= mode 模式，方式；fy 是 以该单词的意思是“适度的”。</div>          <div class="root"><span class="lbl">根</span>mod(尺度) + erate → 有尺度的 → 适度的</div>          <div class="zt"><span class="lbl">真题</span>One can get promoted due to his excellent performance, and moderate challenges can increase one&#x27;s progress. 一个人可以因其优秀的表现获 得晋升，适度的挑战可以提升自我。(2016)</div>          <div class="fam"><span class="lbl">族</span>moderation n. 适度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">tolerate</span>
+          <span class="ipa">/&#x27;tpləreit/</span>
+          <span class="pos"></span>
+          <span class="cn">允许；忍受，容许</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>ready to tolerate anything</div>          <div class="mnem"><span class="lbl">记</span>tole 发音类似“逃了”；rate 速 度；连在一起就是：以很快的速度逃跑了。为什 么？忍受到了极点，受不了了→忍受。</div>          <div class="root"><span class="lbl">根</span>toler(忍受) + ate → 容忍</div>          <div class="zt"><span class="lbl">真题</span>They have to tolerate the bad tempers of colleagues. 他们不得不容忍同事们的坏脾气。</div>          <div class="fam"><span class="lbl">族</span>tolerance n. 宽容</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">light</span>
+          <span class="ipa">/lait/</span>
+          <span class="pos"></span>
+          <span class="cn">光线；电灯 adj. 充满亮光的；程度轻的 v. 使明亮</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Light can be slight</div>          <div class="root"><span class="lbl">根</span>本义「光」→ 轻的（光线很轻）</div>          <div class="zt"><span class="lbl">真题</span>For his part, Wang said that in his own experience, losing did light a motivating fire. 王(先生)说，从他自己的经历来看，失败确实点 燃了一束激励人心的火焰。</div>          <div class="fam"><span class="lbl">族</span>lightly adv. 轻轻地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">slight</span>
+          <span class="ipa">/slait/</span>
+          <span class="pos"></span>
+          <span class="cn">轻微的，少量的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it can be slight</div>          <div class="mnem"><span class="lbl">记</span>联想法：light意为“光；轻的”， 一丝(s)光，就是“轻微的，少量的”。本词还可 以想象成死(s)轻(light)，就是很轻，你体重有 点轻啊→轻微的，少量的。</div>          <div class="root"><span class="lbl">根</span>与 light 押韵：轻微的</div>          <div class="zt"><span class="lbl">真题</span>Great leaders recognize the weak signals or slight signs that point to big changes to come. 伟大的领导者能够识别出预示重大变革 即将到来的微弱信号或细微迹象。(2017)</div>          <div class="fam"><span class="lbl">族</span>slightly adv. 稍微</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">enlighten</span>
+          <span class="ipa">/ın&#x27;laitn/</span>
+          <span class="pos"></span>
+          <span class="cn">启发；教导;启迪</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it can enlighten a whole coast</div>          <div class="mnem"><span class="lbl">记</span>en表示“使”，light 表示“光， 灯”。那 enlighten就是使你有光，是不是眼前 一亮的感觉？→启发，启迪。</div>          <div class="root"><span class="lbl">根</span>en(使) + light(光) + en → 使见光 → 启发</div>          <div class="zt"><span class="lbl">真题</span>A few dedicated doctors have fought for years to enlighten the profession. 几位富有献 身精神的医生为启蒙这一行业奋斗多年。</div>          <div class="fam"><span class="lbl">族</span>enlightenment n. 启蒙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">lightning</span>
+          <span class="ipa">/&#x27;laitnm/</span>
+          <span class="pos"></span>
+          <span class="cn">闪电 adj. 闪电般的；飞快的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>During lightning and thunder</div>          <div class="root"><span class="lbl">根</span>lighten(照亮) + ing → 照亮天空的东西</div>          <div class="zt"><span class="lbl">真题</span>He took shelter under a tree and was struck by lightning. 他躲在一棵树下，被闪电击 中了。</div>          <div class="fam"><span class="lbl">族</span>lighten v. 照亮</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">thunder</span>
+          <span class="ipa">/&#x27;0andər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>During lightning and thunder</div>          <div class="mnem"><span class="lbl">记</span>宿舍住了四个人，仨人（thun） 都是打呼噜的(der)，像“打雷”一样响。</div>          <div class="root"><span class="lbl">根</span>拟声词：轰隆</div>          <div class="zt"><span class="lbl">真题</span>New York State plans to shut off the thundering waters of Niagara Falls again. 纽约 州计划再次关闭尼亚加拉瀑布奔腾的水流。 (2016)</div>          <div class="fam"><span class="lbl">族</span>thunderous adj. 雷鸣般的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">delight</span>
+          <span class="ipa">/dr&#x27;lait/</span>
+          <span class="pos"></span>
+          <span class="cn">高兴 v. (使)高兴</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would stay at the window with delight</div>          <div class="mnem"><span class="lbl">记</span>d想成弟，弟弟做梦，在黑暗中 挣扎，突然看到一束光(light)，弟弟一定看到了 希望→高兴。</div>          <div class="root"><span class="lbl">根</span>de + light(光) → 心里有光 → 高兴</div>          <div class="zt"><span class="lbl">真题</span>He looked up at his father, his features overflowing with energy and delight. 他抬头看 着父亲，脸上洋溢着活力和喜悦。</div>          <div class="fam"><span class="lbl">族</span>delightful adj. 令人愉快的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">plight</span>
+          <span class="ipa">/plait/</span>
+          <span class="pos"></span>
+          <span class="cn">困境；境况</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never in plight</div>          <div class="mnem"><span class="lbl">记</span>p想象成扑，弟弟看到一束光 (light)，感觉看到了希望，正高兴的时候，突然 光被扑灭了，弟弟再次陷入了“困境”。</div>          <div class="root"><span class="lbl">根</span>与 delight 押韵：困境</div>          <div class="fam"><span class="lbl">族</span>常用 in a sorry plight</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">blight</span>
+          <span class="ipa">/blait/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never with blight</div>          <div class="mnem"><span class="lbl">记</span>b拼音读为“不”，即“没有”， blight就是没有光，没有光所有的生物会怎么样 呢？→枯萎，荒芜。</div>          <div class="root"><span class="lbl">根</span>本义「植物枯萎病」→ 摧残</div>          <div class="fam"><span class="lbl">族</span>blighted adj. 枯萎的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">alight</span>
+          <span class="ipa">/ə&#x27;lart/</span>
+          <span class="pos"></span>
+          <span class="cn">烧着的；点亮的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At dawn the lamp would alight once more</div>          <div class="mnem"><span class="lbl">记</span>字母a，表示强调，light表示 “光”，一再地有光，说明灯一直是“点亮的，烧着 的”。 028</div>          <div class="root"><span class="lbl">根</span>a + light(光) → 亮起来；（从车上）下来</div>          <div class="fam"><span class="lbl">族</span>alight on 偶然发现</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6~7 · Day 07</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

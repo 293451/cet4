@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 02 · The Boy Who Climbed the Ridge</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 02 · 10/14 · Unit 1~2 第 31-60 词</div>
+  <h1>The Boy Who Climbed the Ridge<span class="cn">爬上山脊的男孩</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-02.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2475"><p class="en"><span class="w" data-s="43" data-e="213">Every</span> <span class="w" data-s="256" data-e="512">summer,</span> <span class="w" data-s="768" data-e="939">the</span> <span class="w" data-s="1109" data-e="1237">boy</span> <span class="w" data-s="1280" data-e="1493">went</span> <span class="w" data-s="1536" data-e="1707">down</span> <span class="w" data-s="1749" data-e="1920">to</span> <span class="w" data-s="1963" data-e="2091">the</span> <span class="w target" data-s="2133" data-e="2475" title="海边，海滨">seaside.</span></p><p class="zh">每年夏天，男孩都会去海边。</p></div>
+<div class="pair" data-s0="2688" data-s1="7595"><p class="en"><span class="w" data-s="2688" data-e="3072">He</span> <span class="w" data-s="3200" data-e="3328">would</span> <span class="w target" data-s="3371" data-e="3669" title="航行；开船；在……上航行；驾驶(船) n. 帆；航行">sail</span> <span class="w" data-s="3712" data-e="3840">a</span> <span class="w" data-s="3883" data-e="4053">small</span> <span class="w" data-s="4096" data-e="4395">boat</span> <span class="w" data-s="4437" data-e="4821">close</span> <span class="w" data-s="4907" data-e="5163">to</span> <span class="w" data-s="5205" data-e="5248">the</span> <span class="w target" data-s="5291" data-e="5547" title="岸，滨">shore,</span> <span class="w" data-s="5717" data-e="6144">then</span> <span class="w" data-s="6187" data-e="6400">land</span> <span class="w" data-s="6443" data-e="6699">on</span> <span class="w" data-s="6741" data-e="6869">a</span> <span class="w" data-s="6912" data-e="7040">quiet</span> <span class="w target" data-s="7083" data-e="7595" title="">island.</span></p><p class="zh">他会驾一条小船靠近海岸，然后登上一座安静的小岛。</p></div>
+<div class="pair" data-s0="7765" data-s1="11435"><p class="en"><span class="w" data-s="7765" data-e="8277">He</span> <span class="w" data-s="8320" data-e="8576">liked</span> <span class="w" data-s="8619" data-e="8789">to</span> <span class="w" data-s="8832" data-e="8960">sit</span> <span class="w" data-s="9003" data-e="9173">on</span> <span class="w" data-s="9216" data-e="9301">a</span> <span class="w target" data-s="9344" data-e="9557" title="长凳">bench</span> <span class="w" data-s="9600" data-e="9856">on</span> <span class="w" data-s="9899" data-e="10069">the</span> <span class="w target" data-s="10112" data-e="10283" title="海滩，沙滩，海滨">beach</span> <span class="w" data-s="10325" data-e="10624">and</span> <span class="w" data-s="10667" data-e="10880">watch</span> <span class="w" data-s="10923" data-e="11136">the</span> <span class="w" data-s="11179" data-e="11435">waves.</span></p><p class="zh">他喜欢坐在沙滩的长椅上，看海浪。</p></div>
+<div class="pair" data-s0="12089" data-s1="14095"><p class="en"><span class="w target" data-s="12089" data-e="12431" title="向(或在)内陆 adj. 内陆的">Inland,</span> <span class="w" data-s="12644" data-e="12772">the</span> <span class="w" data-s="13028" data-e="13241">hills</span> <span class="w" data-s="13284" data-e="13455">rose</span> <span class="w" data-s="13497" data-e="13711">behind</span> <span class="w" data-s="13753" data-e="13967">the</span> <span class="w" data-s="14009" data-e="14095">town.</span></p><p class="zh">在内陆方向，群山从小镇背后隆起。</p></div>
+<div class="pair" data-s0="14351" data-s1="16740"><p class="en"><span class="w" data-s="14351" data-e="15033">One</span> <span class="w" data-s="15076" data-e="15247">day</span> <span class="w" data-s="15289" data-e="15588">he</span> <span class="w" data-s="15801" data-e="16057">decided</span> <span class="w" data-s="16100" data-e="16313">to</span> <span class="w" data-s="16356" data-e="16612">climb</span> <span class="w" data-s="16655" data-e="16740">them.</span></p><p class="zh">有一天，他决定去爬那些山。</p></div>
+<div class="pair" data-s0="16911" data-s1="22244"><p class="en"><span class="w" data-s="16911" data-e="17337">He</span> <span class="w" data-s="17380" data-e="17508">took</span> <span class="w" data-s="17551" data-e="17679">a</span> <span class="w" data-s="17721" data-e="17892">rope</span> <span class="w" data-s="17935" data-e="18148">and</span> <span class="w" data-s="18319" data-e="18575">tied</span> <span class="w" data-s="18617" data-e="18703">a</span> <span class="w" data-s="18745" data-e="18831">firm</span> <span class="w target" data-s="18873" data-e="19215" title="纽带；联系，关系；债券，公债v.使牢固结合">bond</span> <span class="w" data-s="19257" data-e="19513">around</span> <span class="w" data-s="19556" data-e="19727">his</span> <span class="w" data-s="19769" data-e="19983">waist,</span> <span class="w" data-s="20239" data-e="20495">and</span> <span class="w" data-s="20623" data-e="20921">used</span> <span class="w" data-s="20964" data-e="21092">it</span> <span class="w" data-s="21135" data-e="21263">to</span> <span class="w target" data-s="21305" data-e="21433" title="捆绑，系，(用长布条)缠绕；结合；约束">bind</span> <span class="w" data-s="21476" data-e="21647">the</span> <span class="w" data-s="21689" data-e="21732">pack</span> <span class="w" data-s="21775" data-e="21988">to</span> <span class="w" data-s="22031" data-e="22116">his</span> <span class="w" data-s="22159" data-e="22244">back.</span></p><p class="zh">他拿了一根绳子，在腰间系成一个牢固的结，用它把背包绑在背上。</p></div>
+<div class="pair" data-s0="22940" data-s1="25970"><p class="en"><span class="w" data-s="22940" data-e="23026">The</span> <span class="w" data-s="23068" data-e="23154">path</span> <span class="w" data-s="23196" data-e="23452">began</span> <span class="w" data-s="23495" data-e="23708">to</span> <span class="w target" data-s="23751" data-e="23964" title="使弯曲；折弯；偏向 n. 弯道；弯曲">bend,</span> <span class="w" data-s="24178" data-e="24476">then</span> <span class="w" data-s="24775" data-e="25031">to</span> <span class="w target" data-s="25074" data-e="25287" title="使弯曲，使扭曲；扭转，转动；扭伤；歪曲 n. 扭动；转弯处">twist</span> <span class="w" data-s="25330" data-e="25500">around</span> <span class="w" data-s="25543" data-e="25714">the</span> <span class="w" data-s="25756" data-e="25970">rocks.</span></p><p class="zh">小路开始弯折，接着绕着岩石盘旋。</p></div>
+<div class="pair" data-s0="26226" data-s1="32370"><p class="en"><span class="w" data-s="26226" data-e="26780">The</span> <span class="w" data-s="26823" data-e="27164">colours</span> <span class="w" data-s="27207" data-e="27250">of</span> <span class="w" data-s="27292" data-e="27378">the</span> <span class="w" data-s="27420" data-e="27719">fields</span> <span class="w" data-s="27762" data-e="27975">seemed</span> <span class="w" data-s="28018" data-e="28146">to</span> <span class="w target" data-s="28188" data-e="28359" title="混合，融合">blend</span> <span class="w" data-s="28402" data-e="28615">together</span> <span class="w" data-s="28658" data-e="28914">and</span> <span class="w target" data-s="28956" data-e="29127" title="混合，搅和；混乱 v.使混合；配制；搞混 (006;">mix</span> <span class="w" data-s="29170" data-e="29383">into</span> <span class="w" data-s="29426" data-e="29596">one,</span> <span class="w" data-s="29767" data-e="29938">and</span> <span class="w" data-s="29980" data-e="30492">the</span> <span class="w" data-s="30535" data-e="30663">air</span> <span class="w" data-s="30706" data-e="30876">was</span> <span class="w" data-s="30919" data-e="31004">a</span> <span class="w target" data-s="31047" data-e="31303" title="混合；混合物，混合剂">mixture</span> <span class="w" data-s="31346" data-e="31474">of</span> <span class="w" data-s="31516" data-e="31730">pine</span> <span class="w" data-s="31772" data-e="31986">and</span> <span class="w" data-s="32028" data-e="32370">salt.</span></p><p class="zh">田野的颜色似乎交融在一起、混成一片，空气里是松树和盐的混合气味。</p></div>
+<div class="pair" data-s0="32875" data-s1="34496"><p class="en"><span class="w" data-s="32875" data-e="32960">He</span> <span class="w" data-s="33003" data-e="33173">stopped</span> <span class="w" data-s="33216" data-e="33429">to</span> <span class="w target" data-s="33472" data-e="33600" title="(一些人感到的)激动，愤怒，震动；搅动，搅和 v.搅动，搅和，搅拌；打动；激发">stir</span> <span class="w" data-s="33643" data-e="33771">the</span> <span class="w" data-s="33813" data-e="33941">dust</span> <span class="w" data-s="33984" data-e="34112">with</span> <span class="w" data-s="34155" data-e="34240">his</span> <span class="w" data-s="34283" data-e="34496">boot.</span></p><p class="zh">他停下来，用靴子搅了搅脚下的尘土。</p></div>
+<div class="pair" data-s0="34667" data-s1="38208"><p class="en"><span class="w" data-s="34667" data-e="35221">Far</span> <span class="w" data-s="35264" data-e="35477">above,</span> <span class="w" data-s="35733" data-e="35904">a</span> <span class="w target" data-s="36075" data-e="36416" title="泉水；喷泉；源泉">fountain</span> <span class="w" data-s="36459" data-e="36587">of</span> <span class="w" data-s="36629" data-e="36715">white</span> <span class="w" data-s="36757" data-e="36928">water</span> <span class="w" data-s="36971" data-e="37269">fell</span> <span class="w" data-s="37312" data-e="37525">from</span> <span class="w" data-s="37568" data-e="37653">a</span> <span class="w" data-s="37696" data-e="37781">high</span> <span class="w target" data-s="37824" data-e="38208" title="山；高山">mountain.</span></p><p class="zh">在高处，一道白色的水柱从高山上倾泻而下。</p></div>
+<div class="pair" data-s0="38379" data-s1="42475"><p class="en"><span class="w" data-s="38379" data-e="38763">The</span> <span class="w" data-s="38805" data-e="38976">view</span> <span class="w" data-s="39019" data-e="39147">was</span> <span class="w target" data-s="39189" data-e="39531" title="影响深远的；深切的；知识渊博的；理解 深刻的">profound,</span> <span class="w" data-s="39829" data-e="40043">and</span> <span class="w" data-s="40085" data-e="40341">it</span> <span class="w" data-s="40384" data-e="40597">shook</span> <span class="w" data-s="40640" data-e="40725">the</span> <span class="w target" data-s="40768" data-e="41067" title="地基，房基；基础；基本原理；根据">foundation</span> <span class="w" data-s="41109" data-e="41365">of</span> <span class="w" data-s="41408" data-e="41707">everything</span> <span class="w" data-s="41749" data-e="41877">he</span> <span class="w" data-s="41920" data-e="42048">thought</span> <span class="w" data-s="42091" data-e="42304">he</span> <span class="w" data-s="42347" data-e="42475">knew.</span></p><p class="zh">眼前的景象意味深长，动摇了他此前所知一切的根基。</p></div>
+<div class="pair" data-s0="43122" data-s1="45596"><p class="en"><span class="w" data-s="43122" data-e="43548">Slowly,</span> <span class="w" data-s="43676" data-e="43847">he</span> <span class="w" data-s="44146" data-e="44274">began</span> <span class="w" data-s="44316" data-e="44572">to</span> <span class="w target" data-s="44615" data-e="44743" title="逐步增加；登上，爬上">mount</span> <span class="w" data-s="44786" data-e="44999">the</span> <span class="w" data-s="45042" data-e="45127">last</span> <span class="w" data-s="45170" data-e="45596">slope.</span></p><p class="zh">他慢慢地开始爬上最后一道坡。</p></div>
+<div class="pair" data-s0="45724" data-s1="48028"><p class="en"><span class="w" data-s="45724" data-e="46663">Birds</span> <span class="w" data-s="46706" data-e="46876">seemed</span> <span class="w" data-s="46919" data-e="47090">to</span> <span class="w target" data-s="47132" data-e="47388" title="急升，猛增；高飞；升空">soar</span> <span class="w" data-s="47431" data-e="47644">over</span> <span class="w" data-s="47687" data-e="47815">the</span> <span class="w target" data-s="47858" data-e="48028" title="山脊；脊；岭；隆起；山脉">ridge.</span></p><p class="zh">鸟儿似乎在山脊上方翱翔。</p></div>
+<div class="pair" data-s0="48242" data-s1="50930"><p class="en"><span class="w" data-s="48242" data-e="48796">He</span> <span class="w" data-s="48839" data-e="49095">could</span> <span class="w" data-s="49138" data-e="49223">see</span> <span class="w" data-s="49266" data-e="49394">the</span> <span class="w" data-s="49436" data-e="49522">full</span> <span class="w target" data-s="49564" data-e="49778" title="数量 v. (与 to 连用) 等于；总计，合计">amount</span> <span class="w" data-s="49820" data-e="50034">of</span> <span class="w" data-s="50076" data-e="50119">the</span> <span class="w" data-s="50162" data-e="50418">valley</span> <span class="w" data-s="50460" data-e="50631">below</span> <span class="w" data-s="50674" data-e="50930">him.</span></p><p class="zh">他能看到下方山谷的全部。</p></div>
+<div class="pair" data-s0="51100" data-s1="54087"><p class="en"><span class="w" data-s="51100" data-e="51698">To</span> <span class="w target" data-s="51740" data-e="51996" title="升高，上升；攀登">ascend</span> <span class="w" data-s="52039" data-e="52252">further</span> <span class="w" data-s="52295" data-e="52594">was</span> <span class="w" data-s="52636" data-e="52764">hard,</span> <span class="w" data-s="53020" data-e="53362">but</span> <span class="w" data-s="53490" data-e="53618">he</span> <span class="w" data-s="53660" data-e="53746">kept</span> <span class="w" data-s="53788" data-e="54087">going.</span></p><p class="zh">再往上攀登很艰难，但他继续往前走。</p></div>
+<div class="pair" data-s0="54428" data-s1="59207"><p class="en"><span class="w" data-s="54428" data-e="54556">His</span> <span class="w" data-s="54599" data-e="54983">grandfather</span> <span class="w" data-s="55026" data-e="55282">had</span> <span class="w" data-s="55324" data-e="55410">been</span> <span class="w" data-s="55452" data-e="55538">a</span> <span class="w target" data-s="55580" data-e="55922" title="子孙，后裔，后代">descendant</span> <span class="w" data-s="55964" data-e="56092">of</span> <span class="w" data-s="56135" data-e="56220">the</span> <span class="w" data-s="56263" data-e="56348">first</span> <span class="w" data-s="56391" data-e="56818">settlers</span> <span class="w" data-s="56860" data-e="57031">here,</span> <span class="w" data-s="57202" data-e="57372">and</span> <span class="w" data-s="57671" data-e="57799">he</span> <span class="w" data-s="57842" data-e="57927">was</span> <span class="w" data-s="57970" data-e="58012">the</span> <span class="w" data-s="58055" data-e="58183">old</span> <span class="w" data-s="58226" data-e="58524">man&#x27;s</span> <span class="w" data-s="58567" data-e="58695">only</span> <span class="w target" data-s="58738" data-e="59207" title="(单复数同形)后代">offspring.</span></p><p class="zh">他的祖父是这里最早一批定居者的后裔，而他是老人唯一的孩子。</p></div>
+<div class="pair" data-s0="60055" data-s1="63852"><p class="en"><span class="w" data-s="60055" data-e="60225">Their</span> <span class="w" data-s="60268" data-e="60396">family</span> <span class="w" data-s="60439" data-e="60737">was</span> <span class="w target" data-s="60780" data-e="61121" title="古代的；古老的;很老的">ancient,</span> <span class="w" data-s="61249" data-e="61505">and</span> <span class="w" data-s="61932" data-e="62231">every</span> <span class="w target" data-s="62273" data-e="62871" title="祖先，祖宗；原型">ancestor</span> <span class="w" data-s="62913" data-e="63084">had</span> <span class="w" data-s="63127" data-e="63255">walked</span> <span class="w" data-s="63297" data-e="63596">this</span> <span class="w" data-s="63639" data-e="63852">path.</span></p><p class="zh">他们的家族很古老，每一位祖先都走过这条路。</p></div>
+<div class="pair" data-s0="64193" data-s1="66455"><p class="en"><span class="w" data-s="64193" data-e="64919">To</span> <span class="w target" data-s="64961" data-e="65260" title="进行，继续下去，前进">proceed</span> <span class="w" data-s="65303" data-e="65601">was</span> <span class="w" data-s="65644" data-e="65772">a</span> <span class="w" data-s="65815" data-e="65900">kind</span> <span class="w" data-s="65943" data-e="66113">of</span> <span class="w" data-s="66156" data-e="66455">duty.</span></p><p class="zh">继续前行，像是一种责任。</p></div>
+<div class="pair" data-s0="66583" data-s1="73537"><p class="en"><span class="w" data-s="66583" data-e="66839">At</span> <span class="w" data-s="67265" data-e="67436">the</span> <span class="w" data-s="67479" data-e="67607">top,</span> <span class="w" data-s="67820" data-e="67948">a</span> <span class="w" data-s="67991" data-e="68503">small</span> <span class="w target" data-s="68545" data-e="69143" title="队伍，行列">procession</span> <span class="w" data-s="69185" data-e="69313">of</span> <span class="w" data-s="69356" data-e="69484">other</span> <span class="w" data-s="69527" data-e="69911">walkers</span> <span class="w" data-s="69953" data-e="70337">joined</span> <span class="w" data-s="70380" data-e="70465">him,</span> <span class="w" data-s="70679" data-e="70764">and</span> <span class="w" data-s="71063" data-e="71489">together</span> <span class="w" data-s="71532" data-e="71788">they</span> <span class="w" data-s="71831" data-e="72513">watched</span> <span class="w" data-s="72556" data-e="72812">the</span> <span class="w" data-s="72855" data-e="72983">sun</span> <span class="w" data-s="73025" data-e="73324">go</span> <span class="w" data-s="73367" data-e="73537">down.</span></p><p class="zh">在山顶，一小队其他登山者加入了进来，他们一起看着太阳落下。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">seaside</span>
+          <span class="ipa">/&#x27;si:saıd/</span>
+          <span class="pos"></span>
+          <span class="cn">海边，海滨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the boy went down to the seaside</div>          <div class="mnem"><span class="lbl">记</span>sea(大海)十side(边)→海边。</div>          <div class="root"><span class="lbl">根</span>sea(海) + side(边) → 海边</div>          <div class="zt"><span class="lbl">真题</span>First of all, Xiamen University is located in a coastal city, Xiamen, which has beautiful and attractive seaside scenery. 首先，厦门大学 地处海滨城市厦门，拥有美丽迷人的海滨风光。</div>          <div class="fam"><span class="lbl">族</span>seashore n. 海岸</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">sail</span>
+          <span class="ipa">/serl/</span>
+          <span class="pos"></span>
+          <span class="cn">航行；开船；在……上航行；驾驶(船) n. 帆；航行</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would sail a small boat close to the shore</div>          <div class="mnem"><span class="lbl">记</span>发音类似“大海(sea)”，在海上 “航行”啊。</div>          <div class="root"><span class="lbl">根</span>本义「帆」→ 扬帆航行</div>          <div class="fam"><span class="lbl">族</span>sailor n. 水手</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">shore</span>
+          <span class="ipa">/∫ə:r/</span>
+          <span class="pos"></span>
+          <span class="cn">岸，滨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>close to the shore</div>          <div class="mnem"><span class="lbl">记</span>该单词比较像short(短的)，只是 t变成了e。e一般都表示“往外”的意思，比如 exit出口；那就是一个东西不短，往外延伸。我们 在海边散步时，是不是发现海岸线总是很长，往 外延伸？所以这个单词就是“岸，滨”的意思。</div>          <div class="root"><span class="lbl">根</span>与 coast 近义；coast 侧重地理，shore 侧重水陆交接</div>          <div class="zt"><span class="lbl">真题</span>The name had stuck ever since Chinese immigrants arrived on the shores of Northern California in the 1850s, eager to try their luck in the gold mines. 自从 19 世纪 50 年代中国移 民来到北加州海岸，渴望在金矿里碰碰运气以 来，这个名字就叫开了。</div>          <div class="fam"><span class="lbl">族</span>offshore adj. 近海的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">island</span>
+          <span class="ipa">/&#x27;ailənd/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>land on a quiet island</div>          <div class="mnem"><span class="lbl">记</span>该单词发音特别像“爱尔兰”， 爱尔兰就是个岛屿，所以该单词就意为“岛”。</div>          <div class="root"><span class="lbl">根</span>is(独立) + land(陆地) → 独立的陆地</div>          <div class="zt"><span class="lbl">真题</span>They settled on a small island north of England. 他们在英格兰北部的一个小岛上定 居。(2017)</div>          <div class="fam"><span class="lbl">族</span>isle n. 小岛</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">inland</span>
+          <span class="ipa">/ın&#x27;lænd,&#x27;ınlænd/</span>
+          <span class="pos"></span>
+          <span class="cn">向(或在)内陆 adj. 内陆的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Inland, the hills rose behind the town</div>          <div class="root"><span class="lbl">根</span>in(内) + land(陆地) → 内陆</div>          <div class="zt"><span class="lbl">真题</span>Dozens of homes have had to be abandoned as the sea has crept farther and farther inland. 随着海水进一步向内陆移动，数十座房屋不得 不被遗弃。</div>          <div class="fam"><span class="lbl">族</span>inlander n. 内陆居民</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">beach</span>
+          <span class="ipa">/bi:t∫/</span>
+          <span class="pos"></span>
+          <span class="cn">海滩，沙滩，海滨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sit on a bench on the beach</div>          <div class="mnem"><span class="lbl">记</span>坐在“沙滩（beach)”上，吃桃子 (peach/pi:t∫/)。</div>          <div class="root"><span class="lbl">根</span>注意与 bench（长椅）只差一个字母</div>          <div class="zt"><span class="lbl">真题</span>He lost his way on a beach. 他在海滩上 迷了路。</div>          <div class="fam"><span class="lbl">族</span>beachside n. 海滨</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">bench</span>
+          <span class="ipa">/bent∫/</span>
+          <span class="pos"></span>
+          <span class="cn">长凳</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sit on a bench on the beach</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“奔驰”。奔驰 车内部的空间很大，座椅也非常宽敞→长凳。</div>          <div class="root"><span class="lbl">根</span>同源 bank（河岸）→ 岸边供人坐的长条</div>          <div class="zt"><span class="lbl">真题</span>I remember sitting on a bench with my aunt at a yoga studio. 我记得和我的阿姨一起 坐在瑜伽工作室的长凳上。(2017)</div>          <div class="fam"><span class="lbl">族</span>benchmark n. 基准</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">bond</span>
+          <span class="ipa">/ba:nd/</span>
+          <span class="pos"></span>
+          <span class="cn">纽带；联系，关系；债券，公债v.使牢固结合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tied a firm bond around his waist</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以记成 b 在 d 的上 面(on)，为什么分不开呢？因为他们是“牢固结 合”在一起的。</div>          <div class="root"><span class="lbl">根</span>bind 的名词形式 → 捆绑形成的「联结」</div>          <div class="zt"><span class="lbl">真题</span>It will help strengthen their emotional bonds. 这将有助于加强他们的情感联系。</div>          <div class="fam"><span class="lbl">族</span>bondage n. 束缚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">bind</span>
+          <span class="ipa">/baind/</span>
+          <span class="pos"></span>
+          <span class="cn">捆绑，系，(用长布条)缠绕；结合；约束</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>used it to bind the pack to his back</div>          <div class="mnem"><span class="lbl">记</span>该单词谐音“绑的”，“捆绑”在 一起。</div>          <div class="root"><span class="lbl">根</span>本义「捆、绑」→ 引申「约束、使结合」</div>          <div class="zt"><span class="lbl">真题</span>The ties that bind us together in common activity are so feeble that they can disappear at any moment. 把我们联系在一起进行共同活动 的纽带是如此脆弱，随时都可能消失。</div>          <div class="fam"><span class="lbl">族</span>bond n. 联结</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">bend</span>
+          <span class="ipa">/bend/</span>
+          <span class="pos"></span>
+          <span class="cn">使弯曲；折弯；偏向 n. 弯道；弯曲</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The path began to bend</div>          <div class="mnem"><span class="lbl">记</span>b这个字母最后(end)变成了 d,不就是“弯曲”的结果吗？</div>          <div class="root"><span class="lbl">根</span>变音自 band（带子）→ 像带子一样弯</div>          <div class="zt"><span class="lbl">真题</span>This is the reason we bend our efforts toward learning and practicing the skills of interesting，effective writing. 这就是我们努力 学习和练习有趣、有效的写作技巧的原因。</div>          <div class="fam"><span class="lbl">族</span>bent adj. 弯曲的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">twist</span>
+          <span class="ipa">/twist/</span>
+          <span class="pos"></span>
+          <span class="cn">使弯曲，使扭曲；扭转，转动；扭伤；歪曲 n. 扭动；转弯处</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then to twist around the rocks</div>          <div class="mnem"><span class="lbl">记</span>tw(跳舞）十ist(专业人员)，跳 舞的人扭来扭去→扭转，转动。</div>          <div class="root"><span class="lbl">根</span>tw- 常表「二、扭」→ 两股拧在一起</div>          <div class="zt"><span class="lbl">真题</span>Wherever it grows, its thick twisting stems are extremely hard to remove. 无论它生 长在哪里，它粗壮扭曲的茎都极难去除。</div>          <div class="fam"><span class="lbl">族</span>twisted adj. 扭曲的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">blend</span>
+          <span class="ipa">/blend/</span>
+          <span class="pos"></span>
+          <span class="cn">混合，融合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The colours of the fields seemed to blend together</div>          <div class="mnem"><span class="lbl">记</span>把b想成“不”，不要把书借给 (lend)他，他会把你的书和别人的书弄混的→混合。</div>          <div class="root"><span class="lbl">根</span>bl- 表「混」→ 混合</div>          <div class="zt"><span class="lbl">真题</span>Fast-food companies are also adding midday and late-night snacks, such as blended drinks and wraps. 快餐公司也在增加午间和深 夜小吃，如混合饮料和墨西哥卷。(2015)</div>          <div class="fam"><span class="lbl">族</span>blender n. 搅拌机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">mix</span>
+          <span class="ipa">/mıks/</span>
+          <span class="pos"></span>
+          <span class="cn">混合，搅和；混乱 v.使混合；配制；搞混 (006;</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>seemed to blend together and mix into one</div>          <div class="mnem"><span class="lbl">记</span>mi(米)+x(线)→米和线“混 合”起来就是米线。</div>          <div class="root"><span class="lbl">根</span>最基础的「混合」，blend 更强调融合无痕</div>          <div class="zt"><span class="lbl">真题</span>But respondents had decidedly mixed feelings about what actions make for a better life in current economy. 但是，对于在当前经济 形势下，什么样的行为才能使生活变得更好，受 访者显然有复杂的感受。(2017) 例 Mix up what you study every half an hour to an hour or so to avoid boredom. 每半小时到 一个小时左右将学习的内容混合在一起，以避 免无聊。</div>          <div class="fam"><span class="lbl">族</span>mixture n. 混合物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">mixture</span>
+          <span class="ipa">/&#x27;mıkst∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">混合；混合物，混合剂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the air was a mixture of pine and salt</div>          <div class="root"><span class="lbl">根</span>mix + ture(名词)</div>          <div class="fam"><span class="lbl">族</span>mix v. 混合</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">stir</span>
+          <span class="ipa">/st3:r/</span>
+          <span class="pos"></span>
+          <span class="cn">(一些人感到的)激动，愤怒，震动；搅动，搅和 v.搅动，搅和，搅拌；打动；激发</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He stopped to stir the dust with his boot</div>          <div class="mnem"><span class="lbl">记</span>一个叫思特(stir)的人特别爱 “搅和”事情。</div>          <div class="root"><span class="lbl">根</span>本义「搅动」→ 引申「激起（情绪）」</div>          <div class="zt"><span class="lbl">真题</span>Believe it or not, his discovery has created a stir in scientific circles. 信不信由你， 他的发现在科学界引起了轰动。</div>          <div class="fam"><span class="lbl">族</span>stirring adj. 激动人心的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">mountain</span>
+          <span class="ipa">/&#x27;mauntn/</span>
+          <span class="pos"></span>
+          <span class="cn">山；高山</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fell from a high mountain</div>          <div class="root"><span class="lbl">根</span>mount(上升) + ain → 隆起的巨物</div>          <div class="zt"><span class="lbl">真题</span>To enjoy the magnificence of a mountain, you have to look upwards in most cases. 要欣 赏大山的壮丽，在大多数情况下，你必须仰视。 (2017)</div>          <div class="fam"><span class="lbl">族</span>mountainous adj. 多山的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">fountain</span>
+          <span class="ipa">/&#x27;fauntn/</span>
+          <span class="pos"></span>
+          <span class="cn">泉水；喷泉；源泉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a fountain of white water fell</div>          <div class="mnem"><span class="lbl">记</span>把 foun想成found（建立、建 ((0 第一单元 设)，tain想成 mountain(山)，在哪里建造一座 山？是不是“喷泉”里都有一座假山?</div>          <div class="root"><span class="lbl">根</span>fount(泉) + ain；同源于 font（字体如水流）</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s possible to be a fountain of knowledge and a boring person. 一个学识渊博 的人，也可能是一个无聊的人。</div>          <div class="fam"><span class="lbl">族</span>fountainhead n. 源头</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">profound</span>
+          <span class="ipa">/prə&#x27;faund/</span>
+          <span class="pos"></span>
+          <span class="cn">影响深远的；深切的；知识渊博的；理解 深刻的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The view was profound</div>          <div class="mnem"><span class="lbl">记</span>提前(pro)建立(found)。武侠 片里有各种门派，最早(提前)成立的大多是“影 响深远的”。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + found(底) → 深到底的</div>          <div class="zt"><span class="lbl">真题</span>Furthermore, as the capital of several dynasties, Beijing has a profound cultural background.此外，作为多个朝代的首都，北京 有着深厚的文化底蕴。</div>          <div class="fam"><span class="lbl">族</span>profoundly adv. 深深地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">foundation</span>
+          <span class="ipa">/faun&#x27;der∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">地基，房基；基础；基本原理；根据</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>shook the foundation of everything he thought he knew</div>          <div class="mnem"><span class="lbl">记</span>found 建立，创立；ation 名词后 缀。创立的东西不就是“基础，根据”吗？</div>          <div class="root"><span class="lbl">根</span>found(打基础) + ation</div>          <div class="zt"><span class="lbl">真题</span>Many people believe that passion and commitment are the foundations of. strong romantic relationships. 许多人认为，热情和承 诺是牢固的恋爱关系的基础。(2021)</div>          <div class="fam"><span class="lbl">族</span>found v. 建立</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">mount</span>
+          <span class="ipa">/maunt/</span>
+          <span class="pos"></span>
+          <span class="cn">逐步增加；登上，爬上</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he began to mount the last slope</div>          <div class="mnem"><span class="lbl">记</span>这个单词让我们立即想到了 mountain(山);mount是动词，不就是“爬上，登 上”吗？</div>          <div class="root"><span class="lbl">根</span>本义「登上」→ 引申「增加、安装」</div>          <div class="zt"><span class="lbl">真题</span>As the popularity of exercise continues to mount, so does scientific evidence of its health benefits.随着运动的普及程度不断提高，科学 证据也证明了运动对健康的益处。</div>          <div class="fam"><span class="lbl">族</span>amount n. 数量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">soar</span>
+          <span class="ipa">/sə:r/</span>
+          <span class="pos"></span>
+          <span class="cn">急升，猛增；高飞；升空</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Birds seemed to soar over the ridge</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“嗖”。小 时候放烟花，是不是点着后，嗖的一下就飞上了 天？→高飞，升空。</div>          <div class="root"><span class="lbl">根</span>注意与 sore（疼痛）、sour（酸的）区分</div>          <div class="zt"><span class="lbl">真题</span>In spite of such temporary measures, soaring food prices and spreading hunger in many other countries are beginning to break down the social order. 尽管采取了这些临时措 施，但许多其他国家飞涨的食品价格和蔓延的 饥饿开始破坏社会秩序。(2016)</div>          <div class="fam"><span class="lbl">族</span>soaring adj. 飙升的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">ridge</span>
+          <span class="ipa">/rıd3/</span>
+          <span class="pos"></span>
+          <span class="cn">山脊；脊；岭；隆起；山脉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Birds seemed to soar over the ridge</div>          <div class="mnem"><span class="lbl">记</span>bridge 是桥，那去掉 b(也就是 去掉桥最上面的东西），就只剩桥拱了，那桥拱 不就是弓形物或拱形物吗？“山脊”就是拱形 的啊。</div>          <div class="root"><span class="lbl">根</span>本义「脊」→ 山脊、屋脊</div>          <div class="zt"><span class="lbl">真题</span>The streams，lakes，meadows(草地)， mountain ridges and forests have also attracted more people to the region. 溪流、湖泊、草地、山 脊和森林也吸引了更多的人来到该地区。</div>          <div class="fam"><span class="lbl">族</span>ridged adj. 有脊的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">amount</span>
+          <span class="ipa">/ə&#x27;maunt/</span>
+          <span class="pos"></span>
+          <span class="cn">数量 v. (与 to 连用) 等于；总计，合计</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the full amount of the valley</div>          <div class="mnem"><span class="lbl">记</span>a一座，mount 山，一座座山，到 底有多少啊？→数量。</div>          <div class="root"><span class="lbl">根</span>a + mount(上升) → 累加起来的总量</div>          <div class="zt"><span class="lbl">真题</span>Regardless of their genetic make-up, infants have to learn an incredible amount of information in a short time. 不管他们的基因构 成如何，婴儿要在短时间内学习大量的信息。 (2021) 例 During the course of trying various things, you will gain a large amount of social experience. 在尝试各种事物的过程中，你会获得大量的社 会经验。</div>          <div class="fam"><span class="lbl">族</span>mount v. 增加</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">ascend</span>
+          <span class="ipa">/ə&#x27;send/</span>
+          <span class="pos"></span>
+          <span class="cn">升高，上升；攀登</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To ascend further was hard</div>          <div class="mnem"><span class="lbl">记</span>一再地（as)+走（ce用汉语拼 音读，类似“撤”，“撤”不就是“走”吗?)→一再地 朝上走→升高；攀登。</div>          <div class="root"><span class="lbl">根</span>a(向) + scend(爬) → 向上爬</div>          <div class="fam"><span class="lbl">族</span>descent n. 下降</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">descendant</span>
+          <span class="ipa">/dr&#x27;sendənt/</span>
+          <span class="pos"></span>
+          <span class="cn">子孙，后裔，后代</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his grandfather had been a descendant of the first settlers</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)生了三个(scen发音 类似“三”)孩子，但(dan)愿他(t)留下子孙→子 孙，后代。</div>          <div class="root"><span class="lbl">根</span>de(向下) + scend(爬) + ant(人) → 从祖先往下传的人</div>          <div class="fam"><span class="lbl">族</span>descend v. 下降</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">offspring</span>
+          <span class="ipa">/&#x27;pfsprın/</span>
+          <span class="pos"></span>
+          <span class="cn">(单复数同形)后代</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he was the old man&#x27;s only offspring</div>          <div class="root"><span class="lbl">根</span>off(离开) + spring(生长) → 从父母身上长出去的</div>          <div class="fam"><span class="lbl">族</span>单复数同形</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">ancient</span>
+          <span class="ipa">/&#x27;ein∫ənt/</span>
+          <span class="pos"></span>
+          <span class="cn">古代的；古老的;很老的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Their family was ancient</div>          <div class="mnem"><span class="lbl">记</span>ancient发音类似于“俺神的 (啊)”，神住在哪个时期→“古代”啊！</div>          <div class="root"><span class="lbl">根</span>anci(前) + ent → 以前的</div>          <div class="zt"><span class="lbl">真题</span>Li Jiang, an ancient town in Yunnan Province, is one of the most famous tourist attractions in China.丽江，云南省的一个古镇， 是中国最著名的旅游景点之一。(2015)</div>          <div class="fam"><span class="lbl">族</span>ancestor n. 祖先</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">ancestor</span>
+          <span class="ipa">/&#x27;ænsestə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">祖先，祖宗；原型</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every ancestor had walked this path</div>          <div class="mnem"><span class="lbl">记</span>一个(an)走(ce)在你前面的人 (or，名词后缀，表示“人”)，就是你的“祖先”。 (008)</div>          <div class="root"><span class="lbl">根</span>an(前) + cest(走) + or(人) → 走在前面的人</div>          <div class="zt"><span class="lbl">真题</span>I think it certain that in decades, not centuries, machines of silicon(硅) will arise first to rival and then exceed their human ancestors.我认为可以肯定的是，在几十年而不 是几个世纪之后，硅机器将首先出现，与人类祖 先相抗衡，然后超越他们。</div>          <div class="fam"><span class="lbl">族</span>ancient adj. 古老的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">proceed</span>
+          <span class="ipa">/prə&#x27;si:d/</span>
+          <span class="pos"></span>
+          <span class="cn">进行，继续下去，前进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To proceed was a kind of duty</div>          <div class="mnem"><span class="lbl">记</span>pro表示“往前”，ce（撤）表示 “走”，所以这个单词就是往前走，即“前进”。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + ceed(走) → 向前走</div>          <div class="zt"><span class="lbl">真题</span>Readers proceed at their own pace. 读者 按照自己的步伐前进。(2019)</div>          <div class="fam"><span class="lbl">族</span>process n. 过程</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">procession</span>
+          <span class="ipa">/prə&#x27;se∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">队伍，行列</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small procession of other walkers joined him</div>          <div class="root"><span class="lbl">根</span>proceed 的名词 → 向前行进的一队人</div>          <div class="fam"><span class="lbl">族</span>proceed v. 行进</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 1~2 · Day 02</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

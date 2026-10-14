@@ -1,0 +1,688 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 04 · A Fire in the Old Kitchen</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 04 · 10/16 · Unit 3~4 第 91-120 词</div>
+  <h1>A Fire in the Old Kitchen<span class="cn">老厨房里的一场火</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-04.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3584"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">cook</span> <span class="w" data-s="341" data-e="555">would</span> <span class="w target" data-s="597" data-e="981" title="使活动，激活">activate</span> <span class="w" data-s="1024" data-e="1152">the</span> <span class="w" data-s="1195" data-e="1280">old</span> <span class="w" data-s="1323" data-e="1664">stove,</span> <span class="w" data-s="1920" data-e="2091">and</span> <span class="w" data-s="2219" data-e="2347">then</span> <span class="w target" data-s="2389" data-e="2645" title="回应，反应 adj. 准确的，精确的">react</span> <span class="w" data-s="2688" data-e="2859">to</span> <span class="w" data-s="2901" data-e="3029">whatever</span> <span class="w" data-s="3072" data-e="3243">it</span> <span class="w" data-s="3285" data-e="3371">gave</span> <span class="w" data-s="3413" data-e="3584">him.</span></p><p class="zh">厨师会点燃那座旧炉子，然后对它给出的一切作出反应。</p></div>
+<div class="pair" data-s0="3797" data-s1="9856"><p class="en"><span class="w" data-s="3797" data-e="4096">His</span> <span class="w" data-s="4437" data-e="4949">methods</span> <span class="w" data-s="4992" data-e="5077">were</span> <span class="w target" data-s="5120" data-e="5291" title="">exact,</span> <span class="w" data-s="5632" data-e="5845">and</span> <span class="w" data-s="5931" data-e="6016">the</span> <span class="w" data-s="6059" data-e="6187">results</span> <span class="w" data-s="6229" data-e="6485">were</span> <span class="w target" data-s="6528" data-e="6784" title="">actual,</span> <span class="w" data-s="7040" data-e="7253">though</span> <span class="w" data-s="7680" data-e="7808">the</span> <span class="w" data-s="7851" data-e="7936">whole</span> <span class="w" data-s="7979" data-e="8149">place</span> <span class="w" data-s="8192" data-e="8533">felt</span> <span class="w" data-s="8576" data-e="8789">almost</span> <span class="w target" data-s="8832" data-e="9387" title="事实上的，实际上的；模拟的，虚拟的">virtual</span> <span class="w" data-s="9429" data-e="9643">in</span> <span class="w" data-s="9685" data-e="9728">the</span> <span class="w" data-s="9771" data-e="9856">dark.</span></p><p class="zh">他的手法精确，结果也是实实在在的，尽管这地方在黑暗里几乎像是虚拟的。</p></div>
+<div class="pair" data-s0="10545" data-s1="14044"><p class="en"><span class="w" data-s="10545" data-e="10631">A</span> <span class="w target" data-s="10673" data-e="11015" title="碎片；片段 v. 破碎，分裂">fragment</span> <span class="w" data-s="11057" data-e="11143">of</span> <span class="w" data-s="11185" data-e="11271">glass</span> <span class="w" data-s="11313" data-e="11740">lay</span> <span class="w" data-s="11783" data-e="11911">on</span> <span class="w" data-s="11953" data-e="12039">the</span> <span class="w" data-s="12081" data-e="12167">floor,</span> <span class="w target" data-s="12423" data-e="13361" title="易碎的;脆的；虚弱的">fragile</span> <span class="w" data-s="13404" data-e="13532">as</span> <span class="w" data-s="13575" data-e="13660">a</span> <span class="w" data-s="13703" data-e="13788">thin</span> <span class="w" data-s="13831" data-e="14044">sheet.</span></p><p class="zh">地板上躺着一块玻璃碎片，脆得像薄薄的一片。</p></div>
+<div class="pair" data-s0="14300" data-s1="19377"><p class="en"><span class="w" data-s="14300" data-e="15196">Only</span> <span class="w" data-s="15239" data-e="15324">a</span> <span class="w" data-s="15367" data-e="15495">small</span> <span class="w target" data-s="15537" data-e="15921" title="小部分;少量；一点儿">fraction</span> <span class="w" data-s="15964" data-e="16177">of</span> <span class="w" data-s="16220" data-e="16263">the</span> <span class="w target" data-s="16305" data-e="16561" title="面粉；粉状物">flour</span> <span class="w" data-s="16604" data-e="16775">could</span> <span class="w" data-s="16817" data-e="16903">be</span> <span class="w" data-s="16945" data-e="17201">saved,</span> <span class="w" data-s="17457" data-e="17756">and</span> <span class="w" data-s="17799" data-e="18140">just</span> <span class="w" data-s="18183" data-e="18311">a</span> <span class="w target" data-s="18353" data-e="18567" title="部分；一份">portion</span> <span class="w" data-s="18609" data-e="18737">of</span> <span class="w" data-s="18780" data-e="18865">it</span> <span class="w" data-s="18908" data-e="18993">was</span> <span class="w" data-s="19036" data-e="19164">still</span> <span class="w" data-s="19207" data-e="19377">dry.</span></p><p class="zh">只有一小部分面粉能保住，其中又只有一部分还是干的。</p></div>
+<div class="pair" data-s0="20107" data-s1="23734"><p class="en"><span class="w" data-s="20107" data-e="20193">The</span> <span class="w target" data-s="20235" data-e="20619" title="部分；份额；比例 (013)">proportion</span> <span class="w" data-s="20662" data-e="20833">of</span> <span class="w" data-s="20875" data-e="21003">what</span> <span class="w" data-s="21046" data-e="21131">was</span> <span class="w" data-s="21174" data-e="21302">lost</span> <span class="w" data-s="21345" data-e="21686">to</span> <span class="w" data-s="21729" data-e="21857">what</span> <span class="w" data-s="21899" data-e="22283">remained</span> <span class="w" data-s="22326" data-e="22582">was</span> <span class="w" data-s="22881" data-e="23051">hard</span> <span class="w" data-s="23094" data-e="23435">to</span> <span class="w" data-s="23478" data-e="23734">accept.</span></p><p class="zh">损失与留存的比例让人难以接受。</p></div>
+<div class="pair" data-s0="24075" data-s1="28257"><p class="en"><span class="w" data-s="24075" data-e="24459">The</span> <span class="w target" data-s="24843" data-e="25270" title="构架；框架；结构；机制；(作为判断、决定等基 础的)信仰；观点；准则">framework</span> <span class="w" data-s="25313" data-e="25483">of</span> <span class="w" data-s="25526" data-e="25611">the</span> <span class="w" data-s="25654" data-e="25867">shelf</span> <span class="w" data-s="25910" data-e="26081">was</span> <span class="w" data-s="26123" data-e="26465">burned,</span> <span class="w" data-s="26635" data-e="27062">and</span> <span class="w" data-s="27105" data-e="27233">he</span> <span class="w" data-s="27275" data-e="27361">could</span> <span class="w" data-s="27403" data-e="27531">only</span> <span class="w target" data-s="27574" data-e="27915" title="皱眉，蹙额；不同意 n. 皱眉，蹙额">frown</span> <span class="w" data-s="27958" data-e="28086">at</span> <span class="w" data-s="28129" data-e="28257">it.</span></p><p class="zh">架子的框架被烧毁了，他只能对着它皱眉。</p></div>
+<div class="pair" data-s0="28735" data-s1="32575"><p class="en"><span class="w" data-s="28735" data-e="28863">Then</span> <span class="w" data-s="28905" data-e="28991">a</span> <span class="w target" data-s="29033" data-e="29247" title="火焰；强烈的情感">flame</span> <span class="w" data-s="29289" data-e="29417">caught,</span> <span class="w" data-s="29673" data-e="29887">and</span> <span class="w" data-s="30057" data-e="30271">the</span> <span class="w" data-s="30313" data-e="30441">fire</span> <span class="w" data-s="30484" data-e="30783">began</span> <span class="w" data-s="30825" data-e="30996">to</span> <span class="w target" data-s="31039" data-e="31295" title="闪耀；突然发怒；燃烧η. 闪光；照明弹">flare</span> <span class="w" data-s="31337" data-e="31508">and</span> <span class="w target" data-s="31551" data-e="31849" title="闪光；闪烁；闪现v. 闪光，闪烁">flash</span> <span class="w" data-s="31892" data-e="32148">across</span> <span class="w" data-s="32191" data-e="32447">the</span> <span class="w" data-s="32489" data-e="32575">wall.</span></p><p class="zh">接着一簇火焰窜起，火开始沿墙面蔓延、闪烁。</p></div>
+<div class="pair" data-s0="32873" data-s1="36969"><p class="en"><span class="w" data-s="32873" data-e="33769">The</span> <span class="w" data-s="33812" data-e="33983">heat</span> <span class="w" data-s="34025" data-e="34196">reached</span> <span class="w" data-s="34239" data-e="34452">his</span> <span class="w target" data-s="34495" data-e="34793" title="肉；果肉">flesh,</span> <span class="w" data-s="34964" data-e="35220">and</span> <span class="w" data-s="35263" data-e="35391">he</span> <span class="w" data-s="35433" data-e="35519">had</span> <span class="w" data-s="35561" data-e="35647">to</span> <span class="w target" data-s="35689" data-e="35903" title="使恢复精力；使凉爽；提醒，提示；使想起">refresh</span> <span class="w" data-s="35945" data-e="36244">himself</span> <span class="w" data-s="36287" data-e="36543">with</span> <span class="w" data-s="36585" data-e="36713">cold</span> <span class="w" data-s="36756" data-e="36969">water.</span></p><p class="zh">热浪烫到了他的皮肉，他只得用冷水给自己降温提神。</p></div>
+<div class="pair" data-s0="37268" data-s1="39103"><p class="en"><span class="w" data-s="37268" data-e="38036">Yet</span> <span class="w" data-s="38079" data-e="38207">life</span> <span class="w" data-s="38249" data-e="38463">would</span> <span class="w target" data-s="38505" data-e="38847" title="繁荣；茂盛；兴旺">flourish</span> <span class="w" data-s="38889" data-e="39103">again.</span></p><p class="zh">但生命终将再次繁茂。</p></div>
+<div class="pair" data-s0="39841" data-s1="42273"><p class="en"><span class="w" data-s="39841" data-e="39926">There</span> <span class="w" data-s="39969" data-e="40097">was</span> <span class="w" data-s="40140" data-e="40310">still</span> <span class="w target" data-s="40353" data-e="40737" title="面粉；粉状物">flour</span> <span class="w" data-s="40780" data-e="41036">and</span> <span class="w target" data-s="41078" data-e="41462" title="">powder</span> <span class="w" data-s="41505" data-e="41676">on</span> <span class="w" data-s="41718" data-e="41761">the</span> <span class="w" data-s="41804" data-e="41889">top</span> <span class="w" data-s="41932" data-e="42273">shelf.</span></p><p class="zh">顶层架子上还有面粉和粉末。</p></div>
+<div class="pair" data-s0="42444" data-s1="46198"><p class="en"><span class="w" data-s="42444" data-e="43084">He</span> <span class="w" data-s="43126" data-e="43212">was</span> <span class="w target" data-s="43254" data-e="43596" title="求知欲强的；好奇的；稀奇古怪的，奇特的； 不寻常的">curious</span> <span class="w" data-s="43638" data-e="43937">about</span> <span class="w" data-s="43980" data-e="44108">what</span> <span class="w" data-s="44150" data-e="44278">had</span> <span class="w" data-s="44321" data-e="44534">happened,</span> <span class="w" data-s="44705" data-e="45046">and</span> <span class="w" data-s="45089" data-e="45217">he</span> <span class="w" data-s="45260" data-e="45345">needed</span> <span class="w" data-s="45388" data-e="45601">an</span> <span class="w target" data-s="45644" data-e="46028" title="精确的，准确的">accurate</span> <span class="w" data-s="46070" data-e="46198">answer.</span></p><p class="zh">他对发生了什么感到好奇，他需要一个准确的答案。</p></div>
+<div class="pair" data-s0="46497" data-s1="50081"><p class="en"><span class="w" data-s="46497" data-e="47009">The</span> <span class="w" data-s="47094" data-e="47265">room</span> <span class="w" data-s="47308" data-e="47521">was</span> <span class="w" data-s="47564" data-e="47692">no</span> <span class="w" data-s="47734" data-e="47862">longer</span> <span class="w target" data-s="47905" data-e="48332" title="(尤指经过努力)获得；保护；拴牢；抵押">secure,</span> <span class="w" data-s="48630" data-e="48886">and</span> <span class="w" data-s="48929" data-e="49142">the</span> <span class="w" data-s="49185" data-e="49270">cause</span> <span class="w" data-s="49313" data-e="49654">was</span> <span class="w target" data-s="49697" data-e="50081" title="模糊的，不清楚的；昏暗的；不出名的 v. 遮掩；使模糊不清">obscure.</span></p><p class="zh">这个房间不再安全，而原因并不清楚。</p></div>
+<div class="pair" data-s0="50819" data-s1="54915"><p class="en"><span class="w" data-s="50819" data-e="50905">He</span> <span class="w" data-s="50947" data-e="51075">called</span> <span class="w" data-s="51118" data-e="51289">for</span> <span class="w" data-s="51331" data-e="51417">help</span> <span class="w" data-s="51459" data-e="51587">to</span> <span class="w target" data-s="51630" data-e="51971" title="">rescue</span> <span class="w" data-s="52014" data-e="52142">what</span> <span class="w" data-s="52185" data-e="52270">he</span> <span class="w" data-s="52313" data-e="52398">could,</span> <span class="w" data-s="52611" data-e="52782">but</span> <span class="w" data-s="53123" data-e="53209">a</span> <span class="w" data-s="53251" data-e="53337">man</span> <span class="w" data-s="53379" data-e="53550">was</span> <span class="w" data-s="53593" data-e="53806">already</span> <span class="w target" data-s="53849" data-e="54318" title="损害，伤害；受伤">injured</span> <span class="w" data-s="54361" data-e="54446">by</span> <span class="w" data-s="54489" data-e="54617">the</span> <span class="w" data-s="54659" data-e="54915">smoke.</span></p><p class="zh">他呼救去救出能救的东西，但已经有一个人被烟熏伤了。</p></div>
+<div class="pair" data-s0="55043" data-s1="57987"><p class="en"><span class="w" data-s="55043" data-e="55555">It</span> <span class="w" data-s="55598" data-e="55726">was</span> <span class="w" data-s="55769" data-e="55854">a</span> <span class="w" data-s="55897" data-e="55982">real</span> <span class="w target" data-s="56025" data-e="56238" title="">danger</span> <span class="w" data-s="56281" data-e="56622">now,</span> <span class="w" data-s="56793" data-e="57006">and</span> <span class="w" data-s="57134" data-e="57475">everything</span> <span class="w" data-s="57518" data-e="57646">was</span> <span class="w" data-s="57689" data-e="57774">at</span> <span class="w target" data-s="57817" data-e="57987" title="桩；风险；股本 v. 拿……冒险">stake.</span></p><p class="zh">这已成真正的危险，一切都岌岌可危。</p></div>
+<div class="pair" data-s0="58615" data-s1="63479"><p class="en"><span class="w" data-s="58615" data-e="58700">For</span> <span class="w" data-s="58743" data-e="58913">three</span> <span class="w target" data-s="58956" data-e="59596" title="连续的，连续不断的">consecutive</span> <span class="w" data-s="59639" data-e="59767">days</span> <span class="w" data-s="59809" data-e="60193">the</span> <span class="w" data-s="60236" data-e="60449">kitchen</span> <span class="w" data-s="60492" data-e="60748">stayed</span> <span class="w" data-s="60791" data-e="60919">shut,</span> <span class="w" data-s="61217" data-e="61345">and</span> <span class="w" data-s="61772" data-e="61900">the</span> <span class="w target" data-s="61943" data-e="62028" title="当前的，现在的；通用的；流行的 n. 水流；气流；电流；趋向">current</span> <span class="w" data-s="62071" data-e="62412">situation</span> <span class="w" data-s="62455" data-e="62839">was</span> <span class="w" data-s="62881" data-e="63095">still</span> <span class="w" data-s="63137" data-e="63479">unclear.</span></p><p class="zh">厨房连续关了三天，目前情况仍不明朗。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">activate</span>
+          <span class="ipa">/&#x27;æktiveit/</span>
+          <span class="pos"></span>
+          <span class="cn">使活动，激活</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The cook would activate the old stove</div>          <div class="mnem"><span class="lbl">记</span>activity n. 活动，活跃；activate 可以理解为“使活动，激活”。</div>          <div class="root"><span class="lbl">根</span>active + ate(使动) → 使活跃</div>          <div class="zt"><span class="lbl">真题</span>Wireless devices will transmit signals so as to activate the alarm once something wrong is detected. 一旦检测到异常情况，无线设备将 发送信号以激活警报。(2016) (012)</div>          <div class="fam"><span class="lbl">族</span>active adj. 活跃的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">react</span>
+          <span class="ipa">/ri&#x27;ækt/</span>
+          <span class="pos"></span>
+          <span class="cn">回应，反应 adj. 准确的，精确的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then react to whatever it gave him</div>          <div class="mnem"><span class="lbl">记</span>ex(出去)+act(表演)→就读武 校的学生如果能出去表演，那他的动作应该是 很“准确的，精确的”。</div>          <div class="root"><span class="lbl">根</span>re(回) + act(做) → 作出反应</div>          <div class="zt"><span class="lbl">真题</span>He is not familiar with the exact details of the goods. 他不熟悉商品的确切细节。(2015)</div>          <div class="fam"><span class="lbl">族</span>reaction n. 反应</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">exact</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His methods were exact</div>          <div class="root"><span class="lbl">根</span>ex(出) + act(做) → 做出来分毫不差</div>          <div class="fam"><span class="lbl">族</span>exactly adv. 确切地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">actual</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the results were actual</div>          <div class="root"><span class="lbl">根</span>act(做) + ual → 实际做出来的</div>          <div class="fam"><span class="lbl">族</span>actually adv. 实际上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">virtual</span>
+          <span class="ipa">/&#x27;və:rt∫uəl/</span>
+          <span class="pos"></span>
+          <span class="cn">事实上的，实际上的；模拟的，虚拟的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>felt almost virtual in the dark</div>          <div class="mnem"><span class="lbl">记</span>virtual发音类似“龌龊”。他看 第一单元 起来一本正经，事实上却很龌龊→事实上的，实 际上的。</div>          <div class="root"><span class="lbl">根</span>virt(力量、实质) + ual → 实质上有、名义上不是</div>          <div class="zt"><span class="lbl">真题</span>The virtual assistant became so advanced and realistic that the students didn&#x27;t know she was a computer. 这个虚拟助手变得如此先进和 逼真，以至于学生们都不知道她是一台电脑。 (2019)</div>          <div class="fam"><span class="lbl">族</span>virtually adv. 几乎</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">fragment</span>
+          <span class="ipa">/&#x27;frægmənt/</span>
+          <span class="pos"></span>
+          <span class="cn">碎片；片段 v. 破碎，分裂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A fragment of glass lay on the floor</div>          <div class="mnem"><span class="lbl">记</span>fr(“芙蓉”汉语拼音的首字母) +ag(汉语拼音读成“阿哥”)→芙蓉想要阿哥的 瓷器，阿哥不给她，争抢过程中，他们不小心把瓷 器摔到了门(m想成门)上，瓷器就“碎”了→碎片。</div>          <div class="root"><span class="lbl">根</span>frag(破) + ment → 破碎之物</div>          <div class="zt"><span class="lbl">真题</span>Dreaming resembles fragments of science fiction. 梦境类似于科幻小说的片段。</div>          <div class="fam"><span class="lbl">族</span>fragmental adj. 碎片的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">fragile</span>
+          <span class="ipa">/&#x27;frædzaıl/</span>
+          <span class="pos"></span>
+          <span class="cn">易碎的;脆的；虚弱的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fragile as a thin sheet</div>          <div class="root"><span class="lbl">根</span>frag(破) + ile(易…的) → 易碎的</div>          <div class="zt"><span class="lbl">真题</span>Life is like a crystal, beautiful but fragile. 生命好像一颗水晶，美丽却脆弱。</div>          <div class="fam"><span class="lbl">族</span>fragility n. 脆弱</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">fraction</span>
+          <span class="ipa">/&#x27;fræk∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">小部分;少量；一点儿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Only a small fraction of the flour</div>          <div class="mnem"><span class="lbl">记</span>芙蓉(fr)的行为(action)，不是 所有人都能接受的→小部分；少量。</div>          <div class="root"><span class="lbl">根</span>fract(打碎) + ion → 打碎后的一小块</div>          <div class="zt"><span class="lbl">真题</span>Only a tiny fraction of Americans change any behaviors in an effort to preserve their privacy.只有一小部分美国人为了保护自己的 隐私而改变了一些行为。</div>          <div class="fam"><span class="lbl">族</span>fracture n. 骨折</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">portion</span>
+          <span class="ipa">/&#x27;pər∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">部分；一份</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>just a portion of it was still dry</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“剖心”，比干 为了表达对君主的忠心，竟然选择了剖心，但是 毕竟不是所有人都会这样做吧？所以剖心只是 部分人的选择→部分；一份。</div>          <div class="root"><span class="lbl">根</span>port(部分) + ion → 一份</div>          <div class="zt"><span class="lbl">真题</span>We get a fairly large portion of calories from fast food and snacks. 我们从快餐和零食 中摄取了相当大部分的卡路里。(2015)</div>          <div class="fam"><span class="lbl">族</span>proportion n. 比例</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">proportion</span>
+          <span class="ipa">/prə&#x27;pər∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">部分；份额；比例 (013)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The proportion of what was lost</div>          <div class="mnem"><span class="lbl">记</span>提前（pro）就会剖心（portion） 的人就更少了，也是“部分，份额”的意思。</div>          <div class="root"><span class="lbl">根</span>pro(相对于) + portion(份) → 各部分之比</div>          <div class="zt"><span class="lbl">真题</span>As is now the case in many big firms, a large proportion of staff are temporary contractors. 与现在许多大公司一样，大部分员工都是临时 合同工。(2017)</div>          <div class="fam"><span class="lbl">族</span>proportional adj. 成比例的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">framework</span>
+          <span class="ipa">/&#x27;freimw3:rk/</span>
+          <span class="pos"></span>
+          <span class="cn">构架；框架；结构；机制；(作为判断、决定等基 础的)信仰；观点；准则</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The framework of the shelf was burned</div>          <div class="root"><span class="lbl">根</span>frame(框架) + work → 骨架结构</div>          <div class="zt"><span class="lbl">真题</span>Paint the wooden frameworks and walls the same colour. 将木质框架和墙壁涂成同样 的颜色。(2022)</div>          <div class="fam"><span class="lbl">族</span>frame n. 框架</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">frown</span>
+          <span class="ipa">/fraun/</span>
+          <span class="pos"></span>
+          <span class="cn">皱眉，蹙额；不同意 n. 皱眉，蹙额</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he could only frown at it</div>          <div class="root"><span class="lbl">根</span>皱眉的动作音 → 皱眉、不赞成</div>          <div class="zt"><span class="lbl">真题</span>The Gatais used to frown when they received power bills that routinely topped 电费账单时，他们总是皱着眉头。 我“不同意”。</div>          <div class="fam"><span class="lbl">族</span>frown on 不赞成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">flame</span>
+          <span class="ipa">/fleim/</span>
+          <span class="pos"></span>
+          <span class="cn">火焰；强烈的情感</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then a flame caught</div>          <div class="mnem"><span class="lbl">记</span>飞来(fl)一个阿妹(ame)，在舞 台上像“火焰”一样燃烧。</div>          <div class="root"><span class="lbl">根</span>fl- 常表「火焰流动」</div>          <div class="fam"><span class="lbl">族</span>flaming adj. 燃烧的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">flare</span>
+          <span class="ipa">/fler/</span>
+          <span class="pos"></span>
+          <span class="cn">闪耀；突然发怒；燃烧η. 闪光；照明弹</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the fire began to flare</div>          <div class="mnem"><span class="lbl">记</span>飞来（fl)一个（a)阿姨（re），阿 姨想在村里搞一场演唱会，结果一首歌没唱完， 人都跑光了。所以阿姨在舞台上不会长久，只 是一闪而过的光→闪光。</div>          <div class="root"><span class="lbl">根</span>与 flame 同源，强调「突然大亮」</div>          <div class="fam"><span class="lbl">族</span>flare-up n. 突然爆发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">flash</span>
+          <span class="ipa">/flæ∫/</span>
+          <span class="pos"></span>
+          <span class="cn">闪光；闪烁；闪现v. 闪光，闪烁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and flash across the wall</div>          <div class="mnem"><span class="lbl">记</span>这个单词我们很熟悉，因为有 些同学在大学里学过Flash(网站动画制作程 序)。flash其实不是动画，是闪过的东西(就是 网页上那些突然跳出来的广告)→闪现。</div>          <div class="root"><span class="lbl">根</span>拟声：啪地一闪</div>          <div class="zt"><span class="lbl">真题</span>The car keeps flashing its headlights. 这辆车一直在闪烁前灯。(2018)</div>          <div class="fam"><span class="lbl">族</span>flashlight n. 手电筒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">flesh</span>
+          <span class="ipa">/fle∫/</span>
+          <span class="pos"></span>
+          <span class="cn">肉；果肉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The heat reached his flesh</div>          <div class="mnem"><span class="lbl">记</span>这个单词很像fresh(新鲜的）， $ 200. 以前当加泰斯夫妇收到超过 200美元的 新鲜的什么？“果肉”啊。</div>          <div class="root"><span class="lbl">根</span>与 fresh 只差一个字母：肉要新鲜</div>          <div class="fam"><span class="lbl">族</span>fleshy adj. 多肉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">refresh</span>
+          <span class="ipa">/rı&#x27;fre∫/</span>
+          <span class="pos"></span>
+          <span class="cn">使恢复精力；使凉爽；提醒，提示；使想起</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he had to refresh himself with cold water</div>          <div class="mnem"><span class="lbl">记</span>芙蓉(fr)拥有(own)这个东西，</div>          <div class="root"><span class="lbl">根</span>re(再) + fresh(新鲜) → 使恢复精神</div>          <div class="zt"><span class="lbl">真题</span>Sleeping 15 minutes to two hours in the early afternoon can make us refreshed. 在下午 早些时候睡15分钟到2个小时，可以让我们神 清气爽。</div>          <div class="fam"><span class="lbl">族</span>refreshment n. 点心</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">flourish</span>
+          <span class="ipa">/&#x27;flarıʃ/</span>
+          <span class="pos"></span>
+          <span class="cn">繁荣；茂盛；兴旺</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>life would flourish again</div>          <div class="mnem"><span class="lbl">记</span>该单词前半部分发音类似 flower(花)。想到花，就能想到洛阳那些牡丹 “茂盛”生长的样子。 (014)</div>          <div class="root"><span class="lbl">根</span>flour(花) + ish → 开花 → 繁荣</div>          <div class="zt"><span class="lbl">真题</span>UNESCO gave Italy two years to manage Venice&#x27;s flourishing tourism.联合国教科文组 织给意大利两年时间管理威尼斯繁荣的旅游 业。(2018)</div>          <div class="fam"><span class="lbl">族</span>flourishing adj. 繁荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">flour</span>
+          <span class="ipa">/&#x27;flavə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">面粉；粉状物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was still flour and powder</div>          <div class="root"><span class="lbl">根</span>与 flower 同源：面粉是麦子的「精华」</div>          <div class="zt"><span class="lbl">真题</span>He shaped delicious masterpieces out of flour，butter and sugar. 他用面粉、黄油和糖塑 造出了美味的代表作。</div>          <div class="fam"><span class="lbl">族</span>floury adj. 粉状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">powder</span>
+          <span class="ipa">/&#x27;paudər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>flour and powder on the top shelf</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“扑的”。往脸上 扑粉，就是上“粉”啊。</div>          <div class="root"><span class="lbl">根</span>本义「粉」→ 火药、爽身粉</div>          <div class="fam"><span class="lbl">族</span>powdery adj. 粉状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">curious</span>
+          <span class="ipa">/&#x27;kjuriəs/</span>
+          <span class="pos"></span>
+          <span class="cn">求知欲强的；好奇的；稀奇古怪的，奇特的； 不寻常的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was curious about what had happened</div>          <div class="mnem"><span class="lbl">记</span>你越 serious，我越 curious。→ 你越严肃，我越好奇→好奇的。</div>          <div class="root"><span class="lbl">根</span>cur(关心) + ious → 想知道的</div>          <div class="zt"><span class="lbl">真题</span>Reading literary fiction, he says, makes us more curious. 他说，阅读文学小说会让我们 更加好奇。(2017)</div>          <div class="fam"><span class="lbl">族</span>curiosity n. 好奇心</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">accurate</span>
+          <span class="ipa">/&#x27;ækjərət/</span>
+          <span class="pos"></span>
+          <span class="cn">精确的，准确的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he needed an accurate answer</div>          <div class="mnem"><span class="lbl">记</span>ac(表示“加强”)+(cur联想成 care“关心”)+ate(形容词后缀)→一再地关心 这件事，就会把事情做得越精确→精确的。</div>          <div class="root"><span class="lbl">根</span>ac(向) + cur(关心) + ate → 用心做出来的 → 准确的</div>          <div class="zt"><span class="lbl">真题</span>Recently it was shown that they could be trained to be as accurate as humans at detecting breast cancer in images. 最近有研究表明，经过 训练，它们可以像人类一样准确地从图像中检 测出乳腺癌。(2017)</div>          <div class="fam"><span class="lbl">族</span>accuracy n. 准确</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">secure</span>
+          <span class="ipa">/sı&#x27;kjur/</span>
+          <span class="pos"></span>
+          <span class="cn">(尤指经过努力)获得；保护；拴牢；抵押</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The room was no longer secure</div>          <div class="mnem"><span class="lbl">记</span>se 想成 see(看到)十 cure(治 愈，治好)→看到她被治好了，安全了，我就安心 了→安心的；安全的。</div>          <div class="root"><span class="lbl">根</span>se(分开) + cure(关心) → 不用操心的 → 安全的</div>          <div class="zt"><span class="lbl">真题</span>She found it difficult to secure a job in her own country. 她发现很难在自己的国家找 到一份工作。</div>          <div class="fam"><span class="lbl">族</span>security n. 安全</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">obscure</span>
+          <span class="ipa">/əb&#x27;skjuə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">模糊的，不清楚的；昏暗的；不出名的 v. 遮掩；使模糊不清</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the cause was obscure</div>          <div class="mnem"><span class="lbl">记</span>ob表示“方向”，那就是朝着一 个快死（s)的人的方向一直在做手术治疗 (cure)，手术都进行七个小时了，医生的眼睛是 不是都“模糊”了？</div>          <div class="root"><span class="lbl">根</span>ob(在上) + scure(遮盖) → 被盖住的 → 模糊的</div>          <div class="zt"><span class="lbl">真题</span>I have looked at the government notes covering the changes and it was extremely obscure guidance. 我看过政府关于这些变化的 说明，它是一个非常模糊的指导。</div>          <div class="fam"><span class="lbl">族</span>obscurity n. 模糊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">rescue</span>
+          <span class="ipa">/&#x27;reskju:/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He called for help to rescue what he could</div>          <div class="mnem"><span class="lbl">记</span>该单词可记忆为：回去(re)“营 救”那个快死的(s)、可爱的(cue发音似 cute) 女孩。</div>          <div class="root"><span class="lbl">根</span>re(再) + scue(摇) → 把人从危险中拽出来</div>          <div class="zt"><span class="lbl">真题</span>After being rescued from the air crash, the people agreed that they had much to be thankful for.从空难中获救后，人们认为他们有 很多值得感谢的事情。</div>          <div class="fam"><span class="lbl">族</span>rescuer n. 救援者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">injure</span>
+          <span class="ipa">/&#x27;mndzə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">损害，伤害；受伤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a man was already injured by the smoke</div>          <div class="mnem"><span class="lbl">记</span>去里面(in)救(ju)阿姨(re)，为 什么？阿姨“受伤”了啊。</div>          <div class="root"><span class="lbl">根</span>in(不) + jure(合法) → 造成不法伤害</div>          <div class="zt"><span class="lbl">真题</span>She was injured in a car accident two weeks ago and still in critical condition. 她在两 周前的一次车祸中受伤，目前情况仍然危急。</div>          <div class="fam"><span class="lbl">族</span>injury n. 伤害</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">danger</span>
+          <span class="ipa">/&#x27;deindzər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was a real danger now</div>          <div class="root"><span class="lbl">根</span>本义「主人的权力」→ 能支配你的东西</div>          <div class="zt"><span class="lbl">真题</span>You may expose yourself to unexpected dangers. 你可能会面临意想不到的危险。(2017)</div>          <div class="fam"><span class="lbl">族</span>dangerous adj. 危险的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">stake</span>
+          <span class="ipa">/steık/</span>
+          <span class="pos"></span>
+          <span class="cn">桩；风险；股本 v. 拿……冒险</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>everything was at stake</div>          <div class="root"><span class="lbl">根</span>本义「桩子」（赌博时押在桩上的筹码）</div>          <div class="zt"><span class="lbl">真题</span>In some situations, the stakes are low and failure is a healthy part of growth. 在某些 情况下，风险很低，失败是成长中健康的一 部分。</div>          <div class="fam"><span class="lbl">族</span>at stake 岌岌可危</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">consecutive</span>
+          <span class="ipa">/kən&#x27;sekjətiv/</span>
+          <span class="pos"></span>
+          <span class="cn">连续的，连续不断的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>For three consecutive days</div>          <div class="mnem"><span class="lbl">记</span>con(一起，共同）十 se(发音类 颜色切割出来拼凑到一起，看上去还是“连续 的”。</div>          <div class="root"><span class="lbl">根</span>con(共同) + secut(跟随) + ive → 一个跟一个的</div>          <div class="fam"><span class="lbl">族</span>consecutively adv. 连续地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">current</span>
+          <span class="ipa">/&#x27;k3:rənt/</span>
+          <span class="pos"></span>
+          <span class="cn">当前的，现在的；通用的；流行的 n. 水流；气流；电流；趋向</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the current situation was still unclear</div>          <div class="mnem"><span class="lbl">记</span>cur发音特别像“care”，rent 租；二者连在一起就是关心什么时候租房子以 及租房子的价格。20年前的你也不关心，20年 后的你又想太多了。所以我们关心的是“现在 的，目前的”价格。</div>          <div class="root"><span class="lbl">根</span>cur(跑) + rent → 正在跑的 → 当前的、水流</div>          <div class="zt"><span class="lbl">真题</span>Environmental problems must be solved to ease the current global food shortage. 必须 解决环境问题，以缓解目前的全球粮食短缺。 (2016)</div>          <div class="fam"><span class="lbl">族</span>currently adv. 目前</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3~4 · Day 04</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
