@@ -19,6 +19,12 @@ on:
         description: "指定第几天（留空=自动按日期算）"
         required: false
 
+# 保活那一步要往仓库写空提交，需要 contents: write。
+# 不加这个的话，Actions 默认只有只读权限，git push 会 403
+# （实测报错：Permission to 293451/cet4.git denied to github-actions[bot]）。
+permissions:
+  contents: write
+
 jobs:
   push:
     runs-on: ubuntu-latest
