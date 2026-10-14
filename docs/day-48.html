@@ -1,0 +1,697 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 48 · The Shop on Cedar Street</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 48 · 11/29 · Unit 7 第 1411-1440 词</div>
+  <h1>The Shop on Cedar Street<span class="cn">雪松街上的铺子</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-48.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4224"><p class="en"><span class="w" data-s="43" data-e="384">Cedar</span> <span class="w" data-s="427" data-e="597">Street</span> <span class="w" data-s="640" data-e="811">had</span> <span class="w" data-s="853" data-e="1024">one</span> <span class="w" data-s="1067" data-e="1323">last</span> <span class="w" data-s="1365" data-e="1621">shop,</span> <span class="w" data-s="1963" data-e="2347">where</span> <span class="w" data-s="2389" data-e="2560">Mrs.</span> <span class="w" data-s="2773" data-e="2944">Han</span> <span class="w target" data-s="2987" data-e="3499" title="">restored</span> <span class="w" data-s="3541" data-e="3755">old</span> <span class="w" data-s="3797" data-e="4224">clocks.</span></p><p class="zh">雪松街上还剩最后一家铺子，韩太太在那里修老钟。</p></div>
+<div class="pair" data-s0="4480" data-s1="7125"><p class="en"><span class="w" data-s="4480" data-e="5120">The</span> <span class="w" data-s="5163" data-e="5504">clocks</span> <span class="w" data-s="5547" data-e="5675">were</span> <span class="w target" data-s="5717" data-e="6101" title="易碎的，脆弱的；精巧的，精致的">delicate,</span> <span class="w" data-s="6229" data-e="6443">and</span> <span class="w" data-s="6571" data-e="6699">so</span> <span class="w" data-s="6741" data-e="6955">was</span> <span class="w" data-s="6997" data-e="7125">she.</span></p><p class="zh">那些钟很精致，她本人也一样，碰不得。</p></div>
+<div class="pair" data-s0="7339" data-s1="10539"><p class="en"><span class="w" data-s="7339" data-e="8149">Last</span> <span class="w" data-s="8192" data-e="8363">winter</span> <span class="w" data-s="8405" data-e="8704">she</span> <span class="w" data-s="8747" data-e="8917">fell</span> <span class="w" data-s="8960" data-e="9131">on</span> <span class="w" data-s="9173" data-e="9259">the</span> <span class="w" data-s="9301" data-e="9387">ice</span> <span class="w" data-s="9429" data-e="9771">and</span> <span class="w" data-s="9813" data-e="10069">could</span> <span class="w" data-s="10112" data-e="10283">not</span> <span class="w" data-s="10325" data-e="10539">stand.</span></p><p class="zh">去年冬天她在冰上摔了一跤，站都站不起来。</p></div>
+<div class="pair" data-s0="11230" data-s1="14644"><p class="en"><span class="w" data-s="11230" data-e="11316">The</span> <span class="w" data-s="11358" data-e="11486">doctor</span> <span class="w target" data-s="11529" data-e="12084" title="(给……)注射(药物等)；投入">injected</span> <span class="w" data-s="12126" data-e="12254">a</span> <span class="w target" data-s="12297" data-e="12510" title="处理方法；疗法，治疗；改进措施；补偿 v. 改正；纠正；改进">remedy</span> <span class="w" data-s="12553" data-e="12681">into</span> <span class="w" data-s="12724" data-e="12809">the</span> <span class="w target" data-s="12852" data-e="13065" title="关节，接头 adj. 联合的,共同的">joint;</span> <span class="w" data-s="13278" data-e="13364">it</span> <span class="w" data-s="13577" data-e="13705">would</span> <span class="w" data-s="13748" data-e="13833">take</span> <span class="w" data-s="13876" data-e="14046">months</span> <span class="w" data-s="14089" data-e="14388">to</span> <span class="w target" data-s="14430" data-e="14644" title="(使)康复，复原；治愈(病人);使又愉快起来">heal.</span></p><p class="zh">医生往她的关节里打了一剂药；要几个月才能好。</p></div>
+<div class="pair" data-s0="15497" data-s1="17673"><p class="en"><span class="w" data-s="15497" data-e="15540">&quot;You</span> <span class="w" data-s="15582" data-e="15753">will</span> <span class="w target" data-s="15796" data-e="16094" title="恢复健康；康复；痊愈，复原；恢复常态">recover,&quot;</span> <span class="w" data-s="16564" data-e="16606">he</span> <span class="w" data-s="16649" data-e="16820">said,</span> <span class="w" data-s="17161" data-e="17246">&quot;but</span> <span class="w" data-s="17374" data-e="17673">slowly.&quot;</span></p><p class="zh">“你会康复的，”他说，“但是很慢。”</p></div>
+<div class="pair" data-s0="18228" data-s1="19465"><p class="en"><span class="w" data-s="18228" data-e="18612">She</span> <span class="w" data-s="18654" data-e="18825">did</span> <span class="w" data-s="18868" data-e="18953">not</span> <span class="w" data-s="18996" data-e="19166">want</span> <span class="w" data-s="19209" data-e="19337">to</span> <span class="w target" data-s="19380" data-e="19465" title="">rest.</span></p><p class="zh">她不想休息。</p></div>
+<div class="pair" data-s0="19806" data-s1="22622"><p class="en"><span class="w" data-s="19806" data-e="19934">For</span> <span class="w" data-s="19977" data-e="20276">fifty</span> <span class="w" data-s="20318" data-e="20404">years</span> <span class="w" data-s="20446" data-e="20830">she</span> <span class="w" data-s="20873" data-e="21129">had</span> <span class="w target" data-s="21172" data-e="21470" title="(~to)奉献；把……用于;致力于">devoted</span> <span class="w" data-s="21513" data-e="21769">herself</span> <span class="w" data-s="21812" data-e="22025">to</span> <span class="w" data-s="22068" data-e="22153">broken</span> <span class="w" data-s="22196" data-e="22622">clocks.</span></p><p class="zh">五十年来，她把自己整个交给了那些坏钟。</p></div>
+<div class="pair" data-s0="22836" data-s1="26462"><p class="en"><span class="w" data-s="22836" data-e="23476">She</span> <span class="w" data-s="23518" data-e="23689">had</span> <span class="w target" data-s="23732" data-e="24116" title="献身于，致力于">dedicated</span> <span class="w" data-s="24158" data-e="24372">her</span> <span class="w" data-s="24414" data-e="24542">life</span> <span class="w" data-s="24585" data-e="24756">to</span> <span class="w" data-s="24798" data-e="24926">them,</span> <span class="w" data-s="25097" data-e="25225">and</span> <span class="w" data-s="25481" data-e="25652">now</span> <span class="w" data-s="25694" data-e="25865">they</span> <span class="w target" data-s="25908" data-e="26121" title="欠(账、情)；归因于">owe</span> <span class="w" data-s="26164" data-e="26249">her</span> <span class="w" data-s="26292" data-e="26462">something.</span></p><p class="zh">她把一生都献给了它们，现在轮到它们欠她点什么了。</p></div>
+<div class="pair" data-s0="27439" data-s1="31364"><p class="en"><span class="w" data-s="27439" data-e="27609">Her</span> <span class="w" data-s="27652" data-e="27993">neighbours</span> <span class="w target" data-s="28036" data-e="28420" title="拒绝，抵制">rejected</span> <span class="w" data-s="28463" data-e="28548">the</span> <span class="w" data-s="28591" data-e="28761">idea</span> <span class="w" data-s="28804" data-e="29060">of</span> <span class="w" data-s="29103" data-e="29529">closing</span> <span class="w" data-s="29572" data-e="29700">the</span> <span class="w" data-s="29743" data-e="29828">shop,</span> <span class="w" data-s="30127" data-e="30255">and</span> <span class="w" data-s="30383" data-e="30809">nobody</span> <span class="w target" data-s="30852" data-e="31364" title="">objected.</span></p><p class="zh">邻居们不接受关店这个主意，也没有人反对留下来。</p></div>
+<div class="pair" data-s0="31577" data-s1="36228"><p class="en"><span class="w" data-s="31577" data-e="32089">They</span> <span class="w target" data-s="32345" data-e="32687" title="捐赠，捐献，赠予">donated</span> <span class="w" data-s="32729" data-e="32985">money,</span> <span class="w target" data-s="33199" data-e="33924" title="(to)贡献，有助于；捐助，捐献">contributed</span> <span class="w" data-s="33967" data-e="34137">tools,</span> <span class="w" data-s="34393" data-e="34649">and</span> <span class="w target" data-s="34735" data-e="35247" title="分配；散布 (181) 第七单元">distributed</span> <span class="w" data-s="35289" data-e="35375">a</span> <span class="w" data-s="35417" data-e="35503">notice</span> <span class="w" data-s="35545" data-e="35844">along</span> <span class="w" data-s="35887" data-e="36057">the</span> <span class="w" data-s="36100" data-e="36228">street.</span></p><p class="zh">他们捐了钱，出了工具，还沿街发了一张通知。</p></div>
+<div class="pair" data-s0="36966" data-s1="41958"><p class="en"><span class="w" data-s="36966" data-e="37094">They</span> <span class="w target" data-s="37137" data-e="37478" title="捆，束；一系列；一大笔钱 v.(成群地)匆忙 赶往；捆绑">bundled</span> <span class="w" data-s="37521" data-e="37606">up</span> <span class="w" data-s="37649" data-e="37777">their</span> <span class="w" data-s="37819" data-e="37990">broken</span> <span class="w" data-s="38033" data-e="38246">things,</span> <span class="w" data-s="38545" data-e="38843">a</span> <span class="w" data-s="39014" data-e="39313">kettle,</span> <span class="w" data-s="39441" data-e="39611">an</span> <span class="w target" data-s="39739" data-e="40123" title="文物；古物；古董；古玩 adj.古老的；古 董的">antique</span> <span class="w" data-s="40166" data-e="40422">vase,</span> <span class="w" data-s="40635" data-e="40806">and</span> <span class="w" data-s="40891" data-e="41275">carried</span> <span class="w" data-s="41318" data-e="41446">them</span> <span class="w" data-s="41489" data-e="41617">to</span> <span class="w" data-s="41659" data-e="41787">her</span> <span class="w" data-s="41830" data-e="41958">door.</span></p><p class="zh">他们把自己家坏掉的东西——一只水壶、一只古董花瓶——捆起来，搬到了她门口。</p></div>
+<div class="pair" data-s0="42683" data-s1="46694"><p class="en"><span class="w" data-s="42683" data-e="42769">&quot;The</span> <span class="w" data-s="42811" data-e="42982">old</span> <span class="w" data-s="43025" data-e="43195">word</span> <span class="w" data-s="43238" data-e="43409">for</span> <span class="w" data-s="43451" data-e="43537">this</span> <span class="w" data-s="43579" data-e="43793">is</span> <span class="w target" data-s="43835" data-e="44731" title="惩罚，报应；报答；报偿">retribution,&quot;</span> <span class="w" data-s="45073" data-e="45115">they</span> <span class="w" data-s="45158" data-e="45286">said.</span> <span class="w" data-s="45755" data-e="45798">&quot;A</span> <span class="w" data-s="46139" data-e="46395">giving</span> <span class="w" data-s="46438" data-e="46694">back.&quot;</span></p><p class="zh">“这事儿的老说法叫报应，”他们说，“是一种还回去。”</p></div>
+<div class="pair" data-s0="47121" data-s1="51259"><p class="en"><span class="w" data-s="47121" data-e="47803">A</span> <span class="w" data-s="47846" data-e="48017">student</span> <span class="w" data-s="48059" data-e="48273">named</span> <span class="w" data-s="48315" data-e="48657">Tao</span> <span class="w" data-s="48699" data-e="48913">came</span> <span class="w" data-s="48955" data-e="49126">with</span> <span class="w" data-s="49169" data-e="49211">a</span> <span class="w target" data-s="49254" data-e="49425" title="计划,方案">project:</span> <span class="w" data-s="49809" data-e="50107">to</span> <span class="w" data-s="50150" data-e="50534">photograph</span> <span class="w" data-s="50577" data-e="50790">old</span> <span class="w" data-s="50833" data-e="51259">shops.</span></p><p class="zh">一个叫陶的学生带着一个计划来了：拍老街上的铺子。</p></div>
+<div class="pair" data-s0="52207" data-s1="55279"><p class="en"><span class="w" data-s="52207" data-e="52292">He</span> <span class="w target" data-s="52335" data-e="52847" title="预料；预见，预计(并做准备);期盼，期望">anticipated</span> <span class="w" data-s="52889" data-e="53060">a</span> <span class="w" data-s="53103" data-e="53615">refusal,</span> <span class="w" data-s="53743" data-e="53913">but</span> <span class="w" data-s="54169" data-e="54297">she</span> <span class="w" data-s="54340" data-e="54639">agreed</span> <span class="w" data-s="54681" data-e="54767">to</span> <span class="w target" data-s="54809" data-e="55279" title="参加;参与">participate.</span></p><p class="zh">他预料会被拒绝，可她却答应参加。</p></div>
+<div class="pair" data-s0="55748" data-s1="58479"><p class="en"><span class="w" data-s="55748" data-e="55791">&quot;I</span> <span class="w" data-s="55961" data-e="56089">have</span> <span class="w" data-s="56132" data-e="56303">one</span> <span class="w target" data-s="56345" data-e="56601" title="题目，主题；科目，学科 v.(～to)使遭受，使">subject,&quot;</span> <span class="w" data-s="57113" data-e="57156">he</span> <span class="w" data-s="57199" data-e="57327">said.</span> <span class="w" data-s="58393" data-e="58479">&quot;You.&quot;</span></p><p class="zh">“我只有一个拍摄对象，”他说，“就是您。”</p></div>
+<div class="pair" data-s0="59332" data-s1="62788"><p class="en"><span class="w" data-s="59332" data-e="59375">&quot;I</span> <span class="w" data-s="59417" data-e="59588">do</span> <span class="w" data-s="59631" data-e="59716">not</span> <span class="w target" data-s="59759" data-e="59887" title="">object</span> <span class="w" data-s="59929" data-e="60143">to</span> <span class="w" data-s="60185" data-e="60313">a</span> <span class="w" data-s="60356" data-e="60484">camera,&quot;</span> <span class="w" data-s="60953" data-e="61124">she</span> <span class="w" data-s="61167" data-e="61380">said.</span> <span class="w" data-s="61679" data-e="62319">&quot;Only</span> <span class="w" data-s="62361" data-e="62532">to</span> <span class="w" data-s="62575" data-e="62788">pity.&quot;</span></p><p class="zh">“我不反对相机，”她说，“我只反对可怜。”</p></div>
+<div class="pair" data-s0="63172" data-s1="66543"><p class="en"><span class="w" data-s="63172" data-e="63855">His</span> <span class="w" data-s="63897" data-e="64068">old</span> <span class="w" data-s="64111" data-e="64367">camera</span> <span class="w target" data-s="64409" data-e="65049" title="喷射；驱逐；弹出">ejected</span> <span class="w" data-s="65092" data-e="65220">each</span> <span class="w" data-s="65263" data-e="65561">photo</span> <span class="w" data-s="65604" data-e="65903">like</span> <span class="w" data-s="65945" data-e="66073">a</span> <span class="w" data-s="66116" data-e="66201">flat</span> <span class="w" data-s="66244" data-e="66543">bird.</span></p><p class="zh">他那台旧相机吐出照片的样子，像一只只扁平的鸟。</p></div>
+<div class="pair" data-s0="67574" data-s1="73376"><p class="en"><span class="w" data-s="67574" data-e="67659">By</span> <span class="w" data-s="67702" data-e="67872">spring,</span> <span class="w" data-s="68171" data-e="68427">one</span> <span class="w" data-s="68768" data-e="69110">quiet</span> <span class="w target" data-s="69152" data-e="69792" title="现象；非凡的人">phenomenon</span> <span class="w" data-s="69835" data-e="70006">was</span> <span class="w" data-s="70048" data-e="70219">easy</span> <span class="w" data-s="70262" data-e="70560">to</span> <span class="w" data-s="70603" data-e="70688">see:</span> <span class="w" data-s="70902" data-e="71542">a</span> <span class="w" data-s="71584" data-e="71798">busy</span> <span class="w" data-s="71840" data-e="72096">shop</span> <span class="w" data-s="72139" data-e="72523">never</span> <span class="w" data-s="72736" data-e="73163">falls</span> <span class="w" data-s="73206" data-e="73376">apart.</span></p><p class="zh">到了春天，有一个安静的现象一眼就能看见：一家热闹的铺子，是不会散掉的。</p></div>
+<div class="pair" data-s0="73632" data-s1="77558"><p class="en"><span class="w" data-s="73632" data-e="74571">Tao&#x27;s</span> <span class="w" data-s="74614" data-e="74870">photos</span> <span class="w target" data-s="74912" data-e="75254" title="(使)结合，组合，联合；兼备n.集团，联合 企业">combined</span> <span class="w" data-s="75296" data-e="75510">the</span> <span class="w" data-s="75552" data-e="75851">street&#x27;s</span> <span class="w" data-s="75894" data-e="76064">stories</span> <span class="w" data-s="76107" data-e="76448">into</span> <span class="w" data-s="76491" data-e="76704">one</span> <span class="w" data-s="76747" data-e="76960">wall</span> <span class="w" data-s="77003" data-e="77174">of</span> <span class="w" data-s="77216" data-e="77558">faces.</span></p><p class="zh">陶的照片把这条街的故事拼成了一整面人脸墙。</p></div>
+<div class="pair" data-s0="77899" data-s1="83915"><p class="en"><span class="w" data-s="77899" data-e="78027">In</span> <span class="w" data-s="78070" data-e="78496">conjunction</span> <span class="w" data-s="78539" data-e="78752">with</span> <span class="w" data-s="78795" data-e="78923">three</span> <span class="w" data-s="78966" data-e="79179">other</span> <span class="w" data-s="79222" data-e="79648">shops,</span> <span class="w" data-s="79734" data-e="79947">he</span> <span class="w" data-s="80160" data-e="80374">hung</span> <span class="w" data-s="80416" data-e="80459">them</span> <span class="w" data-s="80502" data-e="80630">next</span> <span class="w" data-s="80672" data-e="80843">door,</span> <span class="w" data-s="81056" data-e="81227">though</span> <span class="w" data-s="81611" data-e="81739">the</span> <span class="w" data-s="81782" data-e="81995">printer</span> <span class="w" data-s="82038" data-e="82251">set</span> <span class="w" data-s="82294" data-e="82806">conjunction</span> <span class="w" data-s="82848" data-e="83062">as</span> <span class="w target" data-s="83104" data-e="83915" title="">conjunctjon.</span></p><p class="zh">他和另外三家铺子一起把照片挂在了隔壁，只是印厂把 conjunction 印成了 conjunctjon。</p></div>
+<div class="pair" data-s0="84535" data-s1="88033"><p class="en"><span class="w" data-s="84535" data-e="84620">The</span> <span class="w" data-s="84663" data-e="84833">street,</span> <span class="w" data-s="85089" data-e="85431">which</span> <span class="w" data-s="85473" data-e="85601">had</span> <span class="w" data-s="85644" data-e="85815">never</span> <span class="w" data-s="85857" data-e="86113">had</span> <span class="w" data-s="86156" data-e="86369">any</span> <span class="w target" data-s="86412" data-e="86924" title="黏合；结合；凝聚性">cohesion,</span> <span class="w" data-s="87095" data-e="87521">began</span> <span class="w" data-s="87564" data-e="87820">to</span> <span class="w target" data-s="87863" data-e="88033" title="连接，连结；联系">connect.</span></p><p class="zh">这条从来没有过什么凝聚力的街，开始连了起来。</p></div>
+<div class="pair" data-s0="88332" data-s1="92343"><p class="en"><span class="w" data-s="88332" data-e="89100">Now</span> <span class="w" data-s="89143" data-e="89356">the</span> <span class="w" data-s="89399" data-e="89527">city</span> <span class="w" data-s="89569" data-e="89740">plans</span> <span class="w" data-s="89783" data-e="90039">to</span> <span class="w target" data-s="90081" data-e="90508" title="(使)合并，成为一体；(使)加入，融入群体">integrate</span> <span class="w" data-s="90551" data-e="90721">these</span> <span class="w" data-s="90764" data-e="90935">small</span> <span class="w" data-s="90977" data-e="91404">shops</span> <span class="w" data-s="91447" data-e="91660">into</span> <span class="w" data-s="91703" data-e="91831">the</span> <span class="w" data-s="91873" data-e="91959">new</span> <span class="w" data-s="92001" data-e="92343">district.</span></p><p class="zh">现在市里打算把这些小店并进新街区。</p></div>
+<div class="pair" data-s0="92513" data-s1="96609"><p class="en"><span class="w" data-s="92513" data-e="93281">Mrs.</span> <span class="w" data-s="93452" data-e="93623">Han</span> <span class="w target" data-s="93665" data-e="94305" title="把……归结于 n. 属性，品质，特征">attributed</span> <span class="w" data-s="94348" data-e="94476">her</span> <span class="w target" data-s="94519" data-e="94903" title="恢复健康；康复；痊愈，复原；恢复常态">recovery</span> <span class="w" data-s="94945" data-e="95116">to</span> <span class="w" data-s="95159" data-e="95244">the</span> <span class="w" data-s="95287" data-e="95415">street,</span> <span class="w" data-s="95671" data-e="96055">not</span> <span class="w" data-s="96097" data-e="96311">to</span> <span class="w" data-s="96353" data-e="96439">the</span> <span class="w" data-s="96481" data-e="96609">doctor.</span></p><p class="zh">韩太太把她的康复归功于这条街，而不是医生。</p></div>
+<div class="pair" data-s0="97382" data-s1="101734"><p class="en"><span class="w" data-s="97382" data-e="97468">Her</span> <span class="w" data-s="97510" data-e="97638">knee</span> <span class="w target" data-s="97681" data-e="97937" title="(使)康复，复原；治愈(病人);使又愉快起来">healed,</span> <span class="w" data-s="98150" data-e="98278">and</span> <span class="w" data-s="98534" data-e="98662">the</span> <span class="w" data-s="98705" data-e="98790">street</span> <span class="w" data-s="98833" data-e="99004">was</span> <span class="w target" data-s="99046" data-e="99430" title="">restored,</span> <span class="w" data-s="99558" data-e="99814">not</span> <span class="w" data-s="99942" data-e="100156">by</span> <span class="w" data-s="100198" data-e="100540">medicine,</span> <span class="w" data-s="100710" data-e="100838">but</span> <span class="w" data-s="101052" data-e="101180">by</span> <span class="w" data-s="101222" data-e="101393">its</span> <span class="w" data-s="101436" data-e="101564">own</span> <span class="w" data-s="101606" data-e="101734">people.</span></p><p class="zh">她的膝盖好了，这条街也修好了——不是靠药，是靠它自己的人。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">bundle</span>
+          <span class="ipa">/&#x27;bandl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">捆，束；一系列；一大笔钱 v.(成群地)匆忙 赶往；捆绑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They bundled up their broken things</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“巴豆”。古代 武侠喜剧片用来让你拉肚子的一种药。是不是 吃得太少没有用，得吃“一包”巴豆才顶用。</div>          <div class="root"><span class="lbl">根</span>联想 bind(捆绑)：把东西捆在一起</div>          <div class="zt"><span class="lbl">真题</span>Employers can also consider how to bundle different types of compensation to help (178) employees cope with their unique situations. 雇 主还可以考虑如何捆绑不同类型的补偿，以帮 助员工应对他们的独特情况。(2022)</div>          <div class="fam"><span class="lbl">族</span>bundles n. 大捆 / bundling n. 捆绑销售</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">restore</span>
+          <span class="ipa">/ri&#x27;sto:r/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>where Mrs. Han restored old clocks</div>          <div class="mnem"><span class="lbl">记</span>restore 分成三部分：rest，o,re。 阿姨(re)休息(rest)一圈(o)才能“恢复”过来。</div>          <div class="root"><span class="lbl">根</span>re(重新) + store(存放) → 重新放回去</div>          <div class="zt"><span class="lbl">真题</span>They were badly damaged but restored. 它们已严重受损，但已得到修复。</div>          <div class="fam"><span class="lbl">族</span>restoration n. 修复 / restorative adj. 恢复的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">recover</span>
+          <span class="ipa">/rı&#x27;kavər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">恢复健康；康复；痊愈，复原；恢复常态</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>You will recover</div>          <div class="mnem"><span class="lbl">记</span>小时候发烧的时候，妈妈就给 我盖很多被子，她总说多(re再，又)盖(cover) 经受 被子，捂捂汗就“康复”了。</div>          <div class="root"><span class="lbl">根</span>re(再) + cover(覆盖) → 再盖回来 → 康复</div>          <div class="zt"><span class="lbl">真题</span>There&#x27;re many people who recover from cancer，stroke，or heart disease. 有很多人从癌 症、中风或心脏病中康复。</div>          <div class="fam"><span class="lbl">族</span>recovery n. 康复 / recovered adj. 恢复的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">heal</span>
+          <span class="ipa">/hi:1/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)康复，复原；治愈(病人);使又愉快起来</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it would take months to heal</div>          <div class="mnem"><span class="lbl">记</span>他(he)都(al 想成 all)好了，那 就是他的病都好了，“痊愈；康复”了。 (179) 第七单元</div>          <div class="root"><span class="lbl">根</span>联想：他(he)全都(all)好了 → 痊愈</div>          <div class="zt"><span class="lbl">真题</span>That hasn&#x27;t stopped thousands of winter depressives(抑郁症患者) from trying to heal themselves.那并没有阻止成千上万的冬季抑 郁症患者试图治愈自己。</div>          <div class="fam"><span class="lbl">族</span>healing n. 治疗 / healer n. 治疗者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">remedy</span>
+          <span class="ipa">/&#x27;remədi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">处理方法；疗法，治疗；改进措施；补偿 v. 改正；纠正；改进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The doctor injected a remedy into the joint</div>          <div class="mnem"><span class="lbl">记</span>remedy 可以拆解为：回来(re) “治疗”我(me)，因为我快死了(dy，die的分词形 式就是 dying)。</div>          <div class="root"><span class="lbl">根</span>re(回) + med(医) → 回来医治 → 疗法</div>          <div class="zt"><span class="lbl">真题</span>But many tech home remedies can be explained by a little science. 但是，许多科技家 庭疗法可以用一点科学来解释。(2016)</div>          <div class="fam"><span class="lbl">族</span>remedial adj. 补救的 / remediable adj. 可补救的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">inject</span>
+          <span class="ipa">/ın&#x27;dzekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(给……)注射(药物等)；投入</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The doctor injected a remedy</div>          <div class="mnem"><span class="lbl">记</span>词根 ject发音类似“接个它”， 想象我扔给你一个东西，让你接住，所以ject当 词根讲时，意为“抛，扔”。in表示“里面”，inject 表示“往里扔”→注射，投入。</div>          <div class="root"><span class="lbl">根</span>in(向里) + ject(扔) → 往里扔 → 注射</div>          <div class="fam"><span class="lbl">族</span>injection n. 注射 / injector n. 注射器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">subject</span>
+          <span class="ipa">/&#x27;sabdzıkt,səb&#x27;d3ekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">题目，主题；科目，学科 v.(～to)使遭受，使</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I have one subject</div>          <div class="mnem"><span class="lbl">记</span>往下(sub)扔（ject)→使服从， 使遭受。</div>          <div class="root"><span class="lbl">根</span>sub(在下) + ject(扔) → 扔在下面 → 使遭受；主题</div>          <div class="zt"><span class="lbl">真题</span>Most college professors agree the kind of exam they choose largely depends on the subject.大多数大学教授都同意，他们选择的考 试类型在很大程度上取决于科目。(2017)</div>          <div class="fam"><span class="lbl">族</span>subjective adj. 主观的 / subjection n. 征服</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">phenomenon</span>
+          <span class="ipa">/fə&#x27;na:minən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">现象；非凡的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one quiet phenomenon was easy to see</div>          <div class="root"><span class="lbl">根</span>phen(显现) + omenon → 显现出来的事</div>          <div class="zt"><span class="lbl">真题</span>Muscle performance can also be affected by a phenomenon called &quot;central fatigue&quot;. 肌肉 表现也会受到一种叫作“中枢疲劳”的现象的影 响。(2017)</div>          <div class="fam"><span class="lbl">族</span>phenomena n. 现象(复数) / phenomenal adj. 非凡的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">object</span>
+          <span class="ipa">/&#x27;pbd3ıkt,əb&#x27;d3ekt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I do not object to a camera</div>          <div class="mnem"><span class="lbl">记</span>ob（表示方向的前缀）十ject (扔)→朝着某个方向扔。记得我们看过的史诗 大片吗？当某个人演讲时，你不同意他的观点， 就拿东西扔他→反对。</div>          <div class="root"><span class="lbl">根</span>ob(对着) + ject(扔) → 对着扔过去 → 反对</div>          <div class="zt"><span class="lbl">真题</span>Her mother objected to Eric&#x27;s flying lessons. 她母亲反对埃里克上飞行课。</div>          <div class="fam"><span class="lbl">族</span>objection n. 反对 / objective adj. 客观的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">reject</span>
+          <span class="ipa">/r&#x27;d3ekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">拒绝，抵制</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her neighbours rejected the idea of closing the shop</div>          <div class="mnem"><span class="lbl">记</span>re(回来或重复)十ject(扔)→ 扔回来→拒绝，抵制。</div>          <div class="root"><span class="lbl">根</span>re(回) + ject(扔) → 扔回来 → 拒绝</div>          <div class="zt"><span class="lbl">真题</span>They reject using toilet paper with unnecessary features.他们拒绝使用带有不必 要功能的卫生纸。(2017)</div>          <div class="fam"><span class="lbl">族</span>rejection n. 拒绝 / rejected adj. 被拒的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">project</span>
+          <span class="ipa">/&#x27;prpd3ekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">计划,方案</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A student named Tao came with a project</div>          <div class="mnem"><span class="lbl">记</span>pro(往前)十ject(扔)→做一件 事情之前，提前扔出去一个什么？→计划， 方案。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + ject(扔) → 提前扔出去 → 计划</div>          <div class="zt"><span class="lbl">真题</span>Business schools grade their students in part on their performance in group projects. 商 学院对学生的评分部分取决于他们在小组项目 中的表现。(2017)</div>          <div class="fam"><span class="lbl">族</span>projector n. 投影仪 / projection n. 投影</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">eject</span>
+          <span class="ipa">/ı&#x27;dzekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">喷射；驱逐；弹出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His old camera ejected each photo like a flat bird</div>          <div class="mnem"><span class="lbl">记</span>e(出去)十ject(抛、扔)→往外 扔→喷射；弹出。</div>          <div class="root"><span class="lbl">根</span>e(向外) + ject(扔) → 往外扔 → 弹出</div>          <div class="zt"><span class="lbl">真题</span>The speed of electric cars in the country has not occurred as fast as ejected. 这个国家电 动汽车的速度还没有像被弹射出去那样快。</div>          <div class="fam"><span class="lbl">族</span>ejection n. 喷出 / ejective adj. 喷出的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">anticipate</span>
+          <span class="ipa">/æn&#x27;tisipeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">预料；预见，预计(并做准备);期盼，期望</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He anticipated a refusal</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“俺提 cici(喜之 郎果冻)陪她”。你知道她特别爱吃喜之郎果 冻，提一袋cici去看她，是不是“期望”她高兴？</div>          <div class="root"><span class="lbl">根</span>anti(前) + cip(拿) + ate → 提前拿在手 → 预料</div>          <div class="zt"><span class="lbl">真题</span>My financial aid did not anticipate any of the costs and so it did not cover them. 我的经 济援助没有考虑到任何费用，所以没有涵盖这 些费用。(2022)</div>          <div class="fam"><span class="lbl">族</span>anticipation n. 预料 / anticipated adj. 预期的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">participate</span>
+          <span class="ipa">/pa:r&#x27;tisipeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">参加;参与</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but she agreed to participate</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“怕提 ci(吸)陪 他”。怕他被UFO吸去，提前去陪他，不就是 “加入他”吗？→参加，参与。</div>          <div class="root"><span class="lbl">根</span>part(部分) + cip(拿) + ate → 拿一份 → 参加</div>          <div class="zt"><span class="lbl">真题</span>She had participated in the Berkeley study. 她参与了伯克利的研究。</div>          <div class="fam"><span class="lbl">族</span>participation n. 参与 / participant n. 参加者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">antique</span>
+          <span class="ipa">/æn&#x27;ti:k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">文物；古物；古董；古玩 adj.古老的；古 董的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an antique vase</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“俺提个”。俺 提个“古董”给爷爷送去，他就喜欢这种东西。</div>          <div class="root"><span class="lbl">根</span>ant(前) + ique → 以前留下来的东西 → 古董</div>          <div class="zt"><span class="lbl">真题</span>It stores lots of priceless antiques. 它存 放着许多无价的古董。</div>          <div class="fam"><span class="lbl">族</span>antiquity n. 古物 / antiquated adj. 过时的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">donate</span>
+          <span class="ipa">/&#x27;dəuneit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">捐赠，捐献，赠予</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They donated money</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“兜内的”。把 兜内的都“捐献”出去。</div>          <div class="root"><span class="lbl">根</span>don(给予) + ate → 给出去 → 捐赠</div>          <div class="zt"><span class="lbl">真题</span>It received an incredibly large number of donated books. 它收到了数量惊人的捐赠书籍。 (2020)</div>          <div class="fam"><span class="lbl">族</span>donation n. 捐赠 / donor n. 捐赠者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">devote</span>
+          <span class="ipa">/di&#x27;vəut/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(~to)奉献；把……用于;致力于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she had devoted herself to broken clocks</div>          <div class="mnem"><span class="lbl">记</span>de 发音类似“弟”;vote发音类 似“volt(雪佛兰的一款车)”。弟弟最大的愿望 就是买一辆volt，所以弟弟干什么事情都“致力 于”买这款车。(My younger brother devotes himself to buying a volt.)</div>          <div class="root"><span class="lbl">根</span>de(完全) + vot(誓愿) → 完全许下心愿 → 奉献</div>          <div class="zt"><span class="lbl">真题</span>She decided to devote all her time to cultivating and developing it. 她决定把所有的 180 时间都用来培养和发展它。(2017)</div>          <div class="fam"><span class="lbl">族</span>devotion n. 献身 / devoted adj. 忠诚的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">dedicate</span>
+          <span class="ipa">/&#x27;dedıkert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">献身于，致力于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She had dedicated her life to them</div>          <div class="mnem"><span class="lbl">记</span>de(弟弟)十dic(说)十ate(动词 后缀)→弟弟一再地说一个东西→致力于这个 东西→致力于。</div>          <div class="root"><span class="lbl">根</span>de(加强) + dic(说) + ate → 郑重说出 → 献身于</div>          <div class="zt"><span class="lbl">真题</span>If working from home becomes permanent, employees will have to dedicate part of their private space to work. 如果要永久性居家办公， 员工将不得不拿出一部分私人空间来工作。</div>          <div class="fam"><span class="lbl">族</span>dedication n. 奉献 / dedicated adj. 专注的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">delicate</span>
+          <span class="ipa">/&#x27;delıkət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">易碎的，脆弱的；精巧的，精致的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The clocks were delicate, and so was she</div>          <div class="mnem"><span class="lbl">记</span>deli(得力），一种文具的品牌； cat猫；那就是得力文具厂做了一个文具的猫猫 装饰品，估计是陶瓷的→易碎的。</div>          <div class="root"><span class="lbl">根</span>de(加强) + lic(取悦) → 让人喜爱的 → 精致的</div>          <div class="zt"><span class="lbl">真题</span>Contemporary artists have followed this tradition to create eggs that speak to the anxieties of our age: Life is precious, and delicate.当代艺术家遵循这一传统，创作出了 鸡蛋画来表达我们这个时代的焦虑：生命是珍 贵的，也是脆弱的。(2017)</div>          <div class="fam"><span class="lbl">族</span>delicacy n. 精致；美味 / delicately adv. 精细地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">contribute</span>
+          <span class="ipa">/kən&#x27;trıbju:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(to)贡献，有助于；捐助，捐献</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>contributed tools</div>          <div class="root"><span class="lbl">根</span>con(一起) + tribut(给) + e → 一起给 → 贡献</div>          <div class="zt"><span class="lbl">真题</span>A variety of factors contribute to the long-run increase in the share of young adults living with their parents. 多种因素导致了与父 母同住的年轻人比例的长期增长。(2019)</div>          <div class="fam"><span class="lbl">族</span>contribution n. 贡献 / contributor n. 贡献者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">distribute</span>
+          <span class="ipa">/dr&#x27;strıbju:t; &#x27;distrıbju:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">分配；散布 (181) 第七单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and distributed a notice along the street</div>          <div class="mnem"><span class="lbl">记</span>dis(往下)十tribut(给予)十e→ 往下给→分配，散布。</div>          <div class="root"><span class="lbl">根</span>dis(分开) + tribut(给) + e → 分开给 → 分配</div>          <div class="zt"><span class="lbl">真题</span>He hires children to distribute ads in shopping centers. 他雇佣孩子在购物中心分发 广告。(2011)</div>          <div class="fam"><span class="lbl">族</span>distribution n. 分配 / distributor n. 经销商</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">retribution</span>
+          <span class="ipa">/retrı&#x27;bju:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">惩罚，报应；报答；报偿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old word for this is retribution</div>          <div class="mnem"><span class="lbl">记</span>re(回)十tribut(给予)十ion(名 词后缀)→给回去→报答；报偿。</div>          <div class="root"><span class="lbl">根</span>re(回) + tribut(给) + ion → 给回去 → 报应</div>          <div class="fam"><span class="lbl">族</span>retributive adj. 报应的 / tribute n. 贡品</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">attribute</span>
+          <span class="ipa">/&#x27;ætrıbjuit, ə&#x27;trıbju:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">把……归结于 n. 属性，品质，特征</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mrs. Han attributed her recovery to the street</div>          <div class="mnem"><span class="lbl">记</span>at(表强调，加强）+ tribut（给 予)十e→一定要把东西给出去→把……分配 至，归于→归属→属性。 【拓展】tribute /&#x27;tribju:t/ n.贡品；颂词</div>          <div class="root"><span class="lbl">根</span>at(加强) + tribut(给) + e → 把……给到某处 → 归因于</div>          <div class="zt"><span class="lbl">真题</span>The people there produced high-quality Moutai, which was treated as a tribute to the emperor.那里的人们生产出了高品质的茅台 酒，它被当作贡品献给皇帝。</div>          <div class="fam"><span class="lbl">族</span>attribution n. 归因 / tribute n. 贡品</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">owe</span>
+          <span class="ipa">/əu/</span>
+          <span class="pos">v.</span>
+          <span class="cn">欠(账、情)；归因于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>now they owe her something</div>          <div class="mnem"><span class="lbl">记</span>。联想成矿井，我们(we)每天 在矿井里不分昼夜地干活，是因为“欠”了别人 的钱，赶紧挣钱还债啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：owe sb. sth. 欠某人某物；owe to 归因于</div>          <div class="zt"><span class="lbl">真题</span>The child may feel that he owes her an apology. 这孩子可能觉得他欠她一个道歉。</div>          <div class="fam"><span class="lbl">族</span>owing adj. 未付的 / owing to 由于</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">combine</span>
+          <span class="ipa">/kəm&#x27;bain/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)结合，组合，联合；兼备n.集团，联合 企业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Tao&#x27;s photos combined the street&#x27;s stories</div>          <div class="mnem"><span class="lbl">记</span>com 看 成 company 的 缩 写； bine发音类似“并”。公司合并了，就是公司“联 合，结合”了。</div>          <div class="root"><span class="lbl">根</span>com(一起) + bin(两个) + e → 两个合一起 → 结合</div>          <div class="zt"><span class="lbl">真题</span>They often fail to combine teaching with research. 他们常常不能把教学与研究结合起 来。(2016)</div>          <div class="fam"><span class="lbl">族</span>combination n. 组合 / combined adj. 联合的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">connect</span>
+          <span class="ipa">/kə&#x27;nekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">连接，连结；联系</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to connect</div>          <div class="root"><span class="lbl">根</span>con(一起) + nect(绑) → 绑在一起 → 连接</div>          <div class="zt"><span class="lbl">真题</span>Great innovators are good at connecting concepts from various academic fields. 伟大的 创新者善于将各个学术领域的概念联系起来。</div>          <div class="fam"><span class="lbl">族</span>connection n. 联系 / connected adj. 连接的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">conjunctjon</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>though the printer set conjunction as conjunctjon</div>          <div class="root"><span class="lbl">根</span>con(一起) + junct(连接) + ion → 连在一起 → 结合</div>          <div class="fam"><span class="lbl">族</span>conjunction n. 连词；结合 / conjunctive adj. 连接的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">cohesion</span>
+          <span class="ipa">/kəu&#x27;hi:3n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">黏合；结合；凝聚性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had never had any cohesion</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆分为：所有人(co 想成 con“所有的”)都认为他是核心(hesion的 谐音)，他很有凝聚力啊→凝聚性。</div>          <div class="root"><span class="lbl">根</span>co(一起) + hes(粘) + ion → 粘在一起 → 凝聚力</div>          <div class="zt"><span class="lbl">真题</span>All this is done with the aim of improving workplace efficiency, collaboration and cohesion.所有这些都是为了提高工作效 率、协作和凝聚力。(2023)</div>          <div class="fam"><span class="lbl">族</span>cohesive adj. 有凝聚力的 / cohere v. 连贯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">joint</span>
+          <span class="ipa">/dzəint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">关节，接头 adj. 联合的,共同的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a remedy into the joint</div>          <div class="mnem"><span class="lbl">记</span>join v. 连接；想象一下两个骨 头连接的地方，不就是“关节，接头”吗？</div>          <div class="root"><span class="lbl">根</span>join(连接) + t → 两个东西接上的地方 → 关节</div>          <div class="zt"><span class="lbl">真题</span>Training can prevent these by making muscles stronger and keeping joints lubricated (润滑). 训练可以通过使肌肉更强壮和保持关 节的润滑来防止这些。</div>          <div class="fam"><span class="lbl">族</span>jointly adv. 共同地 / joint venture 合资企业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">integrate</span>
+          <span class="ipa">/&#x27;IntigreIt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)合并，成为一体；(使)加入，融入群体</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>plans to integrate these small shops</div>          <div class="mnem"><span class="lbl">记</span>inte 发音类似“音体”；grate发 音类似“great(好)”。连在一起就是：音乐、体育 都要好。我们要做个全面发展的好学生，不光 学习好，音乐、体育也要好→一体化，综合→成 为一体。</div>          <div class="root"><span class="lbl">根</span>in(不) + teg(触动) + rate → 没被碰过，还是整的 → 成为一体</div>          <div class="zt"><span class="lbl">真题</span>But not many are able to integrate innovation into their business. 但能够将创新融 入业务的企业并不多。(2016)</div>          <div class="fam"><span class="lbl">族</span>integration n. 一体化 / integrated adj. 综合的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 48</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

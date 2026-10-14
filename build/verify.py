@@ -16,6 +16,10 @@ _SUFFIXES = ("ically", "ation", "ingly", "edly", "ness", "ment",
 
 def _strip(w: str) -> str:
     w = w.lower()
+    # 先处理 -ied / -ies：还原成 y（buried ← bury，carries ← carry）
+    for suf in ("ied", "ies"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)] + "y"
     for suf in _SUFFIXES:
         if len(w) > len(suf) + 2 and w.endswith(suf):
             return w[: -len(suf)]

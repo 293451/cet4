@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 47 · The Oath and the Glass Case</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 47 · 11/28 · Unit 7 第 1381-1410 词</div>
+  <h1>The Oath and the Glass Case<span class="cn">誓言与玻璃柜</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-47.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="6997"><p class="en"><span class="w" data-s="43" data-e="213">Dr.</span> <span class="w" data-s="341" data-e="725">Qiao</span> <span class="w" data-s="768" data-e="853">began</span> <span class="w" data-s="896" data-e="1109">work</span> <span class="w" data-s="1152" data-e="1323">at</span> <span class="w" data-s="1365" data-e="1451">the</span> <span class="w" data-s="1493" data-e="1579">small</span> <span class="w" data-s="1621" data-e="2005">hospital</span> <span class="w" data-s="2048" data-e="2347">in</span> <span class="w" data-s="2389" data-e="2773">Anhe</span> <span class="w" data-s="2816" data-e="3115">on</span> <span class="w" data-s="3157" data-e="3243">a</span> <span class="w" data-s="3285" data-e="3371">cold</span> <span class="w" data-s="3413" data-e="3883">Monday,</span> <span class="w" data-s="4053" data-e="4181">and</span> <span class="w" data-s="4523" data-e="4608">on</span> <span class="w" data-s="4651" data-e="4736">her</span> <span class="w" data-s="4779" data-e="4864">first</span> <span class="w" data-s="4907" data-e="5163">morning</span> <span class="w" data-s="5205" data-e="5504">she</span> <span class="w" data-s="5547" data-e="5717">had</span> <span class="w" data-s="5760" data-e="5845">to</span> <span class="w target" data-s="5888" data-e="6101" title="发誓，宣誓；诅咒">swear</span> <span class="w" data-s="6144" data-e="6272">an</span> <span class="w" data-s="6315" data-e="6443">oath</span> <span class="w" data-s="6485" data-e="6613">before</span> <span class="w" data-s="6656" data-e="6827">the</span> <span class="w" data-s="6869" data-e="6997">staff.</span></p><p class="zh">乔医生在一个寒冷的周一开始在安和镇的小医院上班，头一天早上她得在全院职工面前宣誓。</p></div>
+<div class="pair" data-s0="7424" data-s1="11861"><p class="en"><span class="w" data-s="7424" data-e="7509">She</span> <span class="w target" data-s="7552" data-e="7893" title="保证；诺言 v. 保证给予(或做)；正式承诺； 使保证,发誓">pledged</span> <span class="w" data-s="7936" data-e="8021">to</span> <span class="w" data-s="8064" data-e="8192">treat</span> <span class="w" data-s="8235" data-e="8448">every</span> <span class="w" data-s="8491" data-e="8789">patient</span> <span class="w" data-s="8832" data-e="9088">the</span> <span class="w" data-s="9131" data-e="9259">same</span> <span class="w" data-s="9301" data-e="9515">way</span> <span class="w" data-s="9557" data-e="9941">and</span> <span class="w" data-s="10069" data-e="10368">to</span> <span class="w target" data-s="10411" data-e="10624" title="使确信，保证，确保 adv.确信地，当然地">assure</span> <span class="w" data-s="10667" data-e="10965">each</span> <span class="w" data-s="11008" data-e="11136">of</span> <span class="w" data-s="11179" data-e="11221">them</span> <span class="w" data-s="11264" data-e="11435">that</span> <span class="w" data-s="11477" data-e="11563">he</span> <span class="w" data-s="11605" data-e="11733">was</span> <span class="w" data-s="11776" data-e="11861">safe.</span></p><p class="zh">她保证对每个病人都一视同仁，也答应让每个人都确信自己是安全的。</p></div>
+<div class="pair" data-s0="12971" data-s1="16561"><p class="en"><span class="w" data-s="12971" data-e="13013">&quot;We</span> <span class="w" data-s="13056" data-e="13312">cannot</span> <span class="w target" data-s="13355" data-e="13739" title="投保；给……保险；接受投保；承保；保证， 确保">insure</span> <span class="w" data-s="13781" data-e="13995">you</span> <span class="w" data-s="14037" data-e="14165">against</span> <span class="w" data-s="14208" data-e="14677">illness,&quot;</span> <span class="w" data-s="15751" data-e="15793">the</span> <span class="w" data-s="15836" data-e="15879">old</span> <span class="w target" data-s="15921" data-e="16348" title="医生，内科医生">physician</span> <span class="w" data-s="16391" data-e="16561">said.</span></p><p class="zh">“我们没法给你保住了不得病的险，”老内科医生说。</p></div>
+<div class="pair" data-s0="16945" data-s1="22065"><p class="en"><span class="w" data-s="16945" data-e="16988">&quot;But</span> <span class="w" data-s="17671" data-e="17799">we</span> <span class="w" data-s="17841" data-e="17969">can</span> <span class="w target" data-s="18012" data-e="18225" title="保证，确保">ensure</span> <span class="w" data-s="18268" data-e="18481">you</span> <span class="w" data-s="18524" data-e="18652">are</span> <span class="w" data-s="18695" data-e="18780">never</span> <span class="w" data-s="18823" data-e="19079">alone,</span> <span class="w" data-s="19420" data-e="19633">and</span> <span class="w" data-s="19804" data-e="20103">I</span> <span class="w target" data-s="20145" data-e="20572" title="保证，担保η.保证，担保；保证书，保修单">guarantee</span> <span class="w" data-s="20615" data-e="20871">nobody</span> <span class="w" data-s="20913" data-e="21169">here</span> <span class="w" data-s="21212" data-e="21511">will</span> <span class="w" data-s="21553" data-e="21724">lie</span> <span class="w" data-s="21767" data-e="21937">to</span> <span class="w" data-s="21980" data-e="22065">you.&quot;</span></p><p class="zh">“但我们能确保你永远不会一个人待着，我担保这里没人会对你说假话。”</p></div>
+<div class="pair" data-s0="22492" data-s1="24668"><p class="en"><span class="w" data-s="22492" data-e="22961">In</span> <span class="w" data-s="23004" data-e="23132">the</span> <span class="w" data-s="23175" data-e="23516">corridor</span> <span class="w" data-s="23559" data-e="23900">stood</span> <span class="w" data-s="24071" data-e="24241">a</span> <span class="w" data-s="24284" data-e="24369">glass</span> <span class="w" data-s="24412" data-e="24668">case.</span></p><p class="zh">走廊上立着一个玻璃柜。</p></div>
+<div class="pair" data-s0="25009" data-s1="29319"><p class="en"><span class="w" data-s="25009" data-e="25351">Inside</span> <span class="w" data-s="25393" data-e="25649">it</span> <span class="w" data-s="25692" data-e="25905">lay</span> <span class="w" data-s="26119" data-e="26289">a</span> <span class="w target" data-s="26332" data-e="26545" title="剑，刀">sword</span> <span class="w" data-s="26588" data-e="26801">and</span> <span class="w" data-s="26844" data-e="27015">an</span> <span class="w target" data-s="27057" data-e="27356" title="箭">arrow</span> <span class="w" data-s="27399" data-e="27612">that</span> <span class="w" data-s="27868" data-e="28039">a</span> <span class="w" data-s="28081" data-e="28337">farmer</span> <span class="w" data-s="28380" data-e="28465">had</span> <span class="w" data-s="28508" data-e="28679">pulled</span> <span class="w" data-s="28721" data-e="28892">out</span> <span class="w" data-s="28935" data-e="29063">of</span> <span class="w" data-s="29105" data-e="29148">the</span> <span class="w" data-s="29191" data-e="29319">river.</span></p><p class="zh">里面放着一把剑和一支箭，是一位农民从河里捞上来的。</p></div>
+<div class="pair" data-s0="30211" data-s1="32429"><p class="en"><span class="w" data-s="30211" data-e="30296">One</span> <span class="w" data-s="30339" data-e="30552">night</span> <span class="w" data-s="30595" data-e="30893">a</span> <span class="w" data-s="31021" data-e="31192">boy</span> <span class="w" data-s="31235" data-e="31405">of</span> <span class="w" data-s="31448" data-e="31747">twelve</span> <span class="w" data-s="31789" data-e="31960">was</span> <span class="w" data-s="32003" data-e="32259">carried</span> <span class="w" data-s="32301" data-e="32429">in.</span></p><p class="zh">一天夜里，一个十二岁的男孩被送了进来。</p></div>
+<div class="pair" data-s0="32643" data-s1="37507"><p class="en"><span class="w" data-s="32643" data-e="33112">He</span> <span class="w" data-s="33155" data-e="33453">said</span> <span class="w" data-s="33496" data-e="33667">the</span> <span class="w" data-s="33709" data-e="33965">ceiling</span> <span class="w" data-s="34008" data-e="34221">lamp</span> <span class="w target" data-s="34264" data-e="34691" title="耀眼眩目；令人眼花缭乱的东西 v. 使目 眩，使眼花；(美貌、技能等)使倾倒">dazzled</span> <span class="w" data-s="34733" data-e="34819">him,</span> <span class="w" data-s="35032" data-e="35245">the</span> <span class="w" data-s="35373" data-e="35544">room</span> <span class="w" data-s="35587" data-e="35757">began</span> <span class="w" data-s="35800" data-e="36013">to</span> <span class="w" data-s="36056" data-e="36184">turn,</span> <span class="w" data-s="36440" data-e="36653">and</span> <span class="w" data-s="36781" data-e="36909">he</span> <span class="w" data-s="36952" data-e="37080">felt</span> <span class="w target" data-s="37123" data-e="37507" title="头晕目眩的">dizzy.</span></p><p class="zh">他说天花板上的灯晃得他眼花，屋子开始打转，他头晕得厉害。</p></div>
+<div class="pair" data-s0="37592" data-s1="39384"><p class="en"><span class="w" data-s="37592" data-e="37976">A</span> <span class="w" data-s="38019" data-e="38445">minute</span> <span class="w" data-s="38488" data-e="38701">later</span> <span class="w" data-s="38744" data-e="38957">he</span> <span class="w target" data-s="39000" data-e="39384" title="(光、声、味)微弱的，不清楚的；可能性不大 的；昏厥的 v.昏厥">fainted.</span></p><p class="zh">一分钟后就昏了过去。</p></div>
+<div class="pair" data-s0="39555" data-s1="43920"><p class="en"><span class="w" data-s="39555" data-e="40280">Dr.</span> <span class="w" data-s="41062" data-e="41446">Qiao</span> <span class="w" data-s="41488" data-e="41659">asked</span> <span class="w" data-s="41702" data-e="41915">about</span> <span class="w" data-s="41958" data-e="42086">his</span> <span class="w" data-s="42128" data-e="42342">meals</span> <span class="w" data-s="42384" data-e="42683">and</span> <span class="w" data-s="42726" data-e="43110">gave</span> <span class="w" data-s="43152" data-e="43280">him</span> <span class="w" data-s="43323" data-e="43408">a</span> <span class="w target" data-s="43451" data-e="43579" title="身体的；肉体的；躯体的；客观存在的；现实 的；物质的；有形的；物理学的">physical</span> <span class="w" data-s="43622" data-e="43920">check.</span></p><p class="zh">乔医生问他平时吃什么，又给他做了一次身体检查。</p></div>
+<div class="pair" data-s0="44262" data-s1="47846"><p class="en"><span class="w" data-s="44262" data-e="44859">His</span> <span class="w" data-s="44902" data-e="45286">stomach</span> <span class="w" data-s="45328" data-e="45456">had</span> <span class="w" data-s="45499" data-e="45670">begun</span> <span class="w" data-s="45712" data-e="45840">to</span> <span class="w target" data-s="45883" data-e="46096" title="肿胀，隆起；增加">swell,</span> <span class="w" data-s="46310" data-e="46523">and</span> <span class="w" data-s="46694" data-e="46822">it</span> <span class="w" data-s="46864" data-e="46950">hurt</span> <span class="w" data-s="46992" data-e="47248">when</span> <span class="w" data-s="47291" data-e="47419">she</span> <span class="w" data-s="47462" data-e="47590">pressed</span> <span class="w" data-s="47632" data-e="47846">it.</span></p><p class="zh">他的肚子已经开始肿起来，按下去就疼。</p></div>
+<div class="pair" data-s0="48059" data-s1="51472"><p class="en"><span class="w" data-s="48059" data-e="48614">She</span> <span class="w" data-s="48656" data-e="48784">took</span> <span class="w" data-s="48827" data-e="48912">a</span> <span class="w target" data-s="48955" data-e="49254" title="样品，式样v. 抽样试验，抽样调查">sample</span> <span class="w" data-s="49296" data-e="49382">of</span> <span class="w" data-s="49424" data-e="49510">his</span> <span class="w" data-s="49552" data-e="49638">blood</span> <span class="w" data-s="49680" data-e="50022">and</span> <span class="w" data-s="50064" data-e="50363">sent</span> <span class="w" data-s="50406" data-e="50576">a</span> <span class="w target" data-s="50619" data-e="51003" title="样品；样本；标本 (175)">specimen</span> <span class="w" data-s="51046" data-e="51174">to</span> <span class="w" data-s="51216" data-e="51302">the</span> <span class="w" data-s="51344" data-e="51472">lab.</span></p><p class="zh">她抽了一份血样，把标本送到了化验室。</p></div>
+<div class="pair" data-s0="52168" data-s1="56392"><p class="en"><span class="w" data-s="52168" data-e="52253">The</span> <span class="w" data-s="52296" data-e="52424">report</span> <span class="w" data-s="52466" data-e="52765">came</span> <span class="w" data-s="52808" data-e="52978">back:</span> <span class="w" data-s="53277" data-e="53917">it</span> <span class="w" data-s="54045" data-e="54173">was</span> <span class="w" data-s="54216" data-e="54344">not</span> <span class="w" data-s="54386" data-e="54557">a</span> <span class="w target" data-s="54600" data-e="55026" title="接触传染；接触性传染病；(不良事物的快速) 传播，蔓延，扩散">contagion,</span> <span class="w" data-s="55240" data-e="55368">and</span> <span class="w" data-s="55496" data-e="55666">he</span> <span class="w" data-s="55709" data-e="55837">had</span> <span class="w" data-s="55880" data-e="56008">no</span> <span class="w" data-s="56050" data-e="56392">fever.</span></p><p class="zh">报告回来了：不是传染病，也没有发烧。</p></div>
+<div class="pair" data-s0="56520" data-s1="58781"><p class="en"><span class="w" data-s="56520" data-e="57245">She</span> <span class="w" data-s="57288" data-e="57458">could</span> <span class="w target" data-s="57501" data-e="58013" title="诊断(疾病);判断(问题的原因)">diagnose</span> <span class="w" data-s="58056" data-e="58098">the</span> <span class="w" data-s="58141" data-e="58269">problem</span> <span class="w" data-s="58312" data-e="58610">at</span> <span class="w" data-s="58653" data-e="58781">once.</span></p><p class="zh">她一下子就能诊断出问题所在。</p></div>
+<div class="pair" data-s0="59037" data-s1="62834"><p class="en"><span class="w" data-s="59037" data-e="59677">A</span> <span class="w" data-s="59720" data-e="59933">body</span> <span class="w" data-s="59976" data-e="60232">is</span> <span class="w" data-s="60274" data-e="60360">a</span> <span class="w" data-s="60402" data-e="60530">living</span> <span class="w target" data-s="60573" data-e="61085" title="有机体；生物；有机组织；有机体系">organism,</span> <span class="w" data-s="61298" data-e="61512">and</span> <span class="w" data-s="61640" data-e="61810">each</span> <span class="w target" data-s="61853" data-e="62109" title="(人体或动植物的)器官；(官方的)机构，机 关；管风琴；风琴">organ</span> <span class="w" data-s="62152" data-e="62408">has</span> <span class="w" data-s="62450" data-e="62578">its</span> <span class="w target" data-s="62621" data-e="62834" title="作用；功能；职能；机能；函数v.起作用；正 常工作；运转">function.</span></p><p class="zh">人体是一个活的有机体，每个器官都有自己的功能。</p></div>
+<div class="pair" data-s0="63511" data-s1="68033"><p class="en"><span class="w" data-s="63511" data-e="63639">When</span> <span class="w" data-s="63681" data-e="63809">the</span> <span class="w target" data-s="63852" data-e="64108" title="(食物、饮料等的)摄取量，吸入量；吸收；吸入">intake</span> <span class="w" data-s="64151" data-e="64279">of</span> <span class="w" data-s="64321" data-e="64449">sugar</span> <span class="w" data-s="64492" data-e="64748">is</span> <span class="w" data-s="64791" data-e="64919">too</span> <span class="w" data-s="64961" data-e="65175">high,</span> <span class="w" data-s="65473" data-e="65644">the</span> <span class="w" data-s="65857" data-e="66241">stomach</span> <span class="w" data-s="66284" data-e="66583">cannot</span> <span class="w target" data-s="66625" data-e="67137" title="吸收(液体，知识等)；同化；理解，掌握；使全 神贯注">absorb</span> <span class="w" data-s="67180" data-e="67265">it</span> <span class="w" data-s="67308" data-e="67436">or</span> <span class="w target" data-s="67479" data-e="67777" title="消化；领会；领悟；理解 η. 摘要；概要；文 摘；汇编">digest</span> <span class="w" data-s="67820" data-e="68033">it.</span></p><p class="zh">糖的摄入量太高时，胃既吸收不了也消化不了。</p></div>
+<div class="pair" data-s0="68204" data-s1="69740"><p class="en"><span class="w" data-s="68204" data-e="68588">He</span> <span class="w" data-s="68631" data-e="68844">did</span> <span class="w" data-s="68887" data-e="68972">not</span> <span class="w" data-s="69015" data-e="69228">need</span> <span class="w target" data-s="69271" data-e="69740" title="外科手术；外科学；诊室；门诊处">surgery.</span></p><p class="zh">他不需要做手术。</p></div>
+<div class="pair" data-s0="69868" data-s1="73452"><p class="en"><span class="w" data-s="69868" data-e="70295">The</span> <span class="w target" data-s="70337" data-e="70764" title="外科医生">surgeon</span> <span class="w" data-s="70807" data-e="70892">on</span> <span class="w" data-s="70935" data-e="71191">duty</span> <span class="w" data-s="71233" data-e="71361">said</span> <span class="w" data-s="71404" data-e="71532">a</span> <span class="w" data-s="71575" data-e="71703">bowl</span> <span class="w" data-s="71745" data-e="71831">of</span> <span class="w" data-s="71873" data-e="72129">rice</span> <span class="w" data-s="72172" data-e="72300">would</span> <span class="w" data-s="72343" data-e="72513">help</span> <span class="w" data-s="72556" data-e="72769">more</span> <span class="w" data-s="72812" data-e="73025">than</span> <span class="w" data-s="73068" data-e="73153">his</span> <span class="w" data-s="73196" data-e="73452">knife.</span></p><p class="zh">值班的外科医生说，一碗米饭比他的刀管用得多。</p></div>
+<div class="pair" data-s0="74106" data-s1="76751"><p class="en"><span class="w" data-s="74106" data-e="74191">A</span> <span class="w" data-s="74234" data-e="74490">nurse</span> <span class="w" data-s="74533" data-e="74661">came</span> <span class="w" data-s="74703" data-e="74831">to</span> <span class="w target" data-s="74874" data-e="75215" title="组织；筹备；安排；处理；分配">organize</span> <span class="w" data-s="75258" data-e="75514">and</span> <span class="w target" data-s="75557" data-e="75813" title="递，送；发表，表达；移交，交付">deliver</span> <span class="w" data-s="75855" data-e="75983">his</span> <span class="w" data-s="76026" data-e="76239">meals</span> <span class="w" data-s="76282" data-e="76453">to</span> <span class="w" data-s="76495" data-e="76581">his</span> <span class="w" data-s="76623" data-e="76751">bed.</span></p><p class="zh">一位护士来安排他的饮食，并把饭送到床边。</p></div>
+<div class="pair" data-s0="77007" data-s1="79909"><p class="en"><span class="w" data-s="77007" data-e="77605">For</span> <span class="w" data-s="77647" data-e="77861">three</span> <span class="w" data-s="77903" data-e="78117">days</span> <span class="w" data-s="78159" data-e="78458">he</span> <span class="w" data-s="78501" data-e="78714">drank</span> <span class="w" data-s="78757" data-e="78885">warm</span> <span class="w" data-s="78927" data-e="79183">water</span> <span class="w" data-s="79226" data-e="79525">through</span> <span class="w" data-s="79567" data-e="79695">a</span> <span class="w target" data-s="79738" data-e="79909" title="稻草；吸管">straw.</span></p><p class="zh">头三天他只喝温水，用一根吸管。</p></div>
+<div class="pair" data-s0="80165" data-s1="84986"><p class="en"><span class="w" data-s="80165" data-e="80762">On</span> <span class="w" data-s="80805" data-e="80890">the</span> <span class="w" data-s="80933" data-e="81061">fourth</span> <span class="w" data-s="81103" data-e="81317">morning</span> <span class="w" data-s="81359" data-e="81615">he</span> <span class="w" data-s="81658" data-e="81829">walked</span> <span class="w" data-s="81871" data-e="82085">out,</span> <span class="w" data-s="82341" data-e="82511">and</span> <span class="w" data-s="82554" data-e="82938">Dr.</span> <span class="w" data-s="83109" data-e="83493">Qiao</span> <span class="w" data-s="83535" data-e="83706">gave</span> <span class="w" data-s="83749" data-e="83834">him</span> <span class="w" data-s="83877" data-e="83962">a</span> <span class="w" data-s="84005" data-e="84090">small</span> <span class="w target" data-s="84133" data-e="84474" title="(药的)一剂，一服 v. 给(某人)服药">dose</span> <span class="w" data-s="84517" data-e="84602">of</span> <span class="w" data-s="84645" data-e="84986">medicine.</span></p><p class="zh">第四天早上他走出去了；乔医生给他开了一小剂药。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">swear</span>
+          <span class="ipa">/swer/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发誓，宣誓；诅咒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she had to swear an oath before the staff</div>          <div class="mnem"><span class="lbl">记</span>美女(s)穿(wear)得那么正式， 干什么去？→宣誓，发誓。</div>          <div class="root"><span class="lbl">根</span>联想：s(美女) + wear(穿) → 穿得正式去宣誓</div>          <div class="fam"><span class="lbl">族</span>sworn adj. 宣誓过的 / swear word 脏话</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">swell</span>
+          <span class="ipa">/swel/</span>
+          <span class="pos">v.</span>
+          <span class="cn">肿胀，隆起；增加</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His stomach had begun to swell</div>          <div class="mnem"><span class="lbl">记</span>美女(s)掉到井（well)里了，很 久没有人救她，腿在水里都泡肿了→肿胀。</div>          <div class="root"><span class="lbl">根</span>联想 well(井) → 掉进井里泡久了就肿了 → 肿胀</div>          <div class="zt"><span class="lbl">真题</span>When IT is operating as it should, employee self-confidence swells. 当 IT 正常运 转时，员工的自信心就会膨胀。(2021)</div>          <div class="fam"><span class="lbl">族</span>swelling n. 肿胀 / swollen adj. 肿起来的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">sword</span>
+          <span class="ipa">/sə:rd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">剑，刀</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>lay a sword and an arrow</div>          <div class="mnem"><span class="lbl">记</span>这个美女(s)说话(word)，就像 “剑”一样犀利。</div>          <div class="root"><span class="lbl">根</span>联想 word(词) → 说出来的话像剑一样利 → 剑</div>          <div class="zt"><span class="lbl">真题</span>The sword hasn&#x27;t had a military function for a hundred years. 这把剑已经有 100 年没有 军事用途了。</div>          <div class="fam"><span class="lbl">族</span>swordsman n. 剑客 / cross swords 交锋</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">arrow</span>
+          <span class="ipa">/&#x27;æreu/</span>
+          <span class="pos"></span>
+          <span class="cn">箭</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an arrow that a farmer had pulled out of the river</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“哎呦”。哎 呦，腿被“箭”射中了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：哎呦 → 腿被射中喊哎呦 → 箭</div>          <div class="zt"><span class="lbl">真题</span>An officer then shot an arrow to put it to sleep.一名警官随后射了一箭使它沉睡。 (2019)</div>          <div class="fam"><span class="lbl">族</span>arrowhead n. 箭头 / bow and arrow 弓箭</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">sample</span>
+          <span class="ipa">/&#x27;sa:mpl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">样品，式样v. 抽样试验，抽样调查</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She took a sample of his blood</div>          <div class="root"><span class="lbl">根</span>联想 example(例子) 去掉 ex → 用来当例子的东西 → 样品</div>          <div class="zt"><span class="lbl">真题</span>As in other research, women in our sample tend to over-perceive their weight. 和其 他研究一样，我们样本中的女性倾向于过度关 注自己的体重。(2020)</div>          <div class="fam"><span class="lbl">族</span>sampling n. 抽样 / sampler n. 采样器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">specimen</span>
+          <span class="ipa">/&#x27;spesimən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">样品；样本；标本 (175)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sent a specimen to the lab</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分类似special(特 别的)；men人。那就是特别的人都拿来做“样 本，标本”啊。</div>          <div class="root"><span class="lbl">根</span>spec(看) + imen → 拿给人看的东西 → 标本</div>          <div class="zt"><span class="lbl">真题</span>It is displaying more fossil specimens. 它 展示了更多的化石标本。</div>          <div class="fam"><span class="lbl">族</span>species n. 物种 / specimen n. 标本</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">dizzy</span>
+          <span class="ipa">/&#x27;dızi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">头晕目眩的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he felt dizzy</div>          <div class="mnem"><span class="lbl">记</span>弟弟(di)都快睡着(zz 是睡觉的 符号)了，“头晕目眩的”。</div>          <div class="root"><span class="lbl">根</span>联想 di(弟弟) + zz(睡觉) → 困得头晕 → 头晕目眩的</div>          <div class="fam"><span class="lbl">族</span>dizziness n. 头晕 / dizzying adj. 让人头晕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">dazzle</span>
+          <span class="ipa">/&#x27;dæzl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">耀眼眩目；令人眼花缭乱的东西 v. 使目 眩，使眼花；(美貌、技能等)使倾倒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ceiling lamp dazzled him</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“带走”。因为 东西非常“耀眼炫目”，所以很吸引人，令人都想 带走。</div>          <div class="root"><span class="lbl">根</span>谐音联想：带走 → 耀眼得让人想带走 → 使眼花</div>          <div class="fam"><span class="lbl">族</span>dazzling adj. 耀眼的 / dazzled adj. 目眩的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">faint</span>
+          <span class="ipa">/feint/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(光、声、味)微弱的，不清楚的；可能性不大 的；昏厥的 v.昏厥</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A minute later he fainted</div>          <div class="mnem"><span class="lbl">记</span>发音类似“粉的”。粉色是不是 给人一种很浪漫、眩晕的感觉？→昏倒，昏厥。</div>          <div class="root"><span class="lbl">根</span>谐音联想：粉的 → 粉色让人晕乎乎 → 微弱的；昏厥</div>          <div class="zt"><span class="lbl">真题</span>It carries faint noises from a patient&#x27;s chest to a doctor&#x27;s ear. 它将微弱的声音从病人 的胸部传到医生的耳朵。</div>          <div class="fam"><span class="lbl">族</span>faintly adv. 微弱地 / faintness n. 昏厥</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">insure</span>
+          <span class="ipa">/ın&#x27;∫ur/</span>
+          <span class="pos">v.</span>
+          <span class="cn">投保；给……保险；接受投保；承保；保证， 确保</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>We cannot insure you against illness</div>          <div class="mnem"><span class="lbl">记</span>in内心；sure确定的。使内心 确定。我们很多人内心不确定，怕以后出现意 外，于是他们总是存钱，不舍得花钱，所以保险 公司就出现了，建议人们给自己“投保”。</div>          <div class="root"><span class="lbl">根</span>in(使) + sure(确定) → 使心里有底 → 投保</div>          <div class="fam"><span class="lbl">族</span>insurance n. 保险 / insurer n. 保险公司</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">assure</span>
+          <span class="ipa">/ə&#x27;∫uə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使确信，保证，确保 adv.确信地，当然地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to assure each of them that he was safe</div>          <div class="mnem"><span class="lbl">记</span>as 表示“一再地”;sure表示“确 信的”。我一再地确信你能通过四级考试，我在 向你保证→保证，使确信。</div>          <div class="root"><span class="lbl">根</span>as(一再) + sure(确定) → 一再让人确信 → 保证</div>          <div class="zt"><span class="lbl">真题</span>I can assure you that the animals are well cared for.我可以向你保证这些动物都被照看 得很好。</div>          <div class="fam"><span class="lbl">族</span>assurance n. 保证 / assured adj. 有把握的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">ensure</span>
+          <span class="ipa">/in&#x27;∫uə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保证，确保</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we can ensure you are never alone</div>          <div class="mnem"><span class="lbl">记</span>前缀 en 表示“使”，ensure 使确 信，意思同 assure。但是 assure 后接宾语代词， 以表明向谁保证。ensure后不接宾语代词，而 接 that 从句。</div>          <div class="root"><span class="lbl">根</span>en(使) + sure(确定) → 使某事确定下来 → 确保</div>          <div class="zt"><span class="lbl">真题</span>The United States Postal Service has a system to ensure its employees&#x27;safety. 美国邮 政服务有一个系统来确保其员工的安全。 (2019)</div>          <div class="fam"><span class="lbl">族</span>sure adj. 确定的 / ensure that 确保</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">guarantee</span>
+          <span class="ipa">/igærən&#x27;ti:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保证，担保η.保证，担保；保证书，保修单</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I guarantee nobody here will lie to you</div>          <div class="mnem"><span class="lbl">记</span>该单词可拆成：guar(d)(卫兵， 卫士)+ant(蚂蚁)+ee(小蚂蚁的两只小眼睛)， 所以该单词可想象成：蚂蚁哨兵瞪着两只小眼 (176) 睛说：“保证完成任务”→保证，担保。</div>          <div class="root"><span class="lbl">根</span>联想 guard(卫士) + ant(蚂蚁) + ee(眼睛) → 蚂蚁哨兵说保证完成 → 保证</div>          <div class="zt"><span class="lbl">真题</span>It guarantees the safe shipping of products. 保证产品的安全运输。</div>          <div class="fam"><span class="lbl">族</span>guarantor n. 担保人 / guaranteed adj. 有保证的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">pledge</span>
+          <span class="ipa">/pled3/</span>
+          <span class="pos"></span>
+          <span class="cn">保证；诺言 v. 保证给予(或做)；正式承诺； 使保证,发誓</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She pledged to treat every patient the same way</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“扑来鸡”。就是 你在院子里写作业，突然一只鸡扑到你头上，你 很生气，内心暗暗“发誓”一定把它抓住。</div>          <div class="root"><span class="lbl">根</span>谐音联想：扑来鸡 → 暗暗发誓要抓住它 → 发誓</div>          <div class="zt"><span class="lbl">真题</span>Glasgow has pledged to take the lead in reducing carbon emissions in the U.K. 格拉斯 哥承诺在英国率先减少碳排放。(2021)</div>          <div class="fam"><span class="lbl">族</span>pledge n. 誓言 / pledged adj. 承诺的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">deliver</span>
+          <span class="ipa">/dr&#x27;livə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">递，送；发表，表达；移交，交付</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>organize and deliver his meals to his bed</div>          <div class="mnem"><span class="lbl">记</span>de得；liver肝脏。得把肝脏 “传送”出去做移植手术。</div>          <div class="root"><span class="lbl">根</span>联想 de(得) + liver(肝) → 得把东西送出去 → 递送</div>          <div class="zt"><span class="lbl">真题</span>They worry assistants will one day be used to deliver advertising directly to us. 他们 担心，有一天，智能助手会被用来直接向我们发 送广告。(2023)</div>          <div class="fam"><span class="lbl">族</span>delivery n. 递送 / deliverer n. 投递员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">organ</span>
+          <span class="ipa">/&#x27;o:rgən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(人体或动植物的)器官；(官方的)机构，机 关；管风琴；风琴</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>each organ has its function</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“呕肝”。肝就 是人体的“器官”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：呕肝 → 肝是人体的器官 → 器官</div>          <div class="zt"><span class="lbl">真题</span>About 10-15 percent of these heart operations end in death or damage to the heart or other organs. 大约 10%～15%的心脏手术 最终导致死亡或损伤心脏或其他器官。</div>          <div class="fam"><span class="lbl">族</span>organic adj. 有机的 / organism n. 生物体</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">organism</span>
+          <span class="ipa">/&#x27;ə:rgənizəm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">有机体；生物；有机组织；有机体系</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A body is a living organism</div>          <div class="root"><span class="lbl">根</span>organ(器官) + ism(……体) → 各器官组成的整体 → 生物体</div>          <div class="zt"><span class="lbl">真题</span>It seems simple enough to distinguish between the organism and the surrounding environment. 区分生物体和周围的环境似乎很 (177) 第七单元 简单。</div>          <div class="fam"><span class="lbl">族</span>organic adj. 有机的 / organize v. 组织</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">organize</span>
+          <span class="ipa">/&#x27;ə:rgənaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">组织；筹备；安排；处理；分配</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A nurse came to organize and deliver his meals</div>          <div class="mnem"><span class="lbl">记</span>organ(器官)十ize(使……化) →使器官有序排列→组织。</div>          <div class="root"><span class="lbl">根</span>organ(器官) + ize(使……化) → 使器官各就各位 → 组织</div>          <div class="zt"><span class="lbl">真题</span>They organize their own laboratory work. 他们组织自己的实验室工作。</div>          <div class="fam"><span class="lbl">族</span>organization n. 组织 / organized adj. 有条理的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">function</span>
+          <span class="ipa">/&#x27;fank∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">作用；功能；职能；机能；函数v.起作用；正 常工作；运转</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>each organ has its function</div>          <div class="root"><span class="lbl">根</span>funct(做，执行) + ion(名词后缀) → 做事的本事 → 功能</div>          <div class="zt"><span class="lbl">真题</span>This is evidence that our immune system really doesn&#x27;t function so well when we age. 这 表明，随着年龄的增长，我们的免疫系统真的不 能很好地发挥作用。(2019)</div>          <div class="fam"><span class="lbl">族</span>functional adj. 功能的 / malfunction n. 故障</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">absorb</span>
+          <span class="ipa">/əb&#x27;zə:b/</span>
+          <span class="pos">v.</span>
+          <span class="cn">吸收(液体，知识等)；同化；理解，掌握；使全 神贯注</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the stomach cannot absorb it or digest it</div>          <div class="root"><span class="lbl">根</span>ab(离开) + sorb(吸) → 吸进去 → 吸收</div>          <div class="zt"><span class="lbl">真题</span>Some people are absorbed in the past but not open to new memories, but that&#x27;s not the case for me. 有些人沉湎于过去，而不愿接受新 的回忆，但我不是这样。(2017)</div>          <div class="fam"><span class="lbl">族</span>absorption n. 吸收 / absorbed adj. 全神贯注的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">intake</span>
+          <span class="ipa">/&#x27;ınteık/</span>
+          <span class="pos"></span>
+          <span class="cn">(食物、饮料等的)摄取量，吸入量；吸收；吸入</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the intake of sugar is too high</div>          <div class="mnem"><span class="lbl">记</span>in(里面)十take(带着)→带到 里面去→摄入，吸入。</div>          <div class="root"><span class="lbl">根</span>in(里面) + take(带) → 带进身体里面 → 摄入</div>          <div class="zt"><span class="lbl">真题</span>People who prioritise breakfasts tend to have lower calorie but higher nutritional intake. 优先吃早餐的人往往摄入的热量较低， 但营养较高。(2019)</div>          <div class="fam"><span class="lbl">族</span>take in 吸收 / intake n. 摄入量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">straw</span>
+          <span class="ipa">/stro:/</span>
+          <span class="pos"></span>
+          <span class="cn">稻草；吸管</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he drank warm water through a straw</div>          <div class="mnem"><span class="lbl">记</span>strawberry 这个单词我们很熟 悉：草莓。那 straw 不就是“草”的意思？</div>          <div class="root"><span class="lbl">根</span>联想 strawberry(草莓) → 草莓下面的东西 → 稻草；吸管</div>          <div class="zt"><span class="lbl">真题</span>It adds a layer of straw to the inside of the cup. 它在杯子里面加一层稻草。</div>          <div class="fam"><span class="lbl">族</span>strawberry n. 草莓 / straw hat 草帽</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">digest</span>
+          <span class="ipa">/daı&#x27;dzest, &#x27;daıd3est/</span>
+          <span class="pos">v.</span>
+          <span class="cn">消化；领会；领悟；理解 η. 摘要；概要；文 摘；汇编</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cannot absorb it or digest it</div>          <div class="mnem"><span class="lbl">记</span>弟弟(di)、哥哥(ge)今天晚上吃 多了，在街上(st 想成 street)跑步到深夜，“消 化”一下。</div>          <div class="root"><span class="lbl">根</span>di(分开) + gest(带) → 把食物分开带走 → 消化</div>          <div class="zt"><span class="lbl">真题</span>But you can&#x27;t force the child to think carefully, enjoy books, digest complex information. 但你不能强迫孩子仔细思考，享受 书籍，消化复杂的信息。(2015)</div>          <div class="fam"><span class="lbl">族</span>digestion n. 消化 / digestive adj. 消化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">contagion</span>
+          <span class="ipa">/kən&#x27;teıdzən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">接触传染；接触性传染病；(不良事物的快速) 传播，蔓延，扩散</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it was not a contagion</div>          <div class="mnem"><span class="lbl">记</span>全部的(con)人，他(ta)想成每 一个人，都很紧张(gion发音有“紧”的音)，为什 么？想象一下流感病毒吧，传染性很强，所以每 个人都很紧张→传播，蔓延，扩散。</div>          <div class="root"><span class="lbl">根</span>con(一起) + tag(接触) + ion → 一接触就传开 → 传染</div>          <div class="fam"><span class="lbl">族</span>contagious adj. 传染的 / contact n. 接触</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">diagnose</span>
+          <span class="ipa">/daiəg&#x27;nəus/</span>
+          <span class="pos">v.</span>
+          <span class="cn">诊断(疾病);判断(问题的原因)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She could diagnose the problem at once</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆分为：打(dia)哥 哥(g)的鼻子(nose)，打流血了，哥哥得去医院 “诊断”看看是不是鼻骨骨折了啊。</div>          <div class="root"><span class="lbl">根</span>dia(穿过) + gnose(知道) → 看透了才知道 → 诊断</div>          <div class="zt"><span class="lbl">真题</span>He was wrongly diagnosed. 他被误诊了。</div>          <div class="fam"><span class="lbl">族</span>diagnosis n. 诊断 / diagnostic adj. 诊断的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">surgery</span>
+          <span class="ipa">/&#x27;s3:rdzəri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">外科手术；外科学；诊室；门诊处</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He did not need surgery</div>          <div class="root"><span class="lbl">根</span>surg(手) + ery(名词后缀) → 用手做的治疗 → 外科手术</div>          <div class="zt"><span class="lbl">真题</span>Health insurance and clinical guidelines promote treatment with drugs and surgery. 健 康保险和临床指导方针提倡用药物和手术治 疗。(2021)</div>          <div class="fam"><span class="lbl">族</span>surgical adj. 外科的 / surgeon n. 外科医生</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">surgeon</span>
+          <span class="ipa">/&#x27;s3:d3ən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">外科医生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The surgeon on duty said</div>          <div class="root"><span class="lbl">根</span>surg(手) + eon(人) → 用手治病的人 → 外科医生</div>          <div class="fam"><span class="lbl">族</span>surgery n. 外科手术 / surgical adj. 外科的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">physical</span>
+          <span class="ipa">/&#x27;fızıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">身体的；肉体的；躯体的；客观存在的；现实 的；物质的；有形的；物理学的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>gave him a physical check</div>          <div class="root"><span class="lbl">根</span>physic(自然；身体) + al → 属于身体的 → 身体的</div>          <div class="zt"><span class="lbl">真题</span>What mattered most was the residents&#x27; physical health and mental status. 最重要的是 居民的身体健康和心理状态。(2016)</div>          <div class="fam"><span class="lbl">族</span>physically adv. 身体上 / physician n. 内科医生</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">physician</span>
+          <span class="ipa">/fr&#x27;zi∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">医生，内科医生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old physician said</div>          <div class="mnem"><span class="lbl">记</span>ian是表示“人”的后缀；physic 表示“物理学；医术”。有医术的人→医生。</div>          <div class="root"><span class="lbl">根</span>physic(医术) + ian(人) → 有医术的人 → 医生</div>          <div class="zt"><span class="lbl">真题</span>In general, many lifestyle medicine physicians recommend a plant-based diet — particularly for people with diabetes or other inflammatory conditions.一般来说，医学医生 推荐的许多生活方式，如植物性饮食——特别 是对糖尿病患者或其他炎症患者有效。 (2018)</div>          <div class="fam"><span class="lbl">族</span>physics n. 物理学 / physical adj. 身体的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">dose</span>
+          <span class="ipa">/dəus/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(药的)一剂，一服 v. 给(某人)服药</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>gave him a small dose of medicine</div>          <div class="mnem"><span class="lbl">记</span>最近失眠很严重，我去医院看 病，医生就给我开了“一剂药”，只能喝一次，太 少了，逗死(dose的谐音)了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：逗死 → 一次只给一剂，太少了 → 一剂</div>          <div class="zt"><span class="lbl">真题</span>It will have considerable side effects if taken in large doses. 如果大量服用，会有相当 大的副作用。</div>          <div class="fam"><span class="lbl">族</span>dosage n. 剂量 / dose v. 给……服药</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 47</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

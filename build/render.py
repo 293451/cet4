@@ -53,8 +53,19 @@ _SUFFIXES = ("ically", "ation", "ingly", "edly", "ness", "ment",
 
 
 def _strip(word: str) -> str:
-    """剥掉常见后缀，得到词干。只剥一次，避免把词干削得太狠。"""
+    """
+    剥掉常见后缀，得到词干。只剥一次，避免把词干削得太狠。
+
+    ⚠️ `-ied` 要还原成 `y`，不能直接删：
+        buried ← bury，如果删成 'bur' 就和 bury 对不上了。
+        同理 -ies → y（carries ← carry）。
+    ⚠️ `-y` 本身**不能剥**（apply→applied 这类变形靠 y/i 归一兜，剥了就永远对不上）。
+    """
     w = word.lower()
+    # 先处理 -ied / -ies：还原成 y
+    for suf in ("ied", "ies"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)] + "y"
     for suf in _SUFFIXES:
         if len(w) > len(suf) + 2 and w.endswith(suf):
             return w[: -len(suf)]

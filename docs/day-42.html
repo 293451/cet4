@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 42 · The Long Way to the Villages</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 42 · 11/23 · Unit 6~7 第 1231-1260 词</div>
+  <h1>The Long Way to the Villages<span class="cn">通往村庄的长路</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-42.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3584"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w target" data-s="171" data-e="469" title="学期">semester</span> <span class="w" data-s="512" data-e="640">was</span> <span class="w" data-s="683" data-e="853">nearly</span> <span class="w" data-s="896" data-e="1152">over,</span> <span class="w" data-s="1365" data-e="1536">and</span> <span class="w" data-s="1664" data-e="2048">the</span> <span class="w" data-s="2091" data-e="2176">sports</span> <span class="w target" data-s="2219" data-e="2645" title="(尤指一国经济的)部门，领域，行业；(尤指军 事管制的)区域，地带">sector</span> <span class="w" data-s="2688" data-e="2816">of</span> <span class="w" data-s="2859" data-e="2901">our</span> <span class="w" data-s="2944" data-e="3029">college</span> <span class="w" data-s="3072" data-e="3371">was</span> <span class="w" data-s="3413" data-e="3584">busy.</span></p><p class="zh">这个学期快结束了，我们学院的运动部门忙得不可开交。</p></div>
+<div class="pair" data-s0="3840" data-s1="9301"><p class="en"><span class="w" data-s="3840" data-e="4608">Every</span> <span class="w target" data-s="4651" data-e="4949" title="">section</span> <span class="w" data-s="4992" data-e="5291">of</span> <span class="w" data-s="5333" data-e="5376">the</span> <span class="w" data-s="5419" data-e="5504">old</span> <span class="w target" data-s="5547" data-e="5803" title="体育馆，健身房">gym</span> <span class="w" data-s="5845" data-e="5973">had</span> <span class="w" data-s="6016" data-e="6101">its</span> <span class="w" data-s="6144" data-e="6272">own</span> <span class="w" data-s="6315" data-e="6485">job,</span> <span class="w" data-s="6784" data-e="6912">and</span> <span class="w" data-s="7083" data-e="7467">one</span> <span class="w target" data-s="7509" data-e="7936" title="部分；(水果的)瓣；音段 v. 分割；划分">segment</span> <span class="w" data-s="7979" data-e="8021">of</span> <span class="w" data-s="8064" data-e="8107">the</span> <span class="w" data-s="8149" data-e="8277">floor</span> <span class="w" data-s="8320" data-e="8576">was</span> <span class="w" data-s="8619" data-e="8747">kept</span> <span class="w" data-s="8789" data-e="8960">for</span> <span class="w target" data-s="9003" data-e="9301" title="瑜伽派；瑜伽术">yoga.</span></p><p class="zh">老健身房每一块区域都有自己的用途，地板的一角留着练瑜伽。</p></div>
+<div class="pair" data-s0="9825" data-s1="15415"><p class="en"><span class="w" data-s="9825" data-e="10252">Attendance</span> <span class="w" data-s="10295" data-e="10465">had</span> <span class="w" data-s="10508" data-e="10593">been</span> <span class="w" data-s="10636" data-e="10764">poor</span> <span class="w" data-s="10807" data-e="11148">all</span> <span class="w target" data-s="11191" data-e="11404" title="学期；术语；任期">term,</span> <span class="w" data-s="11703" data-e="11873">so</span> <span class="w" data-s="12087" data-e="12257">the</span> <span class="w" data-s="12300" data-e="12385">school</span> <span class="w" data-s="12428" data-e="12641">made</span> <span class="w" data-s="12684" data-e="12769">a</span> <span class="w target" data-s="12812" data-e="13153" title="短期的;近期的">short-term</span> <span class="w" data-s="13196" data-e="13409">plan:</span> <span class="w" data-s="13708" data-e="14135">open</span> <span class="w" data-s="14177" data-e="14348">the</span> <span class="w" data-s="14391" data-e="14561">doors</span> <span class="w" data-s="14604" data-e="14775">and</span> <span class="w" data-s="14817" data-e="14903">let</span> <span class="w" data-s="14945" data-e="15116">students</span> <span class="w" data-s="15159" data-e="15415">move.</span></p><p class="zh">整个学期出勤都不好，所以学校定了个短期计划：把门打开，让学生动起来。</p></div>
+<div class="pair" data-s0="15799" data-s1="17335"><p class="en"><span class="w" data-s="15799" data-e="16268">Then</span> <span class="w" data-s="16311" data-e="16481">our</span> <span class="w" data-s="16524" data-e="16609">coach</span> <span class="w" data-s="16652" data-e="16823">had</span> <span class="w" data-s="16865" data-e="16908">a</span> <span class="w" data-s="16951" data-e="17036">bigger</span> <span class="w" data-s="17079" data-e="17335">idea.</span></p><p class="zh">后来我们的教练有了个更大的主意。</p></div>
+<div class="pair" data-s0="17633" data-s1="20876"><p class="en"><span class="w" data-s="17633" data-e="17975">She</span> <span class="w" data-s="18145" data-e="18401">wanted</span> <span class="w" data-s="18444" data-e="18657">a</span> <span class="w" data-s="18700" data-e="18785">real</span> <span class="w target" data-s="18828" data-e="19041" title="(尤指长途)旅行，旅程；历程">journey,</span> <span class="w" data-s="19297" data-e="19596">not</span> <span class="w" data-s="19724" data-e="19895">a</span> <span class="w" data-s="19937" data-e="20108">cheap</span> <span class="w target" data-s="20151" data-e="20279" title="旅行；旅游v.在……旅游；在……巡回演 出(或做宣传广告等)">tour</span> <span class="w" data-s="20321" data-e="20492">for</span> <span class="w target" data-s="20535" data-e="20876" title="旅游者，旅行者，观光者，游客">tourists.</span></p><p class="zh">她想要一次真正的旅程，而不是给游客走的廉价观光。</p></div>
+<div class="pair" data-s0="21607" data-s1="27239"><p class="en"><span class="w" data-s="21607" data-e="21820">Years</span> <span class="w" data-s="21863" data-e="22076">ago</span> <span class="w" data-s="22119" data-e="22332">she</span> <span class="w" data-s="22375" data-e="22545">had</span> <span class="w" data-s="22588" data-e="22801">joined</span> <span class="w" data-s="22844" data-e="22929">an</span> <span class="w target" data-s="22972" data-e="23313" title="远征；探险；考察；考察队，探险队">expedition</span> <span class="w" data-s="23356" data-e="23612">in</span> <span class="w" data-s="23655" data-e="23697">the</span> <span class="w" data-s="23740" data-e="24039">western</span> <span class="w" data-s="24081" data-e="24252">hills,</span> <span class="w" data-s="24465" data-e="24679">and</span> <span class="w" data-s="24849" data-e="25105">the</span> <span class="w" data-s="25148" data-e="25276">long</span> <span class="w target" data-s="25319" data-e="25788" title="&amp;. v. 航行，旅行">voyage</span> <span class="w" data-s="25831" data-e="26001">across</span> <span class="w" data-s="26044" data-e="26257">the</span> <span class="w" data-s="26300" data-e="26513">lake</span> <span class="w" data-s="26556" data-e="26727">had</span> <span class="w" data-s="26769" data-e="26897">changed</span> <span class="w" data-s="26940" data-e="27239">her.</span></p><p class="zh">几年前她参加过西部山区的一次考察，那段横渡湖面的航行改变了她。</p></div>
+<div class="pair" data-s0="27793" data-s1="31681"><p class="en"><span class="w" data-s="27793" data-e="28049">&quot;Take</span> <span class="w" data-s="28092" data-e="28263">a</span> <span class="w target" data-s="28305" data-e="28561" title="">vacation,&quot;</span> <span class="w" data-s="29292" data-e="29335">she</span> <span class="w" data-s="29377" data-e="29463">told</span> <span class="w" data-s="29505" data-e="29719">us,</span> <span class="w" data-s="29975" data-e="30359">&quot;but</span> <span class="w" data-s="30529" data-e="30700">do</span> <span class="w" data-s="30743" data-e="30828">not</span> <span class="w" data-s="30871" data-e="31041">forget</span> <span class="w" data-s="31084" data-e="31297">your</span> <span class="w target" data-s="31340" data-e="31681" title="工作；职业；生活方式 第七单元">vocation.&quot;</span></p><p class="zh">“去度个假吧，”她对我们说，“但别忘了你的职业。”</p></div>
+<div class="pair" data-s0="32236" data-s1="39447"><p class="en"><span class="w" data-s="32236" data-e="32705">So</span> <span class="w" data-s="32748" data-e="32876">we</span> <span class="w" data-s="32919" data-e="33175">planned</span> <span class="w" data-s="33217" data-e="33260">a</span> <span class="w" data-s="33303" data-e="33473">weekend</span> <span class="w target" data-s="33516" data-e="34028" title="远足，短途旅行">excursion</span> <span class="w target" data-s="34071" data-e="34497" title="">outdoors,</span> <span class="w" data-s="34753" data-e="35009">a</span> <span class="w" data-s="35052" data-e="35564">small</span> <span class="w target" data-s="35607" data-e="35991" title="(尤指有风险的)企业，商业，冒险行为 v. 冒险;敢于去(危险或令人不快的地方);小心 地说，谨慎地做(尤指会使人烦恼或不快的事)">venture</span> <span class="w" data-s="36033" data-e="36204">with</span> <span class="w" data-s="36247" data-e="36460">tents</span> <span class="w" data-s="36503" data-e="36673">and</span> <span class="w" data-s="36716" data-e="37015">maps,</span> <span class="w" data-s="37185" data-e="37441">and</span> <span class="w" data-s="37527" data-e="37953">we</span> <span class="w" data-s="37996" data-e="38039">would</span> <span class="w target" data-s="38081" data-e="38252" title="访问；拜访 n. 访问；参观；游览；逗留；看望">visit</span> <span class="w" data-s="38295" data-e="38508">three</span> <span class="w" data-s="38551" data-e="38977">villages</span> <span class="w" data-s="39020" data-e="39191">on</span> <span class="w" data-s="39233" data-e="39319">the</span> <span class="w" data-s="39361" data-e="39447">way.</span></p><p class="zh">于是我们计划了一次周末的户外远足——一次带着帐篷和地图的小小冒险，路上还要走访三个村子。</p></div>
+<div class="pair" data-s0="39788" data-s1="41751"><p class="en"><span class="w" data-s="39788" data-e="39873">To</span> <span class="w" data-s="39916" data-e="40044">get</span> <span class="w" data-s="40087" data-e="40172">ready,</span> <span class="w" data-s="40385" data-e="40599">we</span> <span class="w" data-s="40812" data-e="40940">met</span> <span class="w" data-s="40983" data-e="41068">in</span> <span class="w" data-s="41111" data-e="41153">the</span> <span class="w target" data-s="41196" data-e="41324" title="体育馆，健身房">gym</span> <span class="w" data-s="41367" data-e="41537">every</span> <span class="w" data-s="41580" data-e="41751">evening.</span></p><p class="zh">为了做好准备，我们每天晚上都在健身房集合。</p></div>
+<div class="pair" data-s0="42049" data-s1="44695"><p class="en"><span class="w" data-s="42049" data-e="42263">Some</span> <span class="w" data-s="42519" data-e="42647">of</span> <span class="w" data-s="42689" data-e="42775">us</span> <span class="w" data-s="42817" data-e="42945">did</span> <span class="w target" data-s="42988" data-e="43287" title="瑜伽派；瑜伽术">yoga,</span> <span class="w" data-s="43457" data-e="43628">some</span> <span class="w" data-s="43841" data-e="44012">did</span> <span class="w" data-s="44055" data-e="44140">a</span> <span class="w" data-s="44183" data-e="44225">long</span> <span class="w target" data-s="44268" data-e="44695" title="(形状和尺寸)适合，合身；符合；使胜任 adj.健壮的；健康的">workout.</span></p><p class="zh">有人练瑜伽，有人做长时间的锻炼。</p></div>
+<div class="pair" data-s0="45511" data-s1="53233"><p class="en"><span class="w" data-s="45511" data-e="45639">At</span> <span class="w" data-s="45681" data-e="45852">first</span> <span class="w" data-s="45895" data-e="46193">I</span> <span class="w" data-s="46236" data-e="46705">was</span> <span class="w" data-s="46748" data-e="46876">not</span> <span class="w target" data-s="46919" data-e="47089" title="">fit</span> <span class="w" data-s="47132" data-e="47303">at</span> <span class="w" data-s="47345" data-e="47431">all:</span> <span class="w" data-s="47729" data-e="48369">after</span> <span class="w" data-s="48412" data-e="48625">ten</span> <span class="w" data-s="48668" data-e="48924">minutes</span> <span class="w" data-s="48967" data-e="49351">my</span> <span class="w" data-s="49607" data-e="49777">legs</span> <span class="w" data-s="49820" data-e="50119">felt</span> <span class="w" data-s="50161" data-e="50417">heavy,</span> <span class="w" data-s="50673" data-e="50929">and</span> <span class="w" data-s="50972" data-e="51313">my</span> <span class="w" data-s="51356" data-e="51484">phone</span> <span class="w target" data-s="51527" data-e="51953" title="电池">battery</span> <span class="w" data-s="51996" data-e="52337">lasted</span> <span class="w" data-s="52380" data-e="52593">longer</span> <span class="w" data-s="52636" data-e="52849">than</span> <span class="w" data-s="52892" data-e="53020">my</span> <span class="w" data-s="53063" data-e="53233">energy.</span></p><p class="zh">一开始我一点都不健康：十分钟后我的腿就发沉，手机电池比我的体力还耐用。</p></div>
+<div class="pair" data-s0="53970" data-s1="58962"><p class="en"><span class="w" data-s="53970" data-e="54055">But</span> <span class="w" data-s="54098" data-e="54183">the</span> <span class="w" data-s="54226" data-e="54311">coach</span> <span class="w" data-s="54354" data-e="54567">was</span> <span class="w target" data-s="54610" data-e="54951" title="精力充沛的;健壮的">vigorous</span> <span class="w" data-s="54994" data-e="55122">and</span> <span class="w target" data-s="55165" data-e="55634" title="精力充沛的,积极的">energetic,</span> <span class="w" data-s="55719" data-e="55847">and</span> <span class="w" data-s="56018" data-e="56317">her</span> <span class="w" data-s="56359" data-e="56530">joy</span> <span class="w" data-s="56573" data-e="56786">was</span> <span class="w" data-s="56829" data-e="56957">so</span> <span class="w target" data-s="56999" data-e="57511" title="精力充沛的；活跃的；动力的；动态的">dynamic</span> <span class="w" data-s="57554" data-e="57810">that</span> <span class="w" data-s="57938" data-e="58194">nobody</span> <span class="w" data-s="58237" data-e="58535">wanted</span> <span class="w" data-s="58578" data-e="58749">to</span> <span class="w" data-s="58791" data-e="58962">stop.</span></p><p class="zh">但教练精力充沛、干劲十足，她的快乐那么有活力，没人想停下来。</p></div>
+<div class="pair" data-s0="59218" data-s1="62034"><p class="en"><span class="w" data-s="59218" data-e="59858">By</span> <span class="w" data-s="59901" data-e="59986">the</span> <span class="w" data-s="60029" data-e="60157">end</span> <span class="w" data-s="60199" data-e="60285">of</span> <span class="w" data-s="60327" data-e="60370">the</span> <span class="w" data-s="60413" data-e="60498">month</span> <span class="w" data-s="60541" data-e="60839">my</span> <span class="w" data-s="60882" data-e="61053">whole</span> <span class="w target" data-s="61095" data-e="61565" title="健康；安乐；康乐">well-being</span> <span class="w" data-s="61607" data-e="61821">had</span> <span class="w" data-s="61863" data-e="62034">changed.</span></p><p class="zh">到月底，我整个人的身心状态都变了。</p></div>
+<div class="pair" data-s0="62375" data-s1="65149"><p class="en"><span class="w" data-s="62375" data-e="62973">On</span> <span class="w" data-s="63015" data-e="63101">the</span> <span class="w" data-s="63143" data-e="63271">last</span> <span class="w" data-s="63314" data-e="63527">evening</span> <span class="w" data-s="63570" data-e="63869">she</span> <span class="w" data-s="63911" data-e="64082">asked</span> <span class="w" data-s="64125" data-e="64338">us</span> <span class="w" data-s="64381" data-e="64509">to</span> <span class="w target" data-s="64551" data-e="64765" title="修改；复习；修订">revise</span> <span class="w" data-s="64807" data-e="64978">our</span> <span class="w" data-s="65021" data-e="65149">plan.</span></p><p class="zh">最后一晚，她让我们修改计划。</p></div>
+<div class="pair" data-s0="65490" data-s1="69799"><p class="en"><span class="w" data-s="65490" data-e="65618">She</span> <span class="w" data-s="65661" data-e="65789">wanted</span> <span class="w" data-s="65831" data-e="66002">to</span> <span class="w target" data-s="66045" data-e="66471" title="监督，管理">supervise</span> <span class="w" data-s="66514" data-e="66685">every</span> <span class="w" data-s="66727" data-e="66983">detail</span> <span class="w" data-s="67026" data-e="67410">and</span> <span class="w" data-s="67453" data-e="67965">to</span> <span class="w" data-s="68007" data-e="68050">make</span> <span class="w" data-s="68093" data-e="68221">the</span> <span class="w" data-s="68263" data-e="68349">whole</span> <span class="w" data-s="68391" data-e="68733">route</span> <span class="w target" data-s="68775" data-e="69031" title="看得见的，可见的；明显的；能注意到的">visible</span> <span class="w" data-s="69074" data-e="69245">on</span> <span class="w" data-s="69287" data-e="69415">a</span> <span class="w" data-s="69458" data-e="69543">big</span> <span class="w" data-s="69586" data-e="69799">map.</span></p><p class="zh">她要监督每一个细节，还要把整条路线标在一张大得能看见的地图上。</p></div>
+<div class="pair" data-s0="70531" data-s1="73603"><p class="en"><span class="w" data-s="70531" data-e="70616">In</span> <span class="w" data-s="70659" data-e="70787">her</span> <span class="w target" data-s="70829" data-e="71000" title="视力；幻象">vision,</span> <span class="w" data-s="71256" data-e="71341">we</span> <span class="w" data-s="71384" data-e="71512">were</span> <span class="w" data-s="71555" data-e="71640">not</span> <span class="w" data-s="71683" data-e="71896">simply</span> <span class="w" data-s="71939" data-e="72237">walking;</span> <span class="w" data-s="72621" data-e="72664">we</span> <span class="w" data-s="72707" data-e="72835">were</span> <span class="w" data-s="72877" data-e="73005">learning</span> <span class="w" data-s="73048" data-e="73304">how</span> <span class="w" data-s="73347" data-e="73475">to</span> <span class="w" data-s="73517" data-e="73603">see.</span></p><p class="zh">在她的想象里，我们不只是走路，而是在学着怎么去看。</p></div>
+<div class="pair" data-s0="74499" data-s1="76547"><p class="en"><span class="w target" data-s="74499" data-e="74669" title="访问；拜访 n. 访问；参观；游览；逗留；看望">&quot;Visit</span> <span class="w" data-s="74712" data-e="74840">a</span> <span class="w" data-s="74883" data-e="74968">place</span> <span class="w" data-s="75011" data-e="75267">before</span> <span class="w" data-s="75309" data-e="75523">you</span> <span class="w" data-s="75565" data-e="75779">judge</span> <span class="w" data-s="75821" data-e="75949">it,&quot;</span> <span class="w" data-s="76248" data-e="76291">she</span> <span class="w" data-s="76333" data-e="76547">said.</span></p><p class="zh">“先去一个地方看看，再下判断，”她说。</p></div>
+<div class="pair" data-s0="76845" data-s1="78168"><p class="en"><span class="w" data-s="76845" data-e="77187">&quot;Then</span> <span class="w" data-s="77229" data-e="77656">look</span> <span class="w" data-s="77912" data-e="78168">again.&quot;</span></p><p class="zh">“然后再看一次。”</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">sector</span>
+          <span class="ipa">/&#x27;sektər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(尤指一国经济的)部门，领域，行业；(尤指军 事管制的)区域，地带</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sports sector of our college</div>          <div class="root"><span class="lbl">根</span>sect(切) + or(名词后缀) → 切出来的一块 → 部门，行业</div>          <div class="zt"><span class="lbl">真题</span>For the high-tech sector, there are a few other interesting findings. 对于高科技行业，还 有其他一些有趣的发现。 第六单元</div>          <div class="fam"><span class="lbl">族</span>section n. 部分 / sectional adj. 局部的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">section</span>
+          <span class="ipa">/&#x27;sek∫n/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every section of the old gym had its own job</div>          <div class="mnem"><span class="lbl">记</span>sect(切，割）十ion（名词后级） →切开的部分→部分；部门。</div>          <div class="root"><span class="lbl">根</span>sect(切) + ion(名词后缀) → 切开的部分 → 部分；部门</div>          <div class="zt"><span class="lbl">真题</span>The other sections you should get to know are the frozen foods and the canned goods. 其他部分你应该知道的是冷冻食品和罐 装食品。(2015)</div>          <div class="fam"><span class="lbl">族</span>sector n. 部门 / sectional adj. 部分的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">segment</span>
+          <span class="ipa">/&#x27;segmənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">部分；(水果的)瓣；音段 v. 分割；划分</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one segment of the floor was kept for yoga</div>          <div class="root"><span class="lbl">根</span>seg(切) + ment(名词后缀) → 切下的一段 → 部分</div>          <div class="zt"><span class="lbl">真题</span>It is in no one&#x27;s interest to keep a large segment of the population on the margins of society. 将一大部分人口留在社会边缘不符合 任何人的利益。</div>          <div class="fam"><span class="lbl">族</span>segmentation n. 分割 / segment v. 分割</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">semester</span>
+          <span class="ipa">/si&#x27;mestər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">学期</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The semester was nearly over</div>          <div class="root"><span class="lbl">根</span>se(六) + mester(月) → 六个月 → 一学期</div>          <div class="zt"><span class="lbl">真题</span>You took an optional course this semester, didn&#x27;t you？你这学期修了一门选修课，不是吗？</div>          <div class="fam"><span class="lbl">族</span>term n. 学期 / seminar n. 研讨课</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">term</span>
+          <span class="ipa">/t3:rm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">学期；术语；任期</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Attendance had been poor all term</div>          <div class="mnem"><span class="lbl">记</span>这个“学期”，老师特别(te)任命 (rm)她当班长。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：in the long term 长期来看</div>          <div class="zt"><span class="lbl">真题</span>The Greeks are always concerned about boxing themselves in, in terms of convictions. 就信念而言，希腊人总是担心把自己困在里面。 (2016)</div>          <div class="fam"><span class="lbl">族</span>terminal adj. 末端的 / terminate v. 终止</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">short-term</span>
+          <span class="ipa">/i∫ə:rt &#x27;t3:rm/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">短期的;近期的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the school made a short-term plan</div>          <div class="root"><span class="lbl">根</span>short(短) + term(期限) → 短期的</div>          <div class="zt"><span class="lbl">真题</span>A new study suggested that our short- term memory also may play a role in appetite. 一项新的研究表明，我们的短期记忆也可能对 食欲有影响。 (157) 努力的意义是不留遗憾！ 第七单元</div>          <div class="fam"><span class="lbl">族</span>long-term adj. 长期的 / term n. 期限</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">outdoors</span>
+          <span class="ipa">/iaut&#x27;doirz/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a weekend excursion outdoors</div>          <div class="root"><span class="lbl">根</span>out(在外) + doors(门) → 在门外 → 户外</div>          <div class="zt"><span class="lbl">真题</span>Taking a walk can instantly lift your mood, especially when you go outdoors. 散步 可以立即提升你的情绪，尤其是当你在户外的 时候。(2023)</div>          <div class="fam"><span class="lbl">族</span>outdoor adj. 户外的 / indoor adj. 室内的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">venture</span>
+          <span class="ipa">/&#x27;vent∫ər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(尤指有风险的)企业，商业，冒险行为 v. 冒险;敢于去(危险或令人不快的地方);小心 地说，谨慎地做(尤指会使人烦恼或不快的事)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small venture with tents and maps</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为：他们去了(vent 想 成 went)真的(ture 想成 true)。看过《攀登者》 这部电影了吗？他们真的去了，去攀登喜马拉 雅山了。这是冒着生命危险的行为啊→冒险。</div>          <div class="root"><span class="lbl">根</span>ad(向) + vent(来) + ure → 将要来的事 → 冒险</div>          <div class="zt"><span class="lbl">真题</span>Working at home or in cafes, starting businesses of their own, and even launching business ventures that eventually may fail, all indicate “initiative&quot;“creativity&quot;and “adaptability&quot;. 在家或在咖啡馆工作，开始自己的生意，甚至发 起最终可能失败的商业冒险，所有这些都表明 了“主动性”“创造力”和“适应性”。(2021)</div>          <div class="fam"><span class="lbl">族</span>adventure n. 冒险 / venturesome adj. 敢冒险的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">expedition</span>
+          <span class="ipa">/ekspə&#x27;di∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">远征；探险；考察；考察队，探险队</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she had joined an expedition in the western hills</div>          <div class="mnem"><span class="lbl">记</span>发音类似“我开心”。为什么开 心？“假期”了啊。</div>          <div class="root"><span class="lbl">根</span>ex(出) + ped(脚) + ition → 迈脚出去 → 远征，考察</div>          <div class="zt"><span class="lbl">真题</span>She might not get enough vacation. 她可 能没有足够的假期。</div>          <div class="fam"><span class="lbl">族</span>expedite v. 加快 / expeditionary adj. 远征的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">vacation</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Take a vacation, she told us</div>          <div class="root"><span class="lbl">根</span>vac(空) + ation(名词后缀) → 空下来的时间 → 假期</div>          <div class="fam"><span class="lbl">族</span>vacant adj. 空的 / vacate v. 腾出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">vocation</span>
+          <span class="ipa">/vəu&#x27;kei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">工作；职业；生活方式 第七单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but do not forget your vocation</div>          <div class="mnem"><span class="lbl">记</span>这个单词特别像vacation（假 期），那我们记住有个单词特别像“假期”，那就 是“工作”。</div>          <div class="root"><span class="lbl">根</span>voc(叫) + ation → 上天叫你去做的 → 职业</div>          <div class="zt"><span class="lbl">真题</span>They provided the most needed vocational skills.他们提供了最需要的职业技能。(2023)</div>          <div class="fam"><span class="lbl">族</span>vocational adj. 职业的 / advocate v. 提倡</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">excursion</span>
+          <span class="ipa">/1k&#x27;sk3:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">远足，短途旅行</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>So we planned a weekend excursion outdoors</div>          <div class="mnem"><span class="lbl">记</span>该单词可拆分为：出去（ex)+ 开心(cursion发音似“开心”)→出去开心一下 →远足，短途旅行。</div>          <div class="root"><span class="lbl">根</span>ex(出) + curs(跑) + ion → 跑出去一趟 → 短途旅行</div>          <div class="zt"><span class="lbl">真题</span>Students or teachers can participate in excursions to lovely beaches. 学生或老师可以 参加到美丽海滩的短途旅行。</div>          <div class="fam"><span class="lbl">族</span>course n. 路程 / excursionist n. 远足者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">tour</span>
+          <span class="ipa">/tur/</span>
+          <span class="pos">n.</span>
+          <span class="cn">旅行；旅游v.在……旅游；在……巡回演 出(或做宣传广告等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not a cheap tour for tourists</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为他(t)和我们(our)， 一起出去“旅游”了！</div>          <div class="root"><span class="lbl">根</span>tour(转) → 转一圈 → 旅游</div>          <div class="zt"><span class="lbl">真题</span>He toured Ecuador&#x27;s Andes Mountains. 他游览了厄瓜多尔的安第斯山脉。</div>          <div class="fam"><span class="lbl">族</span>tourism n. 旅游业 / tourist n. 游客</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">tourist</span>
+          <span class="ipa">/&#x27;tuərist/</span>
+          <span class="pos">n.</span>
+          <span class="cn">旅游者，旅行者，观光者，游客</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a cheap tour for tourists</div>          <div class="root"><span class="lbl">根</span>tour(转，游) + ist(人) → 到处转的人 → 游客</div>          <div class="zt"><span class="lbl">真题</span>Venice is one of the hottest tourist destinations in the world. 威尼斯是世界上最热 门的旅游胜地之一。(2018)</div>          <div class="fam"><span class="lbl">族</span>tourism n. 旅游业 / tour n. 旅行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">journey</span>
+          <span class="ipa">/&#x27;d3z3:ni/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(尤指长途)旅行，旅程；历程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She wanted a real journey</div>          <div class="mnem"><span class="lbl">记</span>读音类似“脚泥”。“旅行”路上 我们的脚都沾了泥巴。</div>          <div class="root"><span class="lbl">根</span>journ(日，天) + ey → 一天走的路 → 旅程</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s the stage in the middle of the journey when people feel youth vanishing, their prospects (159) narrowing and death approaching. 这是人生旅 程的中间阶段，人们感到青春正在消逝，前景越 来越渺茫，死亡越来越逼近。(2017)</div>          <div class="fam"><span class="lbl">族</span>journal n. 日记 / journalist n. 记者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">voyage</span>
+          <span class="ipa">/&#x27;vəndz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp;. v. 航行，旅行</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the long voyage across the lake had changed her</div>          <div class="mnem"><span class="lbl">记</span>瑜伽英文是：yoga，这个单词就 记忆为：我(vo)练瑜伽(yage想成瑜伽 yoga)， 练瑜伽需要冥想，就是思想在“旅行”啊。</div>          <div class="root"><span class="lbl">根</span>voy(路) + age(名词后缀) → 走一段路 → 航行</div>          <div class="zt"><span class="lbl">真题</span>They gathered together temperature readings collected by everything from a 19th century voyage of British naval ships to modern automated ocean probes. 他们收集了 从19世纪英国海军舰艇航行到现代自动海洋 探测器等各种仪器采集的温度读数。</div>          <div class="fam"><span class="lbl">族</span>voyager n. 航行者 / voyage v. 航行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">yoga</span>
+          <span class="ipa">/&#x27;jəugə/</span>
+          <span class="pos"></span>
+          <span class="cn">瑜伽派；瑜伽术</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Some of us did yoga</div>          <div class="root"><span class="lbl">根</span>梵语 yuj(结合) → 身心结合 → 瑜伽</div>          <div class="zt"><span class="lbl">真题</span>She wasn&#x27;t so much interested in hot yoga. 她对热瑜伽不怎么感兴趣。(2022)</div>          <div class="fam"><span class="lbl">族</span>yogi n. 瑜伽修行者 / yoga class n. 瑜伽课</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">workout</span>
+          <span class="ipa">/&#x27;w3:rkaut/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(形状和尺寸)适合，合身；符合；使胜任 adj.健壮的；健康的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>some did a long workout</div>          <div class="root"><span class="lbl">根</span>work(练) + out(出来) → 把力气练出来 → 锻炼</div>          <div class="zt"><span class="lbl">真题</span>Learning by doing doesn&#x27;t really fit that mold anymore.在实践中学习已经不符合那种 模式了。</div>          <div class="fam"><span class="lbl">族</span>work out v. 锻炼；解决 / workable adj. 可行的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">fit</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I was not fit at all</div>          <div class="root"><span class="lbl">根</span>靠搭配记：keep fit 保持健康</div>          <div class="fam"><span class="lbl">族</span>fitness n. 健康 / fitting adj. 合适的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">well-being</span>
+          <span class="ipa">/&#x27;wel bi:in/</span>
+          <span class="pos">n.</span>
+          <span class="cn">健康；安乐；康乐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>my whole well-being had changed</div>          <div class="root"><span class="lbl">根</span>well(好) + being(存在) → 处于好状态 → 健康，安乐</div>          <div class="zt"><span class="lbl">真题</span>And isn&#x27;t this the generation who say they&#x27;re concerned about their health and the well-being of the planet？这不是说他们关心自 己的健康和地球的福祉的一代人吗？(2020)</div>          <div class="fam"><span class="lbl">族</span>well-off adj. 富裕的 / welfare n. 福利</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">gym</span>
+          <span class="ipa">/d3ım/</span>
+          <span class="pos"></span>
+          <span class="cn">体育馆，健身房</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we met in the gym every evening</div>          <div class="mnem"><span class="lbl">记</span>发音类似“健美”。去哪健美？ “健身房”啊。该单词的全称是：gymnasium n. 体育馆，健身房。</div>          <div class="root"><span class="lbl">根</span>谐音联想：健美 → 去健美的地方 → 健身房</div>          <div class="zt"><span class="lbl">真题</span>Her gym exercise has yielded good results. 她的健身锻炼效果很好。</div>          <div class="fam"><span class="lbl">族</span>gymnasium n. 体育馆 / gymnast n. 体操运动员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">energetic</span>
+          <span class="ipa">/ienə&#x27;dzetrk/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">精力充沛的,积极的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>vigorous and energetic, and her joy</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词形式我们都很 熟悉，很多电池上也有：energy能量，活力。所 以 energetic 就是“精力充沛的”。</div>          <div class="root"><span class="lbl">根</span>energy(能量) + etic(形容词后缀) → 有能量的</div>          <div class="zt"><span class="lbl">真题</span>A football referee should be as young and energetic as possible. 足球裁判应该尽可能年 轻、精力充沛。</div>          <div class="fam"><span class="lbl">族</span>energy n. 能量 / energetically adv. 精力充沛地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">battery</span>
+          <span class="ipa">/&#x27;bætəri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">电池</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>my phone battery lasted longer than my energy</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分发音类似：better。 更好的什么？“电池”啊。</div>          <div class="root"><span class="lbl">根</span>bat(打) + tery → 一排连打的东西 → 电池组</div>          <div class="zt"><span class="lbl">真题</span>More will be invested in bike battery research.更多资金将投入自行车电池研究。 (2020)</div>          <div class="fam"><span class="lbl">族</span>batter v. 连续猛击 / battery life n. 电池寿命</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">vigorous</span>
+          <span class="ipa">/&#x27;vigərəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">精力充沛的;健壮的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>But the coach was vigorous and energetic</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“喂个肉”，吃 了之后“精力充沛的”。</div>          <div class="root"><span class="lbl">根</span>vig(活力) + orous(形容词后缀) → 有活力的</div>          <div class="zt"><span class="lbl">真题</span>Many come through periods of stress (160) with more physical and mental vigor than they had before.许多人在经历压力时期时，身体和 精神都比以往更有活力。</div>          <div class="fam"><span class="lbl">族</span>vigor n. 活力 / vigorously adv. 有力地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">dynamic</span>
+          <span class="ipa">/daı&#x27;næmık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">精力充沛的；活跃的；动力的；动态的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her joy was so dynamic that nobody wanted to stop</div>          <div class="mnem"><span class="lbl">记</span>看一些机器人的大片，濒死(dy 想成 die的分词 dying)的那个(na)妹妹(m)身 上装了集成电路(ic)后，又恢复了活力→精力充</div>          <div class="root"><span class="lbl">根</span>dynam(力) + ic(形容词后缀) → 有力的，动的</div>          <div class="zt"><span class="lbl">真题</span>It is a dynamic and self-improving process. 这是一个动态的、自我完善的过程。(2022)</div>          <div class="fam"><span class="lbl">族</span>dynamo n. 发电机 / dynamics n. 动力学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">visit</span>
+          <span class="ipa">/&#x27;vizit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">访问；拜访 n. 访问；参观；游览；逗留；看望</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we would visit three villages on the way</div>          <div class="mnem"><span class="lbl">记</span>vis 表示“看”，it 它→看它→参 观，访问。</div>          <div class="root"><span class="lbl">根</span>vis(看) + it → 去看一看 → 访问</div>          <div class="zt"><span class="lbl">真题</span>For what reason may your friends feel reluctant to visit your home？为什么你的朋友 不愿意去你家？</div>          <div class="fam"><span class="lbl">族</span>visitor n. 访客 / revisit v. 重访</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">visible</span>
+          <span class="ipa">/&#x27;vizəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">看得见的，可见的；明显的；能注意到的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to make the whole route visible on a big map</div>          <div class="root"><span class="lbl">根</span>vis(看) + ible(能……的) → 能看见的</div>          <div class="zt"><span class="lbl">真题</span>This option gives job seekers who post their resumes the most visibility to the broadest employer audience possible. 这个选项 可以让发布简历的求职者在尽可能多的雇主面 前获得曝光度。</div>          <div class="fam"><span class="lbl">族</span>vision n. 视力 / visibly adv. 明显地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">revise</span>
+          <span class="ipa">/rı&#x27;vaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">修改；复习；修订</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she asked us to revise our plan</div>          <div class="root"><span class="lbl">根</span>re(再) + vise(看) → 再看一遍 → 修改，复习</div>          <div class="zt"><span class="lbl">真题</span>Patients&#x27;data has to be revised from time to time. 患者的数据必须不时地进行修改。 (161) 第七单元</div>          <div class="fam"><span class="lbl">族</span>revision n. 修订 / review v. 复习</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">vision</span>
+          <span class="ipa">/&#x27;vi3n/</span>
+          <span class="pos"></span>
+          <span class="cn">视力；幻象</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In her vision, we were not simply walking</div>          <div class="mnem"><span class="lbl">记</span>vis 看；ion 名词后缀→看的东 西。看的主体就是视力，看的客体就是幻象，所 以该单词意思是“视力；幻象”。</div>          <div class="root"><span class="lbl">根</span>vis(看) + ion(名词后缀) → 看到的东西 → 视力；眼力</div>          <div class="zt"><span class="lbl">真题</span>Our own vision of a perfect childhood has never been adjusted. 我们对完美童年的憧憬从 来没有被改变过。</div>          <div class="fam"><span class="lbl">族</span>visual adj. 视觉的 / visionary n. 有远见的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">supervise</span>
+          <span class="ipa">/&#x27;su:pərvaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">监督，管理</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She wanted to supervise every detail</div>          <div class="mnem"><span class="lbl">记</span>从上面（super上面，超越）看 (vise)→监督。</div>          <div class="root"><span class="lbl">根</span>super(上面) + vise(看) → 从上面看 → 监督</div>          <div class="zt"><span class="lbl">真题</span>It does not supervise its employees. 它不 监督它的员工。(2021)</div>          <div class="fam"><span class="lbl">族</span>supervisor n. 主管 / supervision n. 监督</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6~7 · Day 42</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

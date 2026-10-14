@@ -1,0 +1,689 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 52 · The Weaver at Sandy Bay</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 52 · 12/3 · Unit 8 第 1531-1560 词</div>
+  <h1>The Weaver at Sandy Bay<span class="cn">沙滩湾的织布人</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-52.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5120"><p class="en"><span class="w target" data-s="43" data-e="341" title="宏伟的；重大的，壮丽的，极好的">Grandma</span> <span class="w" data-s="384" data-e="597">Su</span> <span class="w" data-s="640" data-e="853">is</span> <span class="w" data-s="896" data-e="1323">eighty-two,</span> <span class="w" data-s="1536" data-e="1707">and</span> <span class="w" data-s="1835" data-e="2261">her</span> <span class="w" data-s="2304" data-e="2432">body</span> <span class="w" data-s="2475" data-e="2731">has</span> <span class="w" data-s="2773" data-e="2987">grown</span> <span class="w target" data-s="3029" data-e="3371" title="虚弱的,衰弱的">feeble</span> <span class="w" data-s="3413" data-e="3584">and</span> <span class="w target" data-s="3627" data-e="4096" title="(身体上或感情上)脆弱的，易受……伤 害的">vulnerable</span> <span class="w" data-s="4139" data-e="4309">to</span> <span class="w" data-s="4352" data-e="4565">every</span> <span class="w" data-s="4608" data-e="4821">cold</span> <span class="w" data-s="4864" data-e="5120">wind.</span></p><p class="zh">苏奶奶八十二岁了，身体越来越虚弱，一阵冷风都能伤到她。</p></div>
+<div class="pair" data-s0="5376" data-s1="11093"><p class="en"><span class="w" data-s="5376" data-e="6016">Her</span> <span class="w" data-s="6059" data-e="6229">hands</span> <span class="w target" data-s="6272" data-e="6741" title="发抖；战栗；焦虑；摇晃 n. 颤抖；战栗；摇晃">tremble</span> <span class="w" data-s="6784" data-e="6955">when</span> <span class="w" data-s="6997" data-e="7125">she</span> <span class="w" data-s="7168" data-e="7467">lifts</span> <span class="w" data-s="7509" data-e="7595">the</span> <span class="w" data-s="7637" data-e="7723">heavy</span> <span class="w" data-s="7765" data-e="8149">kettle,</span> <span class="w" data-s="8277" data-e="8448">and</span> <span class="w" data-s="8576" data-e="8960">in</span> <span class="w" data-s="9003" data-e="9131">winter</span> <span class="w" data-s="9173" data-e="9515">she</span> <span class="w target" data-s="9557" data-e="9899" title="颤抖，哆嗦，寒战v.颤抖，哆嗦，发抖">shivers</span> <span class="w" data-s="9941" data-e="10197">even</span> <span class="w" data-s="10240" data-e="10581">beside</span> <span class="w" data-s="10624" data-e="10795">the</span> <span class="w" data-s="10837" data-e="11093">stove.</span></p><p class="zh">她提起那把沉水壶时两只手会发抖；冬天里，就算站在炉子边她也会打哆嗦。</p></div>
+<div class="pair" data-s0="11741" data-s1="15965"><p class="en"><span class="w" data-s="11741" data-e="11826">Her</span> <span class="w" data-s="11869" data-e="11997">son</span> <span class="w" data-s="12040" data-e="12424">calls</span> <span class="w" data-s="12466" data-e="12680">her</span> <span class="w" data-s="12722" data-e="12850">a</span> <span class="w target" data-s="12893" data-e="13106" title="">burden,</span> <span class="w" data-s="13277" data-e="13448">but</span> <span class="w" data-s="14002" data-e="14130">her</span> <span class="w" data-s="14173" data-e="14301">voice</span> <span class="w" data-s="14344" data-e="14770">stays</span> <span class="w target" data-s="14813" data-e="15154" title="和善的；慈爱的；温柔的；嫩的；柔软的；疼 痛的；易损坏的">tender</span> <span class="w" data-s="15197" data-e="15453">and</span> <span class="w target" data-s="15496" data-e="15965" title="温暖的，暖和的；温和的，温柔的；轻微的">mild.</span></p><p class="zh">儿子说她是负担，可她的声音依然温柔、和缓。</p></div>
+<div class="pair" data-s0="16264" data-s1="23090"><p class="en"><span class="w" data-s="16264" data-e="16776">She</span> <span class="w" data-s="16818" data-e="17202">keeps</span> <span class="w" data-s="17245" data-e="17373">one</span> <span class="w" data-s="17416" data-e="17928">narrow</span> <span class="w" data-s="17970" data-e="18098">room</span> <span class="w target" data-s="18141" data-e="18610" title="整齐的，整洁的 v. 整理；收拾">tidy:</span> <span class="w" data-s="18824" data-e="19378">a</span> <span class="w" data-s="19421" data-e="19720">loom,</span> <span class="w" data-s="19933" data-e="20317">three</span> <span class="w" data-s="20360" data-e="20786">rolls</span> <span class="w" data-s="20829" data-e="20957">of</span> <span class="w" data-s="21000" data-e="21213">grey</span> <span class="w target" data-s="21256" data-e="21640" title="织物，布料；构造，结构">fabric,</span> <span class="w" data-s="21810" data-e="22024">and</span> <span class="w" data-s="22152" data-e="22365">a</span> <span class="w" data-s="22408" data-e="22536">basket</span> <span class="w" data-s="22578" data-e="22834">of</span> <span class="w" data-s="22877" data-e="23090">wool.</span></p><p class="zh">她把一间窄小的屋子收拾得整整齐齐：一台织机、三卷灰布，还有一篮羊毛。</p></div>
+<div class="pair" data-s0="23614" data-s1="27326"><p class="en"><span class="w" data-s="23614" data-e="23742">Every</span> <span class="w" data-s="23784" data-e="23998">morning</span> <span class="w" data-s="24040" data-e="24254">she</span> <span class="w target" data-s="24296" data-e="24595" title="织，编；纺织">weaves</span> <span class="w" data-s="24638" data-e="24680">at</span> <span class="w" data-s="24723" data-e="24808">the</span> <span class="w" data-s="24851" data-e="24979">window,</span> <span class="w" data-s="25192" data-e="25448">and</span> <span class="w" data-s="25662" data-e="25875">the</span> <span class="w target" data-s="25918" data-e="26088" title="波，波浪 v.(挥手)示意，致意">waves</span> <span class="w" data-s="26131" data-e="26302">below</span> <span class="w" data-s="26344" data-e="26558">the</span> <span class="w" data-s="26600" data-e="26771">cliff</span> <span class="w" data-s="26814" data-e="26942">keep</span> <span class="w" data-s="26984" data-e="27155">her</span> <span class="w" data-s="27198" data-e="27326">time.</span></p><p class="zh">每天早晨她都在窗边织布，崖下的海浪替她打着拍子。</p></div>
+<div class="pair" data-s0="27624" data-s1="31123"><p class="en"><span class="w" data-s="27624" data-e="28008">When</span> <span class="w" data-s="28179" data-e="28307">the</span> <span class="w target" data-s="28350" data-e="28478" title="潮汐，潮水；潮水般的人流">tide</span> <span class="w" data-s="28520" data-e="28648">comes</span> <span class="w" data-s="28691" data-e="28862">in,</span> <span class="w" data-s="29032" data-e="29416">she</span> <span class="w" data-s="29459" data-e="29758">stops</span> <span class="w" data-s="29800" data-e="29971">and</span> <span class="w" data-s="30014" data-e="30312">watches</span> <span class="w" data-s="30355" data-e="30483">it</span> <span class="w" data-s="30526" data-e="30782">climb</span> <span class="w" data-s="30824" data-e="30867">the</span> <span class="w" data-s="30910" data-e="31123">stones.</span></p><p class="zh">潮水涨上来的时候，她就停下手，看着潮水一点点爬上石头。</p></div>
+<div class="pair" data-s0="31795" data-s1="35976"><p class="en"><span class="w" data-s="31795" data-e="32008">Last</span> <span class="w" data-s="32051" data-e="32264">spring</span> <span class="w" data-s="32307" data-e="32605">the</span> <span class="w" data-s="32648" data-e="32776">town</span> <span class="w" data-s="32819" data-e="33032">held</span> <span class="w" data-s="33075" data-e="33203">a</span> <span class="w target" data-s="33245" data-e="33459" title="织，编；纺织">weaving</span> <span class="w" data-s="33501" data-e="33672">show,</span> <span class="w" data-s="33928" data-e="34184">and</span> <span class="w" data-s="34227" data-e="34483">her</span> <span class="w" data-s="34525" data-e="34824">cloth</span> <span class="w" data-s="34867" data-e="35080">was</span> <span class="w" data-s="35123" data-e="35208">the</span> <span class="w target" data-s="35251" data-e="35549" title="奇迹 v.感到惊奇；大为赞叹">marvel</span> <span class="w" data-s="35592" data-e="35720">of</span> <span class="w" data-s="35763" data-e="35805">the</span> <span class="w" data-s="35848" data-e="35976">hall.</span></p><p class="zh">去年春天，镇上办了织布展，她的布成了整个展厅里的奇观。</p></div>
+<div class="pair" data-s0="36189" data-s1="39005"><p class="en"><span class="w" data-s="36189" data-e="36829">The</span> <span class="w" data-s="36915" data-e="37213">judges</span> <span class="w" data-s="37256" data-e="37384">called</span> <span class="w" data-s="37427" data-e="37597">it</span> <span class="w target" data-s="37640" data-e="38195" title="宏伟的，壮丽的；令人印象深刻的，出色的； 高尚的，高贵的">magnificent</span> <span class="w" data-s="38237" data-e="38408">and</span> <span class="w target" data-s="38451" data-e="39005" title="壮观的，令人惊叹的">spectacular.</span></p><p class="zh">评委说它宏伟壮观。</p></div>
+<div class="pair" data-s0="39219" data-s1="42845"><p class="en"><span class="w" data-s="39219" data-e="39901">One</span> <span class="w" data-s="39944" data-e="40115">of</span> <span class="w" data-s="40157" data-e="40200">them</span> <span class="w" data-s="40243" data-e="40413">said</span> <span class="w" data-s="40456" data-e="40541">it</span> <span class="w" data-s="40584" data-e="40669">was</span> <span class="w target" data-s="40712" data-e="40797" title="宏伟的；重大的，壮丽的，极好的">grand,</span> <span class="w" data-s="41096" data-e="41395">and</span> <span class="w" data-s="41480" data-e="41907">another</span> <span class="w" data-s="41949" data-e="42163">said</span> <span class="w" data-s="42205" data-e="42333">it</span> <span class="w" data-s="42376" data-e="42461">was</span> <span class="w target" data-s="42504" data-e="42845" title="极好的，了不起的；极大的，惊人的">terrific.</span></p><p class="zh">其中一个说它了不起，另一个说它棒极了。</p></div>
+<div class="pair" data-s0="43493" data-s1="46736"><p class="en"><span class="w" data-s="43493" data-e="43578">A</span> <span class="w" data-s="43621" data-e="44005">reporter</span> <span class="w" data-s="44048" data-e="44176">wrote</span> <span class="w" data-s="44218" data-e="44389">that</span> <span class="w" data-s="44432" data-e="44517">it</span> <span class="w" data-s="44560" data-e="44645">was</span> <span class="w target" data-s="44688" data-e="45072" title="巧妙的；使人印象深的；聪颖的；技艺高 超的">brilliant,</span> <span class="w" data-s="45200" data-e="45498">even</span> <span class="w target" data-s="45541" data-e="46181" title="极好的，绝妙的；非凡的，巨大的，惊人的； 虚构的，传说的">fabulous,</span> <span class="w" data-s="46352" data-e="46736">work.</span></p><p class="zh">一个记者写道，这是绝妙的、甚至是非凡的作品。</p></div>
+<div class="pair" data-s0="47077" data-s1="50533"><p class="en"><span class="w" data-s="47077" data-e="47589">She</span> <span class="w" data-s="47632" data-e="47802">won</span> <span class="w" data-s="47845" data-e="47973">the</span> <span class="w" data-s="48016" data-e="48101">first</span> <span class="w target" data-s="48144" data-e="48442" title="授予 n. 奖品,奖金">award,</span> <span class="w" data-s="48656" data-e="48869">and</span> <span class="w" data-s="48997" data-e="49125">the</span> <span class="w target" data-s="49168" data-e="49381" title="报酬；奖励，回报；赏金v.奖励；酬谢；值得 (付出)">reward</span> <span class="w" data-s="49424" data-e="49637">was</span> <span class="w" data-s="49680" data-e="49765">a</span> <span class="w" data-s="49808" data-e="49936">small</span> <span class="w" data-s="49978" data-e="50192">sum</span> <span class="w" data-s="50234" data-e="50362">of</span> <span class="w" data-s="50405" data-e="50533">money.</span></p><p class="zh">她得了头奖，奖金是一小笔钱。</p></div>
+<div class="pair" data-s0="50746" data-s1="54245"><p class="en"><span class="w" data-s="50746" data-e="50960">She</span> <span class="w" data-s="51216" data-e="51429">felt</span> <span class="w target" data-s="51472" data-e="51898" title="令人尴尬的，难对付的，笨拙的 n. 敬畏 v. 使敬畏">awkward</span> <span class="w" data-s="51941" data-e="52069">on</span> <span class="w" data-s="52112" data-e="52197">the</span> <span class="w" data-s="52240" data-e="52368">stage,</span> <span class="w" data-s="52666" data-e="52965">and</span> <span class="w" data-s="53008" data-e="53136">stood</span> <span class="w" data-s="53178" data-e="53349">in</span> <span class="w target" data-s="53392" data-e="53562" title="">awe</span> <span class="w" data-s="53605" data-e="53861">of</span> <span class="w" data-s="53904" data-e="53946">the</span> <span class="w" data-s="53989" data-e="54245">crowd.</span></p><p class="zh">站在台上她觉得很尴尬，面对人群心里满是敬畏。</p></div>
+<div class="pair" data-s0="54501" data-s1="59322"><p class="en"><span class="w" data-s="54501" data-e="54586">The</span> <span class="w" data-s="54629" data-e="54970">doctors</span> <span class="w" data-s="55013" data-e="55141">had</span> <span class="w" data-s="55184" data-e="55269">told</span> <span class="w" data-s="55312" data-e="55440">her</span> <span class="w" data-s="55482" data-e="55610">to</span> <span class="w" data-s="55653" data-e="55696">eat</span> <span class="w" data-s="55738" data-e="55909">better:</span> <span class="w" data-s="56165" data-e="56677">more</span> <span class="w target" data-s="56720" data-e="57189" title="(食物的)纤维素，(布绳的)纤维，丝">fibre,</span> <span class="w" data-s="57317" data-e="57445">more</span> <span class="w target" data-s="57658" data-e="58085" title="">vitamins,</span> <span class="w" data-s="58256" data-e="58512">more</span> <span class="w" data-s="58640" data-e="58853">real</span> <span class="w target" data-s="58896" data-e="59322" title="营养，营养学">nutrition.</span></p><p class="zh">医生早就让她吃得更好一些：多一点纤维，多一点维生素，多一点真正的营养。</p></div>
+<div class="pair" data-s0="60199" data-s1="64977"><p class="en"><span class="w" data-s="60199" data-e="60327">She</span> <span class="w" data-s="60369" data-e="60625">buys</span> <span class="w" data-s="60668" data-e="60839">soft</span> <span class="w target" data-s="60881" data-e="61223" title="纸巾，面巾纸，薄织物">tissue</span> <span class="w" data-s="61265" data-e="61521">for</span> <span class="w" data-s="61564" data-e="61649">her</span> <span class="w" data-s="61692" data-e="61948">nose</span> <span class="w" data-s="61991" data-e="62247">and</span> <span class="w" data-s="62460" data-e="62801">keeps</span> <span class="w" data-s="62844" data-e="62929">her</span> <span class="w target" data-s="62972" data-e="63313" title="行李；思想包袱">baggage</span> <span class="w" data-s="63356" data-e="63527">light</span> <span class="w" data-s="63569" data-e="63825">when</span> <span class="w" data-s="63868" data-e="63996">she</span> <span class="w" data-s="64039" data-e="64380">travels</span> <span class="w" data-s="64423" data-e="64551">to</span> <span class="w" data-s="64593" data-e="64679">the</span> <span class="w" data-s="64721" data-e="64977">clinic.</span></p><p class="zh">她买柔软的纸巾擦鼻子；去诊所时，行李也带得很轻。</p></div>
+<div class="pair" data-s0="65105" data-s1="71548"><p class="en"><span class="w" data-s="65105" data-e="65703">A</span> <span class="w" data-s="65745" data-e="65916">young</span> <span class="w" data-s="65959" data-e="66129">man</span> <span class="w" data-s="66172" data-e="66343">once</span> <span class="w" data-s="66385" data-e="66641">said</span> <span class="w" data-s="66684" data-e="66855">the</span> <span class="w" data-s="66897" data-e="67068">design</span> <span class="w" data-s="67111" data-e="67367">was</span> <span class="w" data-s="67409" data-e="67537">his,</span> <span class="w" data-s="67793" data-e="68177">but</span> <span class="w" data-s="68220" data-e="68433">that</span> <span class="w" data-s="68476" data-e="68689">story</span> <span class="w" data-s="68732" data-e="68988">was</span> <span class="w" data-s="69031" data-e="69201">easy</span> <span class="w" data-s="69244" data-e="69500">to</span> <span class="w target" data-s="69543" data-e="69969" title="捏造，伪造；虚构">fabricate</span> <span class="w" data-s="70012" data-e="70311">and</span> <span class="w" data-s="70481" data-e="70695">easy</span> <span class="w" data-s="70737" data-e="70951">to</span> <span class="w" data-s="70993" data-e="71207">prove</span> <span class="w" data-s="71249" data-e="71548">false.</span></p><p class="zh">有个年轻人曾说这个花样是他画的，可这种说法很容易捏造，也很容易被戳穿。</p></div>
+<div class="pair" data-s0="71847" data-s1="74364"><p class="en"><span class="w" data-s="71847" data-e="71932">He</span> <span class="w" data-s="71975" data-e="72103">was</span> <span class="w" data-s="72145" data-e="72231">a</span> <span class="w target" data-s="72273" data-e="72572" title="令人讨厌的人或事物">nuisance,</span> <span class="w" data-s="72785" data-e="72999">she</span> <span class="w" data-s="73084" data-e="73255">said,</span> <span class="w" data-s="73468" data-e="73596">and</span> <span class="w" data-s="73767" data-e="73895">then</span> <span class="w" data-s="73937" data-e="74065">she</span> <span class="w" data-s="74108" data-e="74364">laughed.</span></p><p class="zh">“他就是个讨厌鬼，”她说，然后笑了。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">tissue</span>
+          <span class="ipa">/&#x27;tifu:/</span>
+          <span class="pos"></span>
+          <span class="cn">纸巾，面巾纸，薄织物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She buys soft tissue for her nose</div>          <div class="mnem"><span class="lbl">记</span>我们平常买的所有纸巾上都有 这个单词。 (194)</div>          <div class="root"><span class="lbl">根</span>联想：纸巾盒上印的 tissue → 纸巾；(身体)组织</div>          <div class="zt"><span class="lbl">真题</span>They try to limit their usage of paper including facial tissue and kitchen roll—to save money.他们试图限制纸张的使用，包括面巾纸 和厨房用纸，以节省开支。(2017)</div>          <div class="fam"><span class="lbl">族</span>tissue paper n. 薄纸</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">baggage</span>
+          <span class="ipa">/&#x27;bægid3/</span>
+          <span class="pos"></span>
+          <span class="cn">行李；思想包袱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>keeps her baggage light when she travels to the clinic</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：包包（bag）给 哥哥(gage)。这个包包就是哥哥的“行李”啊。</div>          <div class="root"><span class="lbl">根</span>bag(包) + gage → 哥哥的包 → 行李</div>          <div class="zt"><span class="lbl">真题</span>And remember no more than 10 ounces of carry-on baggage are allowed. 记住随身携带 的行李不能超过10盎司。</div>          <div class="fam"><span class="lbl">族</span>bag n. 包 / luggage n. 行李</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">burden</span>
+          <span class="ipa">/&#x27;b3:dn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her son calls her a burden</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“笨蛋”。身边 有个笨蛋，真是个“负担”。</div>          <div class="root"><span class="lbl">根</span>谐音：笨蛋 → 身边有个笨蛋是负担</div>          <div class="zt"><span class="lbl">真题</span>He has been burdened with excessive work.他的工作负担过重。(2023)</div>          <div class="fam"><span class="lbl">族</span>burdensome adj. 繁重的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">vulnerable</span>
+          <span class="ipa">/&#x27;valnərəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(身体上或感情上)脆弱的，易受……伤 害的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her body has grown feeble and vulnerable to every cold wind</div>          <div class="mnem"><span class="lbl">记</span>该单词拆分为：哇（vul)！你 (ne)弱爆(rable)。说你太虚弱了→易受伤害 的；脆弱的。</div>          <div class="root"><span class="lbl">根</span>vuln(伤) + able(能…的) → 能被伤到的</div>          <div class="zt"><span class="lbl">真题</span>They can become increasingly vulnerable to serious illnesses. 他们可能变得越来越容易 受到严重疾病的影响。(2019)</div>          <div class="fam"><span class="lbl">族</span>vulnerability n. 脆弱性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">feeble</span>
+          <span class="ipa">/&#x27;fi:bl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">虚弱的,衰弱的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her body has grown feeble and vulnerable</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“非（常）（单） 薄”。一个人看起来很单薄→虚弱的，衰弱的。</div>          <div class="root"><span class="lbl">根</span>谐音：非薄 → 人很单薄 → 虚弱的</div>          <div class="fam"><span class="lbl">族</span>feebly adv. 虚弱地 / feebleness n. 虚弱</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">tender</span>
+          <span class="ipa">/&#x27;tendər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">和善的；慈爱的；温柔的；嫩的；柔软的；疼 痛的；易损坏的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but her voice stays tender and mild</div>          <div class="mnem"><span class="lbl">记</span>tender发音很像“疼的”。别人 稍微碰你一下，你就会疼→嫩的；疼痛的；易损 坏的。</div>          <div class="root"><span class="lbl">根</span>谐音：疼的 → 一碰就疼 → 嫩的；温柔的</div>          <div class="zt"><span class="lbl">真题</span>I love imagining what even the most run- down house could look like with a little tender loving care. 我喜欢想象，即使是最破旧的房子， 只要有一点点温柔的呵护，会是什么样子。 (195) 第八单元</div>          <div class="fam"><span class="lbl">族</span>tenderness n. 温柔 / tenderly adv. 温柔地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">mild</span>
+          <span class="ipa">/maild/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">温暖的，暖和的；温和的，温柔的；轻微的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but her voice stays tender and mild</div>          <div class="root"><span class="lbl">根</span>靠搭配记：mild weather 温和的天气</div>          <div class="zt"><span class="lbl">真题</span>So in short, if you like sunny but not too hot summers, mild winters but with lots of cloudy days, Seattle&#x27;s the place to be. 因此，简 而言之，如果你喜欢阳光明媚但不太热的夏天， 气候温和但多云的冬天，那么西雅图就是你要 去的地方。(2019)</div>          <div class="fam"><span class="lbl">族</span>mildly adv. 温和地 / mildness n. 温和</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">tremble</span>
+          <span class="ipa">/&#x27;tremb(ə)1/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发抖；战栗；焦虑；摇晃 n. 颤抖；战栗；摇晃</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her hands tremble when she lifts the heavy kettle</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“穿薄”。穿得很 薄，冷风一吹，就“颤抖，发抖”。</div>          <div class="root"><span class="lbl">根</span>谐音：穿薄 → 穿得薄，冷得发抖</div>          <div class="zt"><span class="lbl">真题</span>They tremble at the thought of being seen in public in clothes that are out of fashion. 他们一想到穿着过时的衣服出现在公共场合心 里就发怵。</div>          <div class="fam"><span class="lbl">族</span>trembling adj. 发抖的 / tremor n. 颤抖</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">shiver</span>
+          <span class="ipa">/&#x27;∫ivər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">颤抖，哆嗦，寒战v.颤抖，哆嗦，发抖</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in winter she shivers even beside the stove</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“洗我”。冬天 洗过澡，“哆嗦”着站在那，天冷了。</div>          <div class="root"><span class="lbl">根</span>谐音：洗我 → 冬天洗完澡直哆嗦</div>          <div class="zt"><span class="lbl">真题</span>But even if your job doesn&#x27;t give you shivers of joy each new day, working is a part of what each of us does and the contribution we make to society. 但是，即使你的工作不能让 你每一天都充满喜悦，工作也是我们每个人生 活的一部分，也是我们对社会的贡献。(2020)</div>          <div class="fam"><span class="lbl">族</span>shivery adj. 令人发抖的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">award</span>
+          <span class="ipa">/ə&#x27;woird/</span>
+          <span class="pos">v.</span>
+          <span class="cn">授予 n. 奖品,奖金</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She won the first award</div>          <div class="mnem"><span class="lbl">记</span>award 发音类似“a word(一个 单词)”。就要下课了，我说：“同学们，多讲个单 词吧，作为对你们今天努力听课的‘奖励’。”</div>          <div class="root"><span class="lbl">根</span>a + ward(想成 word) → 给一个词的奖励</div>          <div class="zt"><span class="lbl">真题</span>The three students were awarded scholarships totaling $ 21，000. 这三名学生获 得了总计2.1万美元的奖学金。</div>          <div class="fam"><span class="lbl">族</span>awardee n. 获奖者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">reward</span>
+          <span class="ipa">/rı&#x27;wo:rd/</span>
+          <span class="pos"></span>
+          <span class="cn">报酬；奖励，回报；赏金v.奖励；酬谢；值得 (付出)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and the reward was a small sum of money</div>          <div class="mnem"><span class="lbl">记</span>老师给你讲了一个单词后，你 就说：“老师，作为回报(re表示“回去”)，我给你 也讲个单词(ward 想成 word)吧。”&quot;reward 的意 思是“回报，奖赏”。</div>          <div class="root"><span class="lbl">根</span>re(回) + ward(想成 word) → 回你一句 → 回报</div>          <div class="zt"><span class="lbl">真题</span>Big houses are advertized as a reward for hard work and diligence. 大房子被宣传是给努 力工作和勤奋的奖赏。(2023)</div>          <div class="fam"><span class="lbl">族</span>rewarding adj. 有回报的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">awkward</span>
+          <span class="ipa">/&#x27;o:kwərd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">令人尴尬的，难对付的，笨拙的 n. 敬畏 v. 使敬畏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She felt awkward on the stage</div>          <div class="mnem"><span class="lbl">记</span>该单词谐音“哦”。当导游在讲 解这个地方曾经发生过的轰轰烈烈的大事件 时，你只能连连发出“哦”的声音，为什么？太 “敬畏”了，只能说“哦”。</div>          <div class="root"><span class="lbl">根</span>谐音：哦，怪 → 让人尴尬的</div>          <div class="zt"><span class="lbl">真题</span>Various children who had come with their parents looked up in awe and delight. 和 父母一起来的孩子们都怀着敬畏和喜悦的心情 抬起头来。</div>          <div class="fam"><span class="lbl">族</span>awkwardly adv. 尴尬地 / awkwardness n. 尴尬</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">awe</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and stood in awe of the crowd</div>          <div class="root"><span class="lbl">根</span>联想：惊叹时只能发出“哦” → 敬畏</div>          <div class="fam"><span class="lbl">族</span>awesome adj. 了不起的 / awful adj. 可怕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">brilliant</span>
+          <span class="ipa">/&#x27;brıliənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巧妙的；使人印象深的；聪颖的；技艺高 超的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A reporter wrote that it was brilliant, even fabulous, work</div>          <div class="mnem"><span class="lbl">记</span>bri(想成 bright，光)+lian(脸) →一脸的光→发光的，灿烂的。</div>          <div class="root"><span class="lbl">根</span>bri(想成 bright 光) + lian(脸) → 一脸光</div>          <div class="zt"><span class="lbl">真题</span>She had no patience for brilliant but irrelevant figures of speech. 她对那些绝妙但无 关紧要的修辞手法没有耐心。</div>          <div class="fam"><span class="lbl">族</span>brilliance n. 光辉 / brilliantly adv. 出色地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">terrific</span>
+          <span class="ipa">/tə&#x27;rıfık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">极好的，了不起的；极大的，惊人的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and another said it was terrific</div>          <div class="mnem"><span class="lbl">记</span>特别的日子(汉语拼音 teri“特 日”)非提到不可(fic的谐音“非可”)的事情，应 该是自己做过的“极好的，了不起的”事情吧。</div>          <div class="root"><span class="lbl">根</span>谐音：特日非可 → 特别日子非提不可 → 极好的</div>          <div class="zt"><span class="lbl">真题</span>She is known to have a terrific figure. 大 家都知道她的身材很好。</div>          <div class="fam"><span class="lbl">族</span>terrify v. 使恐惧 / terrifically adv. 极其</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">magnificent</span>
+          <span class="ipa">/mæg&#x27;nifisnt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">宏伟的，壮丽的；令人印象深刻的，出色的； 高尚的，高贵的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The judges called it magnificent and spectacular</div>          <div class="root"><span class="lbl">根</span>magn(大) + fic(做) + ent → 做得很大 → 宏伟的</div>          <div class="zt"><span class="lbl">真题</span>We visited the magnificent libraries. 我们 参观了宏伟的图书馆。 (ni)飞身(ficent)”。一家人上演空中飞人，场面 多么的宏伟壮丽。</div>          <div class="fam"><span class="lbl">族</span>magnificence n. 宏伟 / magnify v. 放大</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">spectacular</span>
+          <span class="ipa">/spek&#x27;tækjələr/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">壮观的，令人惊叹的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The judges called it magnificent and spectacular</div>          <div class="mnem"><span class="lbl">记</span>sp(看，这个词根前面介绍过)； tacular发音类似“太酷了”。连在一起就是看起 来太酷了→壮观的。</div>          <div class="root"><span class="lbl">根</span>spect(看) + acular(谐音太酷了) → 看起来太酷</div>          <div class="fam"><span class="lbl">族</span>spectacle n. 景象 / spectator n. 观众</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">marvel</span>
+          <span class="ipa">/&#x27;ma:rvl/</span>
+          <span class="pos"></span>
+          <span class="cn">奇迹 v.感到惊奇；大为赞叹</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her cloth was the marvel of the hall</div>          <div class="mnem"><span class="lbl">记</span>marvelous的发音类似“妈(妈 (196) 和)我乐死(了)”。今天我跟妈妈看了一部电 影，看完后，我们都乐死了，说明这部电影演得 很精彩、极好的。marvel v.→赞叹。</div>          <div class="root"><span class="lbl">根</span>联想 marvelous：妈和我乐死了 → 精彩，赞叹</div>          <div class="zt"><span class="lbl">真题</span>All in all, the Olympic class ships were marvels of sea engineering. 总之，奥林匹克级 舰艇是海洋工程的奇迹。</div>          <div class="fam"><span class="lbl">族</span>marvelous adj. 极好的 / marvelously adv. 极好地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">grand</span>
+          <span class="ipa">/grænd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">宏伟的；重大的，壮丽的，极好的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One of them said it was grand</div>          <div class="mnem"><span class="lbl">记</span>grandfather祖 父，grandmother 祖母，都是在你爸爸妈妈上面的人，我们小时候 都觉得父母是超人，无所不能。那祖父母更是 超超人了，更厉害啊→极好的，壮丽的。</div>          <div class="root"><span class="lbl">根</span>联想 grandfather：祖父母是超超人 → 了不起</div>          <div class="zt"><span class="lbl">真题</span>With such a grand history, kite flying is sure to remain an entertaining and popular sport.有着如此悠久的历史，放风筝仍然是一 项适合大众娱乐且受欢迎的运动。(2015)</div>          <div class="fam"><span class="lbl">族</span>grandeur n. 宏伟 / grandly adv. 宏伟地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">fabulous</span>
+          <span class="ipa">/&#x27;fæbjələs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">极好的，绝妙的；非凡的，巨大的，惊人的； 虚构的，传说的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A reporter wrote that it was brilliant, even fabulous, work</div>          <div class="mnem"><span class="lbl">记</span>大雁新写了一本书，这本书发 布(fabu)的那天大雁乐死了(lous)，因为卖得好 啊。所以这本书是“极好的”。</div>          <div class="root"><span class="lbl">根</span>联想：发布(fabu)那天乐死(lous) → 极好的</div>          <div class="fam"><span class="lbl">族</span>fable n. 寓言 / fabulously adv. 极好地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">fabricate</span>
+          <span class="ipa">/&#x27;fæbrikeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">捏造，伪造；虚构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but that story was easy to fabricate</div>          <div class="mnem"><span class="lbl">记</span>该单词前半部分 fabri发音类 似“发布日”；cate发音类似“尅他”，就是打他。 江湖传言，等到他新专辑发布那天，你会带着一 群人去现场打他。这怎么可能呢？→捏造， 伪造。</div>          <div class="root"><span class="lbl">根</span>fabric(布) + ate → 像织布一样编出来 → 捏造</div>          <div class="fam"><span class="lbl">族</span>fabrication n. 捏造 / fabricator n. 捏造者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">fabric</span>
+          <span class="ipa">/&#x27;fæbrık/</span>
+          <span class="pos"></span>
+          <span class="cn">织物，布料；构造，结构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>three rolls of grey fabric</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分（fab)发音类似 “帆布”。帆布也属于一种“布料”啊。</div>          <div class="root"><span class="lbl">根</span>谐音：帆布 → 一种布料</div>          <div class="zt"><span class="lbl">真题</span>I mean, how hard it could be to create fabric and sew it into a shirt shape. 我是说，制 作布料并缝制成衬衫的形状有多难。(2013)</div>          <div class="fam"><span class="lbl">族</span>fabricate v. 捏造 / textile n. 纺织品</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">weave</span>
+          <span class="ipa">/wi:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">织，编；纺织</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every morning she weaves at the window</div>          <div class="mnem"><span class="lbl">记</span>妈妈为我(weave的谐音)“织” 了一件新毛衣。</div>          <div class="root"><span class="lbl">根</span>谐音：为我 → 妈妈为我织毛衣</div>          <div class="zt"><span class="lbl">真题</span>A bird must weave these materials into a nest.鸟必须把这些材料编织成巢。</div>          <div class="fam"><span class="lbl">族</span>weaver n. 织工 / weaving n. 编织</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">wave</span>
+          <span class="ipa">/weiv/</span>
+          <span class="pos">n.</span>
+          <span class="cn">波，波浪 v.(挥手)示意，致意</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and the waves below the cliff keep her time</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“喂，我！”说明有 人在跟我打招呼啊→(挥手)示意，致意。</div>          <div class="root"><span class="lbl">根</span>谐音：喂，我！→ 挥手打招呼 → 波浪</div>          <div class="zt"><span class="lbl">真题</span>So if there is a heat wave this summer, it would be best for us. 所以如果今年夏天有热 浪，对我们来说是最好的。(2015) 例 The people on the bus waved and we waved back. 公共汽车上的人挥手致意，我们也 向他们挥手。</div>          <div class="fam"><span class="lbl">族</span>wavy adj. 波浪形的 / microwave n. 微波</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">tide</span>
+          <span class="ipa">/taid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">潮汐，潮水；潮水般的人流</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>When the tide comes in</div>          <div class="mnem"><span class="lbl">记</span>这个单词比较容易记忆：汰渍 洗衣粉就是这个单词。</div>          <div class="root"><span class="lbl">根</span>联想：汰渍(Tide)洗衣粉 → 潮水</div>          <div class="zt"><span class="lbl">真题</span>So he lay down and fell asleep, but the tide swept in quickly at the beach. 于是他躺下 睡着了，但潮水很快冲上了海滩。(2019)</div>          <div class="fam"><span class="lbl">族</span>tidal adj. 潮汐的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">tidy</span>
+          <span class="ipa">/&#x27;taidi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">整齐的，整洁的 v. 整理；收拾</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She keeps one narrow room tidy</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“泰迪”。泰迪 狗狗都很“干净，整洁”。</div>          <div class="root"><span class="lbl">根</span>谐音：泰迪 → 泰迪狗很整洁</div>          <div class="fam"><span class="lbl">族</span>tidily adv. 整洁地 / tidiness n. 整洁</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">fibre</span>
+          <span class="ipa">/&#x27;faibər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(食物的)纤维素，(布绳的)纤维，丝</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>more fibre, more vitamins, more real nutrition</div>          <div class="mnem"><span class="lbl">记</span>这个单词在饮料的营养成分中 经常见到，“纤维素”占多少的比例。</div>          <div class="root"><span class="lbl">根</span>联想：营养成分表上的“纤维素”</div>          <div class="zt"><span class="lbl">真题</span>Breakfast foods are often higher in fibre and nutrients. 早餐食品的纤维含量和营养成分 通常都较高。(2019)</div>          <div class="fam"><span class="lbl">族</span>fibrous adj. 纤维状的 / fiber n. 纤维(美)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">vitamin</span>
+          <span class="ipa">/&#x27;vaitəmin/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>more fibre, more vitamins, more real nutrition</div>          <div class="root"><span class="lbl">根</span>vit(生命) + amin(胺) → 维持生命之物</div>          <div class="zt"><span class="lbl">真题</span>Vitamins are complex substances that the body requires in very small mounts. 维生素 是一种复杂的物质，人体只需要非常小的量。</div>          <div class="fam"><span class="lbl">族</span>vitamin-rich adj. 富含维生素的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">nutrition</span>
+          <span class="ipa">/nju&#x27;tri∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">营养，营养学</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>more fibre, more vitamins, more real nutrition</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“纽崔莱”。 它不就是美国“营养品”的品牌吗？</div>          <div class="root"><span class="lbl">根</span>nutri(营养) + tion(名词后缀) → 营养</div>          <div class="zt"><span class="lbl">真题</span>We can easily think of a number of foods and recipes that are both inexpensive and nutritious. 我们可以很容易地想到一些既便宜 又有营养的食物和食谱。(2022)</div>          <div class="fam"><span class="lbl">族</span>nutritious adj. 有营养的 / nutrient n. 营养素</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">nuisance</span>
+          <span class="ipa">/&#x27;nu:sns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">令人讨厌的人或事物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was a nuisance, she said</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“牛绅士”。我讨 厌那个一脸牛气哄哄，很自以为是的绅士→令 人讨厌的人或事物。</div>          <div class="root"><span class="lbl">根</span>谐音：牛绅士 → 牛气哄哄的绅士 → 讨厌鬼</div>          <div class="zt"><span class="lbl">真题</span>Unfortunately many employees resent compulsory bonding and often regard these exercises as a nuisance. 不幸的是，许多员工对 强制绑定感到反感，常常认为这种做法令人讨 厌。(2023)</div>          <div class="fam"><span class="lbl">族</span>annoy v. 使恼火 / annoying adj. 恼人的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 8 · Day 52</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

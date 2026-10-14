@@ -1,0 +1,697 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 49 · The Bowl and the Bridge</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 49 · 11/30 · Unit 7 第 1441-1470 词</div>
+  <h1>The Bowl and the Bridge<span class="cn">碗与桥</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-49.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4053"><p class="en"><span class="w" data-s="43" data-e="171">After</span> <span class="w" data-s="213" data-e="384">the</span> <span class="w" data-s="427" data-e="683">flood,</span> <span class="w" data-s="853" data-e="981">the</span> <span class="w" data-s="1365" data-e="1493">old</span> <span class="w" data-s="1536" data-e="1792">stone</span> <span class="w" data-s="1835" data-e="2176">bridge</span> <span class="w" data-s="2219" data-e="2389">at</span> <span class="w" data-s="2432" data-e="2603">Little</span> <span class="w" data-s="2645" data-e="2859">Ford</span> <span class="w" data-s="2901" data-e="3243">began</span> <span class="w" data-s="3285" data-e="3541">to</span> <span class="w target" data-s="3584" data-e="4053" title="解体；崩溃；破裂">disintegrate.</span></p><p class="zh">洪水过后，小渡口那座老石桥开始解体。</p></div>
+<div class="pair" data-s0="4267" data-s1="8533"><p class="en"><span class="w" data-s="4267" data-e="4651">The</span> <span class="w target" data-s="4821" data-e="5120" title="水泥；胶合剂；胶接剂；黏固剂，纽带 v.黏结，胶合；加强，巩固">cement</span> <span class="w" data-s="5163" data-e="5376">between</span> <span class="w" data-s="5419" data-e="5589">the</span> <span class="w" data-s="5632" data-e="5803">stones</span> <span class="w" data-s="5845" data-e="6059">had</span> <span class="w" data-s="6101" data-e="6272">turned</span> <span class="w" data-s="6315" data-e="6528">to</span> <span class="w" data-s="6571" data-e="6741">sand,</span> <span class="w" data-s="6997" data-e="7168">and</span> <span class="w" data-s="7467" data-e="7680">no</span> <span class="w" data-s="7723" data-e="8021">rail</span> <span class="w" data-s="8064" data-e="8235">was</span> <span class="w target" data-s="8277" data-e="8533" title="完整的；完好无损的">intact.</span></p><p class="zh">石头之间的水泥已经变成了沙，没有一段栏杆是完好的。</p></div>
+<div class="pair" data-s0="9187" data-s1="12088"><p class="en"><span class="w" data-s="9187" data-e="9272">One</span> <span class="w" data-s="9315" data-e="9614">beam</span> <span class="w" data-s="9656" data-e="9784">was</span> <span class="w" data-s="9827" data-e="9998">still</span> <span class="w target" data-s="10040" data-e="10382" title="贴上；把……固定，把……附(在……上)； (使)与……有联系">attached</span> <span class="w" data-s="10424" data-e="10638">to</span> <span class="w" data-s="10680" data-e="10766">the</span> <span class="w" data-s="10808" data-e="10894">bank,</span> <span class="w target" data-s="11192" data-e="11662" title="紧紧抓住；粘住；附着">clinging</span> <span class="w" data-s="11704" data-e="11790">to</span> <span class="w" data-s="11832" data-e="11918">a</span> <span class="w" data-s="11960" data-e="12088">rock.</span></p><p class="zh">有一根横梁还连在河岸上，紧紧抓着一块石头。</p></div>
+<div class="pair" data-s0="12387" data-s1="17123"><p class="en"><span class="w" data-s="12387" data-e="13112">An,</span> <span class="w" data-s="13283" data-e="13624">who</span> <span class="w" data-s="13752" data-e="13880">was</span> <span class="w" data-s="13923" data-e="14264">twelve,</span> <span class="w" data-s="14520" data-e="14734">put</span> <span class="w" data-s="14776" data-e="14904">his</span> <span class="w" data-s="14947" data-e="15075">hand</span> <span class="w" data-s="15118" data-e="15331">into</span> <span class="w" data-s="15374" data-e="15502">the</span> <span class="w" data-s="15544" data-e="15758">crack</span> <span class="w" data-s="15800" data-e="16014">and</span> <span class="w" data-s="16056" data-e="16184">felt</span> <span class="w" data-s="16227" data-e="16483">something</span> <span class="w target" data-s="16526" data-e="17123" title="有形的；实际的；真实的；可感知的">tangible.</span></p><p class="zh">十二岁的阿安把手伸进裂缝里，摸到一样实实在在的东西。</p></div>
+<div class="pair" data-s0="17379" data-s1="21048"><p class="en"><span class="w" data-s="17379" data-e="17464">It</span> <span class="w" data-s="17507" data-e="17550">was</span> <span class="w" data-s="17592" data-e="17720">a</span> <span class="w" data-s="17763" data-e="17806">piece</span> <span class="w" data-s="17848" data-e="18019">of</span> <span class="w" data-s="18062" data-e="18147">a</span> <span class="w" data-s="18190" data-e="18318">blue</span> <span class="w" data-s="18360" data-e="18659">bowl,</span> <span class="w" data-s="18787" data-e="19000">with</span> <span class="w" data-s="19427" data-e="19555">a</span> <span class="w target" data-s="19598" data-e="19640" title="一点；少量；一部分">bit</span> <span class="w" data-s="19683" data-e="19768">of</span> <span class="w" data-s="19811" data-e="19896">old</span> <span class="w target" data-s="19939" data-e="20110" title="胶，胶水 v. 黏合，粘贴">glue</span> <span class="w target" data-s="20152" data-e="20664" title="枝条，枯枝；条状物v.刺，插入；粘着，黏 住；卡住">sticking</span> <span class="w" data-s="20707" data-e="20878">to</span> <span class="w" data-s="20920" data-e="21048">it.</span></p><p class="zh">那是一块蓝碗的碎片，上面还粘着一点旧胶水。</p></div>
+<div class="pair" data-s0="21176" data-s1="25187"><p class="en"><span class="w" data-s="21176" data-e="21390">He</span> <span class="w" data-s="21731" data-e="22030">had</span> <span class="w" data-s="22072" data-e="22200">no</span> <span class="w target" data-s="22243" data-e="22584" title="线索;提示">clue</span> <span class="w" data-s="22627" data-e="22798">whose</span> <span class="w" data-s="22840" data-e="23096">bowl</span> <span class="w" data-s="23139" data-e="23224">it</span> <span class="w" data-s="23267" data-e="23352">was;</span> <span class="w" data-s="23736" data-e="24206">no</span> <span class="w" data-s="24248" data-e="24504">name</span> <span class="w" data-s="24547" data-e="24846">was</span> <span class="w" data-s="24888" data-e="25016">on</span> <span class="w" data-s="25059" data-e="25187">it.</span></p><p class="zh">他完全不知道这只碗是谁的，上面也没有名字。</p></div>
+<div class="pair" data-s0="25927" data-s1="27804"><p class="en"><span class="w" data-s="25927" data-e="26055">His</span> <span class="w" data-s="26097" data-e="26481">grandmother</span> <span class="w" data-s="26524" data-e="26695">came</span> <span class="w" data-s="26737" data-e="26993">and</span> <span class="w" data-s="27036" data-e="27121">held</span> <span class="w" data-s="27164" data-e="27292">it</span> <span class="w" data-s="27335" data-e="27420">in</span> <span class="w" data-s="27463" data-e="27548">both</span> <span class="w" data-s="27591" data-e="27804">hands.</span></p><p class="zh">奶奶走过来，用两只手捧住了它。</p></div>
+<div class="pair" data-s0="28572" data-s1="32497"><p class="en"><span class="w" data-s="28572" data-e="28743">&quot;That</span> <span class="w" data-s="28785" data-e="28913">is</span> <span class="w" data-s="28956" data-e="29041">a</span> <span class="w target" data-s="29084" data-e="29169" title="暗示，提示 0. 给(某人)暗示(或提示)">cue</span> <span class="w" data-s="29212" data-e="29383">I</span> <span class="w" data-s="29425" data-e="29553">never</span> <span class="w" data-s="29596" data-e="29767">wanted,&quot;</span> <span class="w" data-s="30407" data-e="30535">she</span> <span class="w" data-s="30577" data-e="30748">said.</span> <span class="w" data-s="31089" data-e="31516">&quot;My</span> <span class="w" data-s="31559" data-e="31772">mother</span> <span class="w" data-s="31815" data-e="32028">gave</span> <span class="w" data-s="32071" data-e="32241">it</span> <span class="w" data-s="32284" data-e="32327">to</span> <span class="w" data-s="32369" data-e="32497">me.&quot;</span></p><p class="zh">“这是我最不想要的提示，”她说，“这是我妈给我的。”</p></div>
+<div class="pair" data-s0="32881" data-s1="35911"><p class="en"><span class="w" data-s="32881" data-e="33180">Her</span> <span class="w" data-s="33223" data-e="33351">voice</span> <span class="w" data-s="33393" data-e="33649">was</span> <span class="w target" data-s="33692" data-e="34033" title="激烈而不愉快的；使人悲痛的；严寒的；味 苦的">bitter,</span> <span class="w" data-s="34119" data-e="34332">and</span> <span class="w" data-s="34460" data-e="34716">her</span> <span class="w" data-s="34759" data-e="34887">eyes</span> <span class="w" data-s="34929" data-e="35185">were</span> <span class="w" data-s="35228" data-e="35356">full</span> <span class="w" data-s="35399" data-e="35527">of</span> <span class="w target" data-s="35569" data-e="35911" title="悲伤，悲痛；伤心事v. 感到悲伤">sorrow.</span></p><p class="zh">她的声音发苦，眼里满是悲伤。</p></div>
+<div class="pair" data-s0="36476" data-s1="39761"><p class="en"><span class="w" data-s="36476" data-e="36561">For</span> <span class="w" data-s="36604" data-e="36732">three</span> <span class="w" data-s="36774" data-e="37030">days</span> <span class="w" data-s="37073" data-e="37329">she</span> <span class="w" data-s="37372" data-e="37542">sat</span> <span class="w" data-s="37585" data-e="37798">in</span> <span class="w target" data-s="37841" data-e="38182" title="痛苦；悲惨；穷困；悲惨的生活；不幸的事；痛 苦的事；老发牢骚的人；不痛快的人">misery</span> <span class="w" data-s="38225" data-e="38481">and</span> <span class="w target" data-s="38524" data-e="38993" title="呻吟；叹息；哼哼；抱怨，发牢骚n.呻吟声； 叹息声；哼哼声；嘎吱声">groaned</span> <span class="w" data-s="39036" data-e="39206">at</span> <span class="w" data-s="39249" data-e="39420">small</span> <span class="w" data-s="39462" data-e="39761">sounds.</span></p><p class="zh">整整三天，她坐在痛苦里，听见一点小声音就哼哼。</p></div>
+<div class="pair" data-s0="40145" data-s1="43985"><p class="en"><span class="w" data-s="40145" data-e="40956">The</span> <span class="w" data-s="40998" data-e="41126">loss</span> <span class="w" data-s="41169" data-e="41382">was</span> <span class="w target" data-s="41425" data-e="41809" title="痛苦的；困难的">painful,</span> <span class="w" data-s="41980" data-e="42193">and</span> <span class="w" data-s="42364" data-e="42705">An</span> <span class="w" data-s="42748" data-e="43004">watched</span> <span class="w" data-s="43046" data-e="43345">her</span> <span class="w target" data-s="43388" data-e="43644" title="绝望 v. 绝望；失去希望；丧失信心">despair</span> <span class="w" data-s="43686" data-e="43985">grow.</span></p><p class="zh">这份失去是痛的，阿安看着她的绝望一点点涨起来。</p></div>
+<div class="pair" data-s0="44714" data-s1="47573"><p class="en"><span class="w" data-s="44714" data-e="44800">He</span> <span class="w target" data-s="44842" data-e="45141" title="比较，相比；比喻">compared</span> <span class="w" data-s="45184" data-e="45354">the</span> <span class="w" data-s="45397" data-e="45525">broken</span> <span class="w" data-s="45568" data-e="45952">bowl</span> <span class="w" data-s="45994" data-e="46080">with</span> <span class="w" data-s="46122" data-e="46208">the</span> <span class="w" data-s="46250" data-e="46464">bridge</span> <span class="w" data-s="46506" data-e="46720">and</span> <span class="w" data-s="46762" data-e="46933">decided</span> <span class="w" data-s="46976" data-e="47189">to</span> <span class="w" data-s="47232" data-e="47317">fix</span> <span class="w" data-s="47360" data-e="47573">both.</span></p><p class="zh">他把破碗和破桥放在一起比较，决定两个都修。</p></div>
+<div class="pair" data-s0="48768" data-s1="52565"><p class="en"><span class="w" data-s="48768" data-e="48810">&quot;You</span> <span class="w" data-s="48853" data-e="49152">cannot,&quot;</span> <span class="w" data-s="49706" data-e="49877">said</span> <span class="w" data-s="49920" data-e="50048">the</span> <span class="w" data-s="50090" data-e="50346">neighbours.</span> <span class="w" data-s="50517" data-e="51114">&quot;Your</span> <span class="w target" data-s="51157" data-e="51712" title="绝望；;拼命">desperation</span> <span class="w" data-s="51754" data-e="52053">will</span> <span class="w" data-s="52096" data-e="52309">hurt</span> <span class="w" data-s="52352" data-e="52565">you.&quot;</span></p><p class="zh">“你修不好的，”邻居们说，“你这样拼命会伤到自己。”</p></div>
+<div class="pair" data-s0="52992" data-s1="55850"><p class="en"><span class="w" data-s="52992" data-e="53504">But</span> <span class="w" data-s="53546" data-e="53674">he</span> <span class="w" data-s="53717" data-e="53760">did</span> <span class="w" data-s="53802" data-e="53973">not</span> <span class="w" data-s="54016" data-e="54144">work</span> <span class="w target" data-s="54186" data-e="54698" title="拼命地;绝望地">desperately;</span> <span class="w" data-s="54954" data-e="55253">he</span> <span class="w" data-s="55296" data-e="55466">worked</span> <span class="w" data-s="55509" data-e="55850">slowly.</span></p><p class="zh">可他并不是在绝望地干，他干得很慢。</p></div>
+<div class="pair" data-s0="56527" data-s1="58916"><p class="en"><span class="w" data-s="56527" data-e="56612">He</span> <span class="w" data-s="56655" data-e="56783">tried</span> <span class="w" data-s="56825" data-e="56996">to</span> <span class="w target" data-s="57039" data-e="57124" title="使平静；使镇定 adj. 沉着的；平静的">calm</span> <span class="w" data-s="57167" data-e="57337">his</span> <span class="w" data-s="57380" data-e="57721">grandmother</span> <span class="w" data-s="57764" data-e="57935">and</span> <span class="w" data-s="57977" data-e="58319">asked</span> <span class="w" data-s="58361" data-e="58489">her</span> <span class="w" data-s="58532" data-e="58617">to</span> <span class="w target" data-s="58660" data-e="58916" title="放松，休息，休养">relax.</span></p><p class="zh">他试着让奶奶平静下来，请她歇一歇、看着他做。</p></div>
+<div class="pair" data-s0="59129" data-s1="61348"><p class="en"><span class="w" data-s="59129" data-e="59556">She</span> <span class="w" data-s="59855" data-e="60025">said</span> <span class="w" data-s="60068" data-e="60196">the</span> <span class="w" data-s="60239" data-e="60324">work</span> <span class="w" data-s="60367" data-e="60537">gave</span> <span class="w" data-s="60580" data-e="60708">her</span> <span class="w" data-s="60751" data-e="60836">back</span> <span class="w" data-s="60879" data-e="61049">her</span> <span class="w target" data-s="61092" data-e="61348" title="神经；神经质；神经紧张；勇气；气魄">nerve.</span></p><p class="zh">她说，这活把她那点精气神又还给她了。</p></div>
+<div class="pair" data-s0="61519" data-s1="64548"><p class="en"><span class="w" data-s="61519" data-e="61732">He</span> <span class="w target" data-s="62159" data-e="62415" title="胶，胶水 v. 黏合，粘贴">glued</span> <span class="w" data-s="62457" data-e="62500">the</span> <span class="w" data-s="62543" data-e="62628">pieces</span> <span class="w" data-s="62671" data-e="62969">together</span> <span class="w" data-s="63012" data-e="63311">and</span> <span class="w" data-s="63353" data-e="63695">filled</span> <span class="w" data-s="63737" data-e="63865">the</span> <span class="w" data-s="63908" data-e="64079">gaps</span> <span class="w" data-s="64121" data-e="64249">with</span> <span class="w target" data-s="64292" data-e="64548" title="水泥；胶合剂；胶接剂；黏固剂，纽带 v.黏结，胶合；加强，巩固">cement.</span></p><p class="zh">他把碎片粘起来，用新的水泥补上缺口。</p></div>
+<div class="pair" data-s0="64804" data-s1="67620"><p class="en"><span class="w" data-s="64804" data-e="64932">The</span> <span class="w" data-s="64975" data-e="65231">village</span> <span class="w target" data-s="65273" data-e="65657" title="推荐，举荐；介绍；劝告；建议">recommended</span> <span class="w" data-s="65700" data-e="65871">a</span> <span class="w" data-s="65913" data-e="66127">mason,</span> <span class="w" data-s="66297" data-e="66468">who</span> <span class="w target" data-s="66681" data-e="66980" title="(尤指公开地)赞扬，称赞，表扬；推荐，举荐； 受到赞同；得到认可">commended</span> <span class="w" data-s="67023" data-e="67193">his</span> <span class="w" data-s="67236" data-e="67620">patience.</span></p><p class="zh">村里推荐了一位泥瓦匠，这位师傅夸他有耐心。</p></div>
+<div class="pair" data-s0="67791" data-s1="70436"><p class="en"><span class="w" data-s="67791" data-e="68217">For</span> <span class="w" data-s="68260" data-e="68431">two</span> <span class="w" data-s="68473" data-e="68644">weeks</span> <span class="w" data-s="68687" data-e="69113">trucks</span> <span class="w" data-s="69156" data-e="69199">had</span> <span class="w" data-s="69241" data-e="69327">to</span> <span class="w target" data-s="69369" data-e="69625" title="&amp; n. 爬行；缓慢行进">crawl</span> <span class="w" data-s="69668" data-e="69796">along</span> <span class="w" data-s="69839" data-e="70052">the</span> <span class="w" data-s="70095" data-e="70223">river</span> <span class="w" data-s="70265" data-e="70436">road.</span></p><p class="zh">有两个星期，卡车只能沿着河边那条路慢慢爬。</p></div>
+<div class="pair" data-s0="71383" data-s1="74242"><p class="en"><span class="w" data-s="71383" data-e="71511">Then</span> <span class="w" data-s="71554" data-e="71767">the</span> <span class="w" data-s="71810" data-e="71980">bridge</span> <span class="w" data-s="72023" data-e="72151">was</span> <span class="w" data-s="72194" data-e="72364">open,</span> <span class="w" data-s="72535" data-e="72748">and</span> <span class="w" data-s="73090" data-e="73260">the</span> <span class="w" data-s="73303" data-e="73346">first</span> <span class="w" data-s="73388" data-e="73602">car</span> <span class="w target" data-s="73644" data-e="74242" title="(使)加速，加快">accelerated.</span></p><p class="zh">然后桥通了，第一辆车加了速。</p></div>
+<div class="pair" data-s0="75180" data-s1="79020"><p class="en"><span class="w" data-s="75180" data-e="75308">&quot;Do</span> <span class="w" data-s="75351" data-e="75564">not</span> <span class="w target" data-s="75607" data-e="76247" title="夸张，夸大">exaggerate,&quot;</span> <span class="w" data-s="76674" data-e="76802">said</span> <span class="w" data-s="76844" data-e="76930">the</span> <span class="w" data-s="76972" data-e="77186">mason.</span> <span class="w" data-s="77698" data-e="77996">&quot;It</span> <span class="w" data-s="78039" data-e="78295">is</span> <span class="w" data-s="78338" data-e="78423">a</span> <span class="w" data-s="78466" data-e="78594">small</span> <span class="w" data-s="78636" data-e="79020">bridge.&quot;</span></p><p class="zh">“别夸张，”泥瓦匠说，“这只是座小桥。”</p></div>
+<div class="pair" data-s0="79447" data-s1="82946"><p class="en"><span class="w" data-s="79447" data-e="79874">At</span> <span class="w" data-s="79916" data-e="80044">the</span> <span class="w" data-s="80087" data-e="80172">far</span> <span class="w" data-s="80215" data-e="80428">side,</span> <span class="w" data-s="80770" data-e="81410">drivers</span> <span class="w" data-s="81452" data-e="81623">had</span> <span class="w" data-s="81666" data-e="81794">to</span> <span class="w target" data-s="81836" data-e="82348" title="减速，降低速度">decelerate</span> <span class="w" data-s="82391" data-e="82519">to</span> <span class="w" data-s="82562" data-e="82647">make</span> <span class="w" data-s="82690" data-e="82775">the</span> <span class="w" data-s="82818" data-e="82946">turn.</span></p><p class="zh">到了对岸，司机都得再减一次速才能转过弯。</p></div>
+<div class="pair" data-s0="83563" data-s1="86293"><p class="en"><span class="w" data-s="83563" data-e="83648">The</span> <span class="w" data-s="83691" data-e="83904">bowl</span> <span class="w" data-s="83947" data-e="84117">stood</span> <span class="w" data-s="84160" data-e="84288">on</span> <span class="w" data-s="84331" data-e="84416">the</span> <span class="w" data-s="84459" data-e="84672">shelf,</span> <span class="w" data-s="84843" data-e="85099">in</span> <span class="w target" data-s="85184" data-e="85397" title="有关系的，供联络的">contact</span> <span class="w" data-s="85440" data-e="85781">with</span> <span class="w" data-s="85824" data-e="85909">the</span> <span class="w" data-s="85952" data-e="86037">morning</span> <span class="w" data-s="86080" data-e="86293">light.</span></p><p class="zh">那只碗摆在架子上，和清晨的光贴在一起。</p></div>
+<div class="pair" data-s0="86549" data-s1="90560"><p class="en"><span class="w" data-s="86549" data-e="86763">An</span> <span class="w" data-s="87189" data-e="87360">kept</span> <span class="w" data-s="87403" data-e="87573">in</span> <span class="w target" data-s="87616" data-e="87787" title="有关系的，供联络的">contact</span> <span class="w" data-s="87829" data-e="88128">with</span> <span class="w" data-s="88171" data-e="88256">the</span> <span class="w" data-s="88299" data-e="88555">mason,</span> <span class="w" data-s="88725" data-e="88939">and</span> <span class="w" data-s="89024" data-e="89621">they</span> <span class="w" data-s="89664" data-e="89835">mended</span> <span class="w" data-s="89877" data-e="90133">two</span> <span class="w" data-s="90176" data-e="90560">bridges.</span></p><p class="zh">阿安一直和泥瓦匠保持着联系，他们一共修好了两座桥。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">disintegrate</span>
+          <span class="ipa">/dis&#x27;ıntigreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">解体；崩溃；破裂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to disintegrate</div>          <div class="mnem"><span class="lbl">记</span>integrate结合，整合，一体化； 前缀 dis 有“分离，分开”的意思，dis十integrate →解体；崩溃。</div>          <div class="root"><span class="lbl">根</span>dis(分开) + integrate(成为一体) → 整体分开 → 解体</div>          <div class="zt"><span class="lbl">真题</span>When governments lose their control on power, law and order begin to disintegrate. 当 政府失去对权力的控制时，法律和秩序就开始 瓦解。(2016)</div>          <div class="fam"><span class="lbl">族</span>disintegration n. 瓦解 / disintegrative adj. 分裂的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">tangible</span>
+          <span class="ipa">/&#x27;tændzəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有形的；实际的；真实的；可感知的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>felt something tangible</div>          <div class="mnem"><span class="lbl">记</span>tang = tact = touch，那这个单 词就可以解释为：可以触摸的，就是“可以感知 的”。</div>          <div class="root"><span class="lbl">根</span>tang(触摸) + ible(可…的) → 可触摸的 → 有形的</div>          <div class="zt"><span class="lbl">真题</span>Craft activities result in tangible and often useful products that can enhance self- esteem.手工活动产生有形的、并且通常是有用 的产品，可以提高人们的自尊感。</div>          <div class="fam"><span class="lbl">族</span>tangibly adv. 切实地 / intangible adj. 无形的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">contact</span>
+          <span class="ipa">/&#x27;ka:ntækt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有关系的，供联络的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in contact with the morning light</div>          <div class="mnem"><span class="lbl">记</span>con(所有的)十tact(触摸)→所 有的触摸→接触，联系。</div>          <div class="root"><span class="lbl">根</span>con(一起) + tact(触摸) → 碰在一起 → 接触</div>          <div class="zt"><span class="lbl">真题</span>However, merely having contact with children does not guarantee happiness in old age.然而，仅仅和孩子接触并不能保证老年幸 福。(2016)</div>          <div class="fam"><span class="lbl">族</span>contactless adj. 非接触的 / tactile adj. 触觉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">intact</span>
+          <span class="ipa">/ın&#x27;tækt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">完整的；完好无损的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and no rail was intact</div>          <div class="mnem"><span class="lbl">记</span>in(否定前缀，没有）十tact（触 摸)→没有触摸→完整的。</div>          <div class="root"><span class="lbl">根</span>in(不) + tact(触摸) → 没被碰过 → 完好无损的</div>          <div class="zt"><span class="lbl">真题</span>It wants to keep its own environment intact. 它想保持自己环境的完整。</div>          <div class="fam"><span class="lbl">族</span>intactness n. 完整 / tact n. 得体</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">attach</span>
+          <span class="ipa">/ə&#x27;tæt∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">贴上；把……固定，把……附(在……上)； (使)与……有联系</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was still attached to the bank</div>          <div class="mnem"><span class="lbl">记</span>at 一再地；tach读音特别像 touch(触摸)。attach 就是一再地触摸→贴上。</div>          <div class="root"><span class="lbl">根</span>at(加强) + tach(钉住) → 牢牢钉上 → 贴上</div>          <div class="zt"><span class="lbl">真题</span>It does not attach enough importance to task-based practice.它对基于任务的实践重视 不够。</div>          <div class="fam"><span class="lbl">族</span>attachment n. 附件；依恋 / attached adj. 附加的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">cling</span>
+          <span class="ipa">/klı/</span>
+          <span class="pos">v.</span>
+          <span class="cn">紧紧抓住；粘住；附着</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>clinging to a rock</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“可怜”。设想 那个可怜的孩子一直“紧紧抓住”母亲的衣角， 一刻都不松开。 (183) 第七单元</div>          <div class="root"><span class="lbl">根</span>谐音联想：可怜(cling)的孩子抓紧衣角不松手</div>          <div class="zt"><span class="lbl">真题</span>As much as we would like to cling on to our past, even the saddest moments can be washed away with time. 尽管我们很想牢牢抓 住过去，但即使是最悲伤的时刻也会被时间 冲走。</div>          <div class="fam"><span class="lbl">族</span>clingy adj. 粘人的 / clinging adj. 紧抓的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">stick</span>
+          <span class="ipa">/strk/</span>
+          <span class="pos"></span>
+          <span class="cn">枝条，枯枝；条状物v.刺，插入；粘着，黏 住；卡住</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a bit of old glue sticking to it</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“死提个”。你 为什么死提个(总是提个)东西？因为“粘着，黏 住”了，甩不掉啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：stick to 坚持；be stuck 卡住</div>          <div class="zt"><span class="lbl">真题</span>His teacher said if he went on like that, his face would get stuck when the winds changed.他的老师说，如果他继续这样下去，当 风向改变时，他的脸就会被卡住。(2017) 例 Stick to the point. 紧绕主题。</div>          <div class="fam"><span class="lbl">族</span>sticky adj. 黏的 / stuck adj. 卡住的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">cement</span>
+          <span class="ipa">/si&#x27;ment/</span>
+          <span class="pos">n.</span>
+          <span class="cn">水泥；胶合剂；胶接剂；黏固剂，纽带 v.黏结，胶合；加强，巩固</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The cement between the stones</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“塞门它”。我 家的门已经破烂不堪了，都在晃动，门柱下塞些 “水泥”，给它固定一下。</div>          <div class="root"><span class="lbl">根</span>谐音联想：塞门它 → 用水泥把松动的门塞稳</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s reported that by the end of this month the output of cement in the factory will have risen by about 10%. 据报道，到本月底，该 工厂的水泥产量将增长约10%。</div>          <div class="fam"><span class="lbl">族</span>cementation n. 黏结 / cement mixer 水泥搅拌机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">glue</span>
+          <span class="ipa">/glu:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">胶，胶水 v. 黏合，粘贴</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a bit of old glue sticking to it</div>          <div class="mnem"><span class="lbl">记</span>哥哥(g)和鹿(lu)为什么总在一 起？他们“粘贴，黏合”在一起了啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a tube of glue 一管胶水；glue A to B</div>          <div class="zt"><span class="lbl">真题</span>It has some glue on it that has colored it slightly, but nothing that will prevent us from using it.它上面有一些胶水，稍微着色，但没有 什么能阻止我们使用它。</div>          <div class="fam"><span class="lbl">族</span>gluey adj. 胶质的 / glued adj. 粘住的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">clue</span>
+          <span class="ipa">/klu:/</span>
+          <span class="pos"></span>
+          <span class="cn">线索;提示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had no clue whose bowl it was</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“可（可爱的） 鹿”，就是个线索。找到鹿，就可以根据这一“线 索”找到鹿的主人，也就是我的哥哥啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：可(爱的)鹿 → 顺鹿找到主人 → 线索</div>          <div class="zt"><span class="lbl">真题</span>They would run around looking for clues and at the end unmask the bad guy. 他们会四 处寻找线索，最后揭开坏人的面具。(2022)</div>          <div class="fam"><span class="lbl">族</span>clueless adj. 一无所知的 / clued-up adj. 知情的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">cue</span>
+          <span class="ipa">/kju:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">暗示，提示 0. 给(某人)暗示(或提示)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>That is a cue I never wanted</div>          <div class="mnem"><span class="lbl">记</span>线索是 clue，线索不就是“暗示， 提示”我们的东西吗？</div>          <div class="root"><span class="lbl">根</span>与 clue 对比记：clue 是线索，cue 是提示，少个 l</div>          <div class="zt"><span class="lbl">真题</span>I think that things have become very gloomy these days, lots of misunderstanding, misleading cues. 我认为这些天的事情变得非常 悲观，有很多误解，误导的线索。(2016)</div>          <div class="fam"><span class="lbl">族</span>cued adj. 被提示的 / cue card 提词卡</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">commend</span>
+          <span class="ipa">/kə&#x27;mend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(尤指公开地)赞扬，称赞，表扬；推荐，举荐； 受到赞同；得到认可</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>who commended his patience</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“可闷的”。也 就是说一个人很内向，不爱说话。对付这种人， 就在公开场合多“表扬”他，他就会慢慢融入进 来，跟大家一起玩了。</div>          <div class="root"><span class="lbl">根</span>com(完全) + mand(委托) → 郑重托付 → 称赞</div>          <div class="fam"><span class="lbl">族</span>commendable adj. 值得称赞的 / commendation n. 表扬</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">recommend</span>
+          <span class="ipa">/irekə&#x27;mend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">推荐，举荐；介绍；劝告；建议</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The village recommended a mason</div>          <div class="mnem"><span class="lbl">记</span>阿姨(re)闷的(mend)，阿姨是 个很闷的人，不爱与人交流，都三十多岁了也没 有男朋友，于是我给她“推荐，介绍”了一个。</div>          <div class="root"><span class="lbl">根</span>re(再) + commend(称赞) → 一再称赞 → 推荐</div>          <div class="zt"><span class="lbl">真题</span>Of the nearly 100 Americans recommended to be studied，77% were white. 在被推荐研究 的近100名美国人中，77%是白人。(2020)</div>          <div class="fam"><span class="lbl">族</span>recommendation n. 推荐 / recommended adj. 被推荐的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">relax</span>
+          <span class="ipa">/rı&#x27;læks/</span>
+          <span class="pos">v.</span>
+          <span class="cn">放松，休息，休养</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked her to relax</div>          <div class="mnem"><span class="lbl">记</span>阿姨(re)来(la)“放松，休息”。</div>          <div class="root"><span class="lbl">根</span>re(回) + lax(松) → 松回去 → 放松</div>          <div class="zt"><span class="lbl">真题</span>But don&#x27;t kids need time to relax? 但是孩 子们不需要时间放松吗？(2023)</div>          <div class="fam"><span class="lbl">族</span>relaxation n. 放松 / relaxed adj. 放松的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">nerve</span>
+          <span class="ipa">/nəirv/</span>
+          <span class="pos">n.</span>
+          <span class="cn">神经；神经质；神经紧张；勇气；气魄</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the work gave her back her nerve</div>          <div class="root"><span class="lbl">根</span>与 nervous(紧张的)同源 → 神经；也指勇气</div>          <div class="zt"><span class="lbl">真题</span>Pain is the only feeling to which the nerves in that layer respond. 疼痛是这一层神 经所能反应的唯一感觉。(2022)</div>          <div class="fam"><span class="lbl">族</span>nervous adj. 紧张的 / nervy adj. 易紧张的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">calm</span>
+          <span class="ipa">/ka:m/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使平静；使镇定 adj. 沉着的；平静的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He tried to calm his grandmother</div>          <div class="mnem"><span class="lbl">记</span>给妈妈（m）打电话（cal想成 call)，妈妈安慰你，你心情好多了，就“平静”了。</div>          <div class="root"><span class="lbl">根</span>联想：call(打电话)给妈妈(m) → 心里就平静了</div>          <div class="zt"><span class="lbl">真题</span>Sit down and try to calm yourself. 坐下, 试着让自己平静下来。</div>          <div class="fam"><span class="lbl">族</span>calmly adv. 平静地 / calmness n. 平静</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">bitter</span>
+          <span class="ipa">/&#x27;bitər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">激烈而不愉快的；使人悲痛的；严寒的；味 苦的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her voice was bitter</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“贝塔”。看过动 画片《舒克和贝塔》吗？舒克和贝塔因为是老 鼠，被人看不起，心里很“苦”，愤愤不平，所以才 决定做好事，改变别人对他们的看法。</div>          <div class="root"><span class="lbl">根</span>谐音联想：贝塔(bitter) → 心里很苦 → 苦的</div>          <div class="zt"><span class="lbl">真题</span>On Wednesday, a polar wind brought bitter cold to the Midwest. 周三，一股极地风给 中西部带来了刺骨的寒冷。(2019)</div>          <div class="fam"><span class="lbl">族</span>bitterly adv. 痛苦地 / bitterness n. 苦味；怨恨</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">bit</span>
+          <span class="ipa">/bɪt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一点；少量；一部分</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a bit of old glue</div>          <div class="root"><span class="lbl">根</span>与 bite(咬)对比记：咬下来的一小口 → 一点，少量</div>          <div class="zt"><span class="lbl">真题</span>Learn a little bit of Spanish. 学一点西班 牙语。</div>          <div class="fam"><span class="lbl">族</span>a bit 一点儿 / bit by bit 一点点地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">misery</span>
+          <span class="ipa">/&#x27;mizəri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">痛苦；悲惨；穷困；悲惨的生活；不幸的事；痛 苦的事；老发牢骚的人；不痛快的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she sat in misery</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“没滋味”。生 活没滋味还真是一件“痛苦”的事。</div>          <div class="root"><span class="lbl">根</span>谐音联想：没滋味(mi-se-ry) → 生活没滋味 → 痛苦</div>          <div class="zt"><span class="lbl">真题</span>This ability will be built upon self- confident people using open and shared (184) scientific knowledge to pull themselves out of their misery. 这种能力将建立在自信的人们使 用开放和共享的科学知识来摆脱痛苦的基础 上。(2022)</div>          <div class="fam"><span class="lbl">族</span>miserable adj. 痛苦的 / miserably adv. 悲惨地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">sorrow</span>
+          <span class="ipa">/&#x27;spreu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">悲伤，悲痛；伤心事v. 感到悲伤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her eyes were full of sorrow</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“烧肉”。你很好 的朋友烧你的肉，是不是很“悲伤”？</div>          <div class="root"><span class="lbl">根</span>谐音联想：烧肉(sorrow) → 好友烧我的肉 → 悲伤</div>          <div class="fam"><span class="lbl">族</span>sorrowful adj. 悲伤的 / sorrowfully adv. 悲伤地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">painful</span>
+          <span class="ipa">/&#x27;peinfl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">痛苦的；困难的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The loss was painful</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词我们很熟悉 pain。我们熟知的谚语是：No pains，no gains. (不劳无获)，pain就是“痛苦”的意思。那 painful 就是“痛苦的”。</div>          <div class="root"><span class="lbl">根</span>pain(疼痛) + ful(充满) → 充满疼痛的 → 痛苦的</div>          <div class="zt"><span class="lbl">真题</span>Yet, there are valid reasons boredom may feel so painful. 然而，也有充分的理由认为 无聊可能会感到如此痛苦。</div>          <div class="fam"><span class="lbl">族</span>pain n. 疼痛 / painfully adv. 痛苦地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">despair</span>
+          <span class="ipa">/dr&#x27;speə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">绝望 v. 绝望；失去希望；丧失信心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>An watched her despair grow</div>          <div class="root"><span class="lbl">根</span>de(否定) + spair(希望) → 没有希望 → 绝望</div>          <div class="fam"><span class="lbl">族</span>despairing adj. 绝望的 / desperate adj. 绝望的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">compare</span>
+          <span class="ipa">/kəm&#x27;peə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">比较，相比；比喻</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He compared the broken bowl with the bridge</div>          <div class="mnem"><span class="lbl">记</span>所有的（com)一对（pare想成 pair)，把一对都拿出来，干嘛？“比较”一下啊。</div>          <div class="root"><span class="lbl">根</span>com(一起) + par(相等) + e → 放一起看是否相等 → 比较</div>          <div class="zt"><span class="lbl">真题</span>Compared with other racing series,就是“减速”。 (185) 第七单元 Formula One focuses more on speed and involves more danger. 与其他赛车系列相比，一 级方程式更注重速度，也更危险。(2023)</div>          <div class="fam"><span class="lbl">族</span>comparison n. 比较 / comparable adj. 可比的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">desperation</span>
+          <span class="ipa">/ıdespə&#x27;rer∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">绝望；;拼命</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Your desperation will hurt you</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以拆分为：de(表否 定)+sper(希望)+at(表加强，一再地)+ion (名词后缀)→一再地没有希望→绝望。</div>          <div class="root"><span class="lbl">根</span>de(否定) + sper(希望) + ation → 一再没希望 → 绝望</div>          <div class="fam"><span class="lbl">族</span>desperate adj. 绝望的 / desperately adv. 拼命地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">desperately</span>
+          <span class="ipa">/&#x27;despərətli/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">拼命地;绝望地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he did not work desperately</div>          <div class="root"><span class="lbl">根</span>desperate(绝望的) + ly(副词后缀) → 拼命地</div>          <div class="zt"><span class="lbl">真题</span>The hidden fees they ask for may prove unmanageable for the very kinds of low-income or first-generation students they are trying desperately to attract. 他们所要求的隐性费用 可能会让那些他们拼命想要吸引的低收入学生 或第一代学生难以承受。(2022)</div>          <div class="fam"><span class="lbl">族</span>desperation n. 绝望 / desperate adj. 拼命的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">accelerate</span>
+          <span class="ipa">/ək&#x27;seləreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)加速，加快</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the first car accelerated</div>          <div class="mnem"><span class="lbl">记</span>ac(一再地）十 cele(发音类似 “赛了”)+rate(速度)→一再地比赛，我们最后 要加速啊→加速，加快。</div>          <div class="root"><span class="lbl">根</span>ac(加强) + celer(快) + ate → 使更快 → 加速</div>          <div class="zt"><span class="lbl">真题</span>It accelerates the exhaustion of rare minerals.它加速了稀有矿物的枯竭。(2022)</div>          <div class="fam"><span class="lbl">族</span>acceleration n. 加速 / accelerator n. 加速器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">decelerate</span>
+          <span class="ipa">/di:&#x27;seləreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">减速，降低速度</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drivers had to decelerate</div>          <div class="mnem"><span class="lbl">记</span>de(表示否定)十cele(发音类似 “赛了”)+rate(表示速度)→比赛时不加速，那</div>          <div class="root"><span class="lbl">根</span>de(否定) + celer(快) + ate → 不快 → 减速</div>          <div class="fam"><span class="lbl">族</span>deceleration n. 减速 / accelerator n. 加速器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">exaggerate</span>
+          <span class="ipa">/ıg&#x27;zædzəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">夸张，夸大</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Do not exaggerate</div>          <div class="mnem"><span class="lbl">记</span>xa 想成“下”，去掉 xa后，egg 就是鸡蛋；rate是速度。那该单词就是鸡下 蛋的速度被“夸张，夸大”了。还记得春晚上 有个小品，说公鸡会下蛋，因为等不及，所以 把蛋下在了狗窝里，那就是下蛋的速度被“夸 张”了。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + agger(堆) + ate → 往外堆太多 → 夸大</div>          <div class="zt"><span class="lbl">真题</span>They provide objective information without exaggerating. 他们提供客观的信息，不 夸大其辞。</div>          <div class="fam"><span class="lbl">族</span>exaggeration n. 夸张 / exaggerated adj. 夸张的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">groan</span>
+          <span class="ipa">/grəun/</span>
+          <span class="pos">v.</span>
+          <span class="cn">呻吟；叹息；哼哼；抱怨，发牢骚n.呻吟声； 叹息声；哼哼声；嘎吱声</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>groaned at small sounds</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“割肉嗯”。是 不是有种被别人割肉发出的“呻吟声”？</div>          <div class="root"><span class="lbl">根</span>谐音联想：割肉嗯 → 被割肉时发出的声音 → 呻吟</div>          <div class="fam"><span class="lbl">族</span>groaning n. 呻吟声 / moan v. 呻吟（近义）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">crawl</span>
+          <span class="ipa">/krə:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp; n. 爬行；缓慢行进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>trucks had to crawl along the river road</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：可（这个字在 河南话里意为“很”，比如说“你长得可漂亮 啦！”)肉(肉，在河南话里就是很慢，比如我们会 说“你咋恁肉呢？”，就是“你怎么那么慢？”)，就 是“缓慢行进，爬行”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：可(很)肉(慢) → 慢吞吞地挪 → 爬行</div>          <div class="zt"><span class="lbl">真题</span>A man was crawling away from the burning wreckage. 一个男人正爬离燃烧着的 残骸。</div>          <div class="fam"><span class="lbl">族</span>crawler n. 爬行者 / crawling adj. 爬行的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 49</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

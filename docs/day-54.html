@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 54 · The Painter at the Checkpoint</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 54 · 12/5 · Unit 8 第 1591-1620 词</div>
+  <h1>The Painter at the Checkpoint<span class="cn">检查站上的画匠</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-54.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2347"><p class="en"><span class="w" data-s="43" data-e="341">Lena</span> <span class="w" data-s="384" data-e="469">works</span> <span class="w" data-s="512" data-e="683">at</span> <span class="w" data-s="725" data-e="811">a</span> <span class="w" data-s="853" data-e="1109">mountain</span> <span class="w target" data-s="1152" data-e="1451" title="(边防)检查站">checkpoint</span> <span class="w" data-s="1493" data-e="1792">between</span> <span class="w" data-s="1835" data-e="2048">two</span> <span class="w" data-s="2091" data-e="2347">countries.</span></p><p class="zh">莉娜在两国交界的一座山口检查站工作。</p></div>
+<div class="pair" data-s0="2645" data-s1="6315"><p class="en"><span class="w" data-s="2645" data-e="3456">Each</span> <span class="w" data-s="3499" data-e="3669">morning</span> <span class="w" data-s="3712" data-e="3968">she</span> <span class="w target" data-s="4011" data-e="4395" title="检查，核对；制止 n. 支票，结账单">checks</span> <span class="w" data-s="4437" data-e="4480">the</span> <span class="w" data-s="4523" data-e="4821">papers</span> <span class="w" data-s="4864" data-e="4992">of</span> <span class="w" data-s="5035" data-e="5077">the</span> <span class="w" data-s="5120" data-e="5248">people</span> <span class="w" data-s="5291" data-e="5504">who</span> <span class="w" data-s="5547" data-e="5675">pass</span> <span class="w" data-s="5717" data-e="5931">the</span> <span class="w" data-s="5973" data-e="6315">barrier.</span></p><p class="zh">每天早上，她都检查过关人的证件。</p></div>
+<div class="pair" data-s0="6485" data-s1="9301"><p class="en"><span class="w" data-s="6485" data-e="6997">From</span> <span class="w" data-s="7040" data-e="7168">her</span> <span class="w target" data-s="7211" data-e="7637" title="(常为单数)立场；观点">standpoint,</span> <span class="w" data-s="7851" data-e="8021">the</span> <span class="w" data-s="8235" data-e="8363">job</span> <span class="w" data-s="8405" data-e="8661">is</span> <span class="w" data-s="8704" data-e="8875">never</span> <span class="w" data-s="8917" data-e="9301">boring.</span></p><p class="zh">从她的立场看，这份工作一点也不无聊。</p></div>
+<div class="pair" data-s0="9860" data-s1="15023"><p class="en"><span class="w" data-s="9860" data-e="9946">A</span> <span class="w" data-s="9988" data-e="10116">good</span> <span class="w" data-s="10159" data-e="10586">officer</span> <span class="w" data-s="10628" data-e="10799">needs</span> <span class="w target" data-s="10842" data-e="11567" title="相当多的；相当大的；值得考虑的">considerable</span> <span class="w" data-s="11610" data-e="12036">patience</span> <span class="w" data-s="12079" data-e="12420">and</span> <span class="w" data-s="12634" data-e="12762">must</span> <span class="w" data-s="12804" data-e="12975">be</span> <span class="w target" data-s="13018" data-e="13530" title="考虑周到的；为(他人)着想的；体谅的；体 贴的">considerate</span> <span class="w" data-s="13572" data-e="13700">to</span> <span class="w" data-s="13743" data-e="13956">tired</span> <span class="w" data-s="13999" data-e="14298">families</span> <span class="w" data-s="14340" data-e="14724">with</span> <span class="w" data-s="14767" data-e="15023">children.</span></p><p class="zh">一名好哨兵需要相当的耐心，还得体谅带着孩子的疲惫家庭。</p></div>
+<div class="pair" data-s0="15322" data-s1="19930"><p class="en"><span class="w" data-s="15322" data-e="15578">That</span> <span class="w" data-s="15962" data-e="16175">was</span> <span class="w" data-s="16218" data-e="16346">the</span> <span class="w" data-s="16388" data-e="16474">first</span> <span class="w target" data-s="16516" data-e="16815" title="观点；看法；重点；核心问题；得分；地点 7.指；指向；对着；朝着">point</span> <span class="w" data-s="16858" data-e="17028">her</span> <span class="w" data-s="17071" data-e="17412">captain</span> <span class="w" data-s="17455" data-e="17626">made,</span> <span class="w" data-s="17882" data-e="18052">and</span> <span class="w" data-s="18266" data-e="18436">she</span> <span class="w" data-s="18479" data-e="18607">still</span> <span class="w" data-s="18650" data-e="18991">remembers</span> <span class="w" data-s="19034" data-e="19332">his</span> <span class="w target" data-s="19375" data-e="19930" title="仔细考虑；深思；斟酌；必须考虑的事">consideration.</span></p><p class="zh">这是队长第一天对她说的第一个要点，她至今记得他这份周到的考虑。</p></div>
+<div class="pair" data-s0="20711" data-s1="23868"><p class="en"><span class="w" data-s="20711" data-e="20796">At</span> <span class="w" data-s="20839" data-e="21052">night,</span> <span class="w" data-s="21266" data-e="21522">in</span> <span class="w" data-s="21692" data-e="21778">a</span> <span class="w" data-s="21820" data-e="21906">room</span> <span class="w" data-s="21948" data-e="22204">behind</span> <span class="w" data-s="22247" data-e="22418">the</span> <span class="w target" data-s="22460" data-e="22759" title="(边防)检查站">checkpoint,</span> <span class="w" data-s="23015" data-e="23570">Lena</span> <span class="w" data-s="23612" data-e="23868">paints.</span></p><p class="zh">夜里，在检查站后面的一间小屋里，莉娜画画。</p></div>
+<div class="pair" data-s0="23996" data-s1="30695"><p class="en"><span class="w" data-s="23996" data-e="24935">She</span> <span class="w" data-s="24978" data-e="25106">has</span> <span class="w" data-s="25148" data-e="25234">a</span> <span class="w target" data-s="25276" data-e="25660" title="幻想，白日梦">fantasy</span> <span class="w" data-s="25703" data-e="25874">about</span> <span class="w" data-s="25916" data-e="26130">showing</span> <span class="w" data-s="26172" data-e="26428">her</span> <span class="w" data-s="26471" data-e="26599">work</span> <span class="w" data-s="26642" data-e="26812">in</span> <span class="w" data-s="26855" data-e="26898">a</span> <span class="w" data-s="26940" data-e="27026">big</span> <span class="w" data-s="27068" data-e="27239">city;</span> <span class="w" data-s="27538" data-e="28178">the</span> <span class="w target" data-s="28220" data-e="28519" title="概念，观点，想法">notion</span> <span class="w" data-s="28562" data-e="28732">feels</span> <span class="w" data-s="28775" data-e="29287">foolish,</span> <span class="w" data-s="29458" data-e="29714">but</span> <span class="w" data-s="29799" data-e="29970">she</span> <span class="w" data-s="30012" data-e="30140">cannot</span> <span class="w" data-s="30183" data-e="30439">drop</span> <span class="w" data-s="30482" data-e="30695">it.</span></p><p class="zh">她幻想有一天能在大城市展出自己的画；这念头显得很傻，可她就是放不下。</p></div>
+<div class="pair" data-s0="31147" data-s1="36864"><p class="en"><span class="w" data-s="31147" data-e="31275">The</span> <span class="w" data-s="31317" data-e="31616">mountains</span> <span class="w target" data-s="31659" data-e="32171" title="深深吸引;迷住">fascinate</span> <span class="w" data-s="32213" data-e="32341">her:</span> <span class="w" data-s="32597" data-e="32683">at</span> <span class="w" data-s="32981" data-e="33408">sunrise</span> <span class="w" data-s="33451" data-e="33707">they</span> <span class="w" data-s="33749" data-e="33877">look</span> <span class="w" data-s="33920" data-e="34048">like</span> <span class="w" data-s="34091" data-e="34219">a</span> <span class="w" data-s="34261" data-e="34347">dream,</span> <span class="w" data-s="34645" data-e="34901">more</span> <span class="w target" data-s="35115" data-e="35584" title="&amp;. v. 想象,设想；喜欢 adj.精致的,绚丽的">fancy</span> <span class="w" data-s="35627" data-e="35755">than</span> <span class="w" data-s="35797" data-e="35883">any</span> <span class="w" data-s="35925" data-e="36181">picture</span> <span class="w" data-s="36224" data-e="36480">she</span> <span class="w" data-s="36523" data-e="36651">could</span> <span class="w target" data-s="36693" data-e="36864" title="想象；设想；误以为；胡乱猜想；猜测">imagine.</span></p><p class="zh">群山让她着迷：日出时它们像一场梦，比她想象的任何画面都更绚丽。</p></div>
+<div class="pair" data-s0="37291" data-s1="42453"><p class="en"><span class="w" data-s="37291" data-e="37547">Yet</span> <span class="w" data-s="37589" data-e="37632">she</span> <span class="w" data-s="37675" data-e="37845">knows</span> <span class="w" data-s="37888" data-e="38187">the</span> <span class="w" data-s="38229" data-e="38400">beautiful</span> <span class="w" data-s="38443" data-e="38741">light</span> <span class="w" data-s="38784" data-e="38955">on</span> <span class="w" data-s="38997" data-e="39040">the</span> <span class="w" data-s="39083" data-e="39168">rock</span> <span class="w" data-s="39211" data-e="39467">is</span> <span class="w" data-s="39509" data-e="39851">partly</span> <span class="w" data-s="39893" data-e="40021">an</span> <span class="w target" data-s="40064" data-e="40235" title="幻想的事物；错觉；错误的观念；幻想">illusion,</span> <span class="w" data-s="40448" data-e="40661">and</span> <span class="w" data-s="41003" data-e="41131">the</span> <span class="w target" data-s="41173" data-e="41301" title="形象；印象；声誉">image</span> <span class="w" data-s="41344" data-e="41600">changes</span> <span class="w" data-s="41643" data-e="41984">with</span> <span class="w" data-s="42027" data-e="42197">every</span> <span class="w" data-s="42240" data-e="42453">hour.</span></p><p class="zh">可她知道，岩石上那美丽的光有一部分只是错觉，那幅影像每小时都在变。</p></div>
+<div class="pair" data-s0="43402" data-s1="49888"><p class="en"><span class="w" data-s="43402" data-e="43530">Her</span> <span class="w" data-s="43573" data-e="43872">teacher,</span> <span class="w" data-s="44042" data-e="44213">an</span> <span class="w" data-s="44384" data-e="44554">old</span> <span class="w target" data-s="44597" data-e="45194" title="哲学家；深思的人；善于思考的人">philosopher,</span> <span class="w" data-s="45322" data-e="45493">used</span> <span class="w" data-s="45920" data-e="46090">to</span> <span class="w" data-s="46133" data-e="46261">say</span> <span class="w" data-s="46304" data-e="46474">that</span> <span class="w" data-s="46517" data-e="46602">art</span> <span class="w" data-s="46645" data-e="46858">is</span> <span class="w target" data-s="46901" data-e="47285" title="无限的，无穷的；极大的，极多的 n. 无限 的事物">infinite</span> <span class="w" data-s="47328" data-e="47498">and</span> <span class="w" data-s="47669" data-e="47925">that</span> <span class="w" data-s="47968" data-e="48181">nobody</span> <span class="w" data-s="48224" data-e="48480">can</span> <span class="w target" data-s="48522" data-e="48864" title="限制；监禁，关押n.界限，范围；限制">confine</span> <span class="w" data-s="48906" data-e="49077">it</span> <span class="w" data-s="49120" data-e="49205">to</span> <span class="w" data-s="49248" data-e="49376">a</span> <span class="w target" data-s="49418" data-e="49717" title="很明显，确定的，明确的">definite</span> <span class="w" data-s="49760" data-e="49888">rule.</span></p><p class="zh">她的老师是位老哲学家，过去常说艺术是无限的，谁也没法把它限制在一条明确的规则里。</p></div>
+<div class="pair" data-s0="50584" data-s1="56814"><p class="en"><span class="w" data-s="50584" data-e="50670">He</span> <span class="w" data-s="50712" data-e="50840">asked</span> <span class="w" data-s="50883" data-e="51096">her</span> <span class="w" data-s="51139" data-e="51267">to</span> <span class="w target" data-s="51310" data-e="51608" title="解释(词语)的含义；给(词语)下定义；阐明； 明确；界定">define</span> <span class="w" data-s="51651" data-e="51907">beauty,</span> <span class="w" data-s="52163" data-e="52419">then</span> <span class="w" data-s="52632" data-e="52803">to</span> <span class="w target" data-s="52846" data-e="53187" title="澄清，阐明">clarify</span> <span class="w" data-s="53230" data-e="53400">it,</span> <span class="w" data-s="53528" data-e="53656">then</span> <span class="w" data-s="53998" data-e="54254">to</span> <span class="w target" data-s="54296" data-e="54510" title="精炼，提纯；改进，改善">refine</span> <span class="w" data-s="54552" data-e="54766">it</span> <span class="w" data-s="54808" data-e="55363">until</span> <span class="w" data-s="55406" data-e="55619">only</span> <span class="w" data-s="55662" data-e="55918">the</span> <span class="w" data-s="55960" data-e="56088">true</span> <span class="w" data-s="56131" data-e="56344">part</span> <span class="w" data-s="56387" data-e="56600">was</span> <span class="w" data-s="56643" data-e="56814">left.</span></p><p class="zh">他让她先给美下定义，再把它讲清楚，然后一遍遍提炼，直到只剩下真实的那一部分。</p></div>
+<div class="pair" data-s0="57880" data-s1="60184"><p class="en"><span class="w" data-s="57880" data-e="58222">&quot;Painting</span> <span class="w" data-s="58264" data-e="58435">is</span> <span class="w" data-s="58478" data-e="58648">not</span> <span class="w" data-s="58691" data-e="58776">a</span> <span class="w target" data-s="58819" data-e="59203" title="">profession,&quot;</span> <span class="w" data-s="59502" data-e="59715">her</span> <span class="w" data-s="59758" data-e="59928">father</span> <span class="w" data-s="59971" data-e="60184">said.</span></p><p class="zh">“画画不是个职业，”她父亲说。</p></div>
+<div class="pair" data-s0="60775" data-s1="68113"><p class="en"><span class="w" data-s="60775" data-e="60860">Her</span> <span class="w" data-s="60903" data-e="61201">teacher</span> <span class="w" data-s="61244" data-e="61415">said</span> <span class="w" data-s="61457" data-e="61671">something</span> <span class="w" data-s="61713" data-e="61969">else:</span> <span class="w" data-s="62225" data-e="62951">one</span> <span class="w" data-s="62993" data-e="63292">small</span> <span class="w" data-s="63335" data-e="63676">idea</span> <span class="w" data-s="63719" data-e="64103">must</span> <span class="w" data-s="64145" data-e="64401">never</span> <span class="w target" data-s="64444" data-e="64956" title="使用，占用；忙着(做某事)">occupy</span> <span class="w" data-s="64999" data-e="65169">your</span> <span class="w" data-s="65212" data-e="65340">whole</span> <span class="w" data-s="65383" data-e="65596">mind,</span> <span class="w" data-s="65937" data-e="66108">or</span> <span class="w" data-s="66407" data-e="66663">your</span> <span class="w target" data-s="66705" data-e="67132" title="职业，工作">occupation</span> <span class="w" data-s="67175" data-e="67559">becomes</span> <span class="w" data-s="67601" data-e="67815">a</span> <span class="w" data-s="67857" data-e="68113">cage.</span></p><p class="zh">老师说的却是另一回事：一个小小的念头绝不能占据你的整个脑子，否则你的职业就成了笼子。</p></div>
+<div class="pair" data-s0="68804" data-s1="74564"><p class="en"><span class="w" data-s="68804" data-e="69060">Last</span> <span class="w" data-s="69103" data-e="69444">spring</span> <span class="w" data-s="69487" data-e="69871">a</span> <span class="w target" data-s="69914" data-e="70084" title="商行；商号；公司 adj.坚固的；坚硬的；结 实的；牢固的；稳固的；坚挺的">firm</span> <span class="w" data-s="70127" data-e="70340">in</span> <span class="w" data-s="70383" data-e="70468">the</span> <span class="w" data-s="70511" data-e="70596">city</span> <span class="w target" data-s="70639" data-e="71194" title="证实，证明；批准 v. 使稳固，使牢固。confirm 就是都(con)牢固。 要把他杀人的罪名坐实，就是要“证明，证实”他 是杀人凶手啊。">confirmed</span> <span class="w" data-s="71236" data-e="71364">that</span> <span class="w" data-s="71407" data-e="71450">it</span> <span class="w" data-s="71492" data-e="71578">wanted</span> <span class="w" data-s="71620" data-e="71791">to</span> <span class="w" data-s="71834" data-e="71919">buy</span> <span class="w" data-s="71962" data-e="72175">three</span> <span class="w" data-s="72218" data-e="72474">of</span> <span class="w" data-s="72516" data-e="72559">her</span> <span class="w" data-s="72602" data-e="72986">paintings</span> <span class="w" data-s="73028" data-e="73327">and</span> <span class="w" data-s="73583" data-e="73711">sent</span> <span class="w" data-s="73754" data-e="73924">a</span> <span class="w target" data-s="73967" data-e="74223" title="支票">cheque</span> <span class="w" data-s="74266" data-e="74351">in</span> <span class="w" data-s="74394" data-e="74436">the</span> <span class="w" data-s="74479" data-e="74564">post.</span></p><p class="zh">去年春天，城里一家公司确认要买她三幅画，还从邮局寄来了一张支票。</p></div>
+<div class="pair" data-s0="74863" data-s1="78276"><p class="en"><span class="w" data-s="74863" data-e="75460">The</span> <span class="w" data-s="75503" data-e="75631">news</span> <span class="w" data-s="75674" data-e="75887">seemed</span> <span class="w" data-s="75930" data-e="76143">to</span> <span class="w target" data-s="76186" data-e="76442" title="证实；确认；肯定，断言">affirm</span> <span class="w" data-s="76484" data-e="77039">everything</span> <span class="w" data-s="77082" data-e="77252">she</span> <span class="w" data-s="77295" data-e="77423">had</span> <span class="w" data-s="77466" data-e="77722">believed</span> <span class="w" data-s="77764" data-e="77935">about</span> <span class="w" data-s="77978" data-e="78276">herself.</span></p><p class="zh">这个消息仿佛证实了她一直悄悄相信的一切。</p></div>
+<div class="pair" data-s0="79051" data-s1="82678"><p class="en"><span class="w" data-s="79051" data-e="79137">Her</span> <span class="w" data-s="79179" data-e="79350">friends</span> <span class="w target" data-s="79393" data-e="79649" title="声称；索取；赢得；夺去(生命) n.声称，主张；索赔">claim</span> <span class="w" data-s="79691" data-e="79905">she</span> <span class="w" data-s="79947" data-e="80075">was</span> <span class="w" data-s="80118" data-e="80246">simply</span> <span class="w" data-s="80289" data-e="80630">lucky,</span> <span class="w" data-s="80886" data-e="81099">but</span> <span class="w" data-s="81355" data-e="81526">she</span> <span class="w" data-s="81569" data-e="81697">will</span> <span class="w" data-s="81739" data-e="81825">not</span> <span class="w target" data-s="81867" data-e="82209" title="承认，坦白；忏悔">confess</span> <span class="w" data-s="82251" data-e="82465">to</span> <span class="w" data-s="82507" data-e="82678">luck.</span></p><p class="zh">朋友们都说她只是运气好，可她不肯承认这是运气。</p></div>
+<div class="pair" data-s0="82891" data-s1="86561"><p class="en"><span class="w" data-s="82891" data-e="83446">When</span> <span class="w" data-s="83489" data-e="83617">a</span> <span class="w" data-s="83659" data-e="84001">reporter</span> <span class="w" data-s="84043" data-e="84129">asked</span> <span class="w" data-s="84171" data-e="84385">her</span> <span class="w" data-s="84427" data-e="84470">to</span> <span class="w" data-s="84513" data-e="84683">explain</span> <span class="w" data-s="84726" data-e="85025">her</span> <span class="w" data-s="85067" data-e="85238">success,</span> <span class="w" data-s="85622" data-e="85963">she</span> <span class="w" data-s="86006" data-e="86134">said</span> <span class="w" data-s="86177" data-e="86347">one</span> <span class="w" data-s="86390" data-e="86561">thing:</span></p><p class="zh">当记者让她解释自己的成功时，她只说了一件事：</p></div>
+<div class="pair" data-s0="87414" data-s1="89121"><p class="en"><span class="w" data-s="87414" data-e="87457">&quot;I</span> <span class="w" data-s="87499" data-e="87670">looked</span> <span class="w" data-s="87713" data-e="87798">at</span> <span class="w" data-s="87841" data-e="87926">the</span> <span class="w" data-s="87969" data-e="88054">same</span> <span class="w" data-s="88097" data-e="88523">mountain</span> <span class="w" data-s="88566" data-e="88694">for</span> <span class="w" data-s="88737" data-e="88865">ten</span> <span class="w" data-s="88907" data-e="89121">years.&quot;</span></p><p class="zh">“我盯着同一座山看了十年。”</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">consideration</span>
+          <span class="ipa">/kənisidə&#x27;rei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">仔细考虑；深思；斟酌；必须考虑的事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she still remembers his consideration</div>          <div class="root"><span class="lbl">根</span>consider(考虑) + ation(名词后缀) → 考虑这件事</div>          <div class="zt"><span class="lbl">真题</span>When business leaders implement IT initiatives with little consideration of how those changes will impact the end user. 业务领 导执行IT计划时，很少考虑那些更改将如何影 响最终用户。(2021)</div>          <div class="fam"><span class="lbl">族</span>consider v. 考虑 / considerate adj. 体贴的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">considerate</span>
+          <span class="ipa">/kən&#x27;sidərət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">考虑周到的；为(他人)着想的；体谅的；体 贴的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>must be considerate to tired families with children</div>          <div class="root"><span class="lbl">根</span>consider(考虑) + ate → 处处替别人考虑 → 体贴的</div>          <div class="zt"><span class="lbl">真题</span>You might begin to think about someone who was kind, considerate, friendly, warm, and so forth. 你可能会开始想到一个人，他善 良、体贴、友好、热情等等。</div>          <div class="fam"><span class="lbl">族</span>consideration n. 考虑 / considerately adv. 体贴地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">considerable</span>
+          <span class="ipa">/kən&#x27;sidərəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">相当多的；相当大的；值得考虑的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A good officer needs considerable patience</div>          <div class="mnem"><span class="lbl">记</span>consider 考虑；considerate 中 的 ate可以想象成“吃”的过去式，连吃都考虑到 了，所以意为“体贴的，周到的”；considerable中 able为形容词后缀，指“可以……的”，连到一起 是可以考虑的，再直白一点，即“相当多的，相当 大的”才是“值得考虑的”啊。</div>          <div class="root"><span class="lbl">根</span>consider(考虑) + able(可…的) → 值得考虑的 → 相当大的</div>          <div class="zt"><span class="lbl">真题</span>Employers argue they make considerable savings on real estate when workers shift from office to home work. 雇主们争辩称，当员工从 办公室搬到家里工作时，他们在房地产上节省 了大量开支。(2021)</div>          <div class="fam"><span class="lbl">族</span>considerably adv. 相当地 / consideration n. 考虑</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">fantasy</span>
+          <span class="ipa">/&#x27;fæntəsi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">幻想，白日梦</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She has a fantasy about showing her work in a big city</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“烦他死”。你 烦谁谁就会“死”吗？这只是你的“幻想”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：烦他死 → 这只能是幻想</div>          <div class="zt"><span class="lbl">真题</span>He spoke of his childhood fantasies about becoming a famous football player.他谈起儿时 想成为足球明星的幻想。</div>          <div class="fam"><span class="lbl">族</span>fantastic adj. 极好的 / fantasize v. 幻想</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">fancy</span>
+          <span class="ipa">/&#x27;fænsi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp;. v. 想象,设想；喜欢 adj.精致的,绚丽的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>more fancy than any picture she could imagine</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“烦死”。四 级备考特别烦的时候，不如坐那儿“想象”一下 自己四级考了680分以后的幸福美好时光，这 样你瞬间就有了斗志。</div>          <div class="root"><span class="lbl">根</span>和 fantasy(幻想) 同源 → 想象出来的；花哨的</div>          <div class="zt"><span class="lbl">真题</span>Guests would fall silent in wonder as servants carried Carême&#x27;s fancy creations into the dining hall. 当仆人们将卡莱姆的精致作品 带入餐厅时，客人们会惊奇地陷入沉默。</div>          <div class="fam"><span class="lbl">族</span>fantasy n. 幻想 / fanciful adj. 奇特的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">fascinate</span>
+          <span class="ipa">/&#x27;fæsineit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">深深吸引;迷住</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The mountains fascinate her</div>          <div class="root"><span class="lbl">根</span>fascin(咒语) + ate(动词后缀) → 像被施了咒 → 迷住</div>          <div class="zt"><span class="lbl">真题</span>Those policy-makers are often fascinated by the latest technology in education and its potential to &quot;transform&quot; education overnight. 这些政策制定者常常被最新的教育技术及其在 一夜之间“改变”教育的潜力吸引。(2022)</div>          <div class="fam"><span class="lbl">族</span>fascinating adj. 迷人的 / fascination n. 魅力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">illusion</span>
+          <span class="ipa">/ı&#x27;lu:3n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">幻想的事物；错觉；错误的观念；幻想</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the beautiful light on the rock is partly an illusion</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“一路引”。想 要你的人生一直有人引导，不会走错或走偏，这 也是你的“幻想”。</div>          <div class="root"><span class="lbl">根</span>il(加强) + lus(光，戏弄) + ion → 被光影骗了</div>          <div class="zt"><span class="lbl">真题</span>Google can give us the powerful illusion that all questions have definite answers. 谷歌 能给我们一种强大的错觉，即所有的问题都有 明确的答案。</div>          <div class="fam"><span class="lbl">族</span>illusory adj. 虚幻的 / delusion n. 妄想</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">notion</span>
+          <span class="ipa">/&#x27;nəu∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">概念，观点，想法</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the notion feels foolish</div>          <div class="mnem"><span class="lbl">记</span>我女儿最近说出了她的一个想 法：她长大以后，要去离家特别远的地方工作。 这个“想法”使我很闹心（notion发音似“闹 心”)。</div>          <div class="root"><span class="lbl">根</span>not(知道) + ion(名词后缀) → 心里知道的东西 → 想法</div>          <div class="zt"><span class="lbl">真题</span>She addresses self-respect and the notion that a person&#x27;s sense of beauty must include more than how much a person weighs. 她谈到 (202) 了自尊以及一个人的美感一定不局限于体重多 少的观念。(2016)</div>          <div class="fam"><span class="lbl">族</span>notional adj. 概念上的 / note n. 笔记</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">point</span>
+          <span class="ipa">/pəint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">观点；看法；重点；核心问题；得分；地点 7.指；指向；对着；朝着</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>That was the first point her captain made</div>          <div class="root"><span class="lbl">根</span>靠搭配记：point of view 观点 / to the point 切题</div>          <div class="zt"><span class="lbl">真题</span>It is likely to be a critical turning point in one&#x27;s life.它可能是一个人一生中的关键转折 点。(2017)</div>          <div class="fam"><span class="lbl">族</span>pointless adj. 无意义的 / pointer n. 指针</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">standpoint</span>
+          <span class="ipa">/&#x27;stændpəint/</span>
+          <span class="pos"></span>
+          <span class="cn">(常为单数)立场；观点</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From her standpoint, the job is never boring</div>          <div class="mnem"><span class="lbl">记</span>站的(stand)那个点(point)，不 就是“观点”吗？</div>          <div class="root"><span class="lbl">根</span>stand(站) + point(点) → 站的那个点 → 立场</div>          <div class="zt"><span class="lbl">真题</span>From a food safety standpoint, if you have millions or more bacteria on a surface, 0.1% is still enough to make you sick. 从食品安全的 角度来看，如果表面有数百万或更多的细菌， 0.1%仍然足以让你生病。</div>          <div class="fam"><span class="lbl">族</span>viewpoint n. 观点 / point n. 点</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">checkpoint</span>
+          <span class="ipa">/&#x27;t∫ekpəint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(边防)检查站</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Lena works at a mountain checkpoint between two countries</div>          <div class="root"><span class="lbl">根</span>check(检查) + point(点) → 设卡检查的那个点</div>          <div class="fam"><span class="lbl">族</span>check v. 检查 / check-in n. 登记处</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">check</span>
+          <span class="ipa">/t∫ek/</span>
+          <span class="pos">v.</span>
+          <span class="cn">检查，核对；制止 n. 支票，结账单</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Each morning she checks the papers of the people who pass the barrier</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为：车(che)上拉了ck (CK是美国一个品牌)吗？要“检查，核对”下。 (203) 第八单元</div>          <div class="root"><span class="lbl">根</span>谐音联想：车(che)上拉了 CK 要检查一下</div>          <div class="zt"><span class="lbl">真题</span>Daffner suggests going to your doctor to check on medications, health problems and other issues that could be affecting memory. 达夫纳建议去看医生，检查一下药物、健康问题 和其他可能影响记忆的问题。(2018)</div>          <div class="fam"><span class="lbl">族</span>checkpoint n. 检查站 / checkout n. 结账处</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">cheque</span>
+          <span class="ipa">/t∫ek/</span>
+          <span class="pos">n.</span>
+          <span class="cn">支票</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sent a cheque in the post</div>          <div class="root"><span class="lbl">根</span>和 check(支票) 同源，只是英式拼写</div>          <div class="zt"><span class="lbl">真题</span>I had just posted the letter when I remembered that hadn&#x27;t enclosed the cheque. 我刚把信寄出去，就想起了信里面没有附上 支票。</div>          <div class="fam"><span class="lbl">族</span>check n. 支票(美式) / paycheck n. 薪水</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">image</span>
+          <span class="ipa">/&#x27;ımıd3/</span>
+          <span class="pos"></span>
+          <span class="cn">形象；印象；声誉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the image changes with every hour</div>          <div class="mnem"><span class="lbl">记</span>我们可以想象：i(我)m（妈妈) age(上了年纪)，仍然在灯光下缝补衣服，这种 “形象”让人永远都忘不了。顺便多记个单词： mend→妈妈(m)到你出门前的最后(end)一刻， 仍然在给你缝补衣服，所以mend是“修补”的 意思。</div>          <div class="root"><span class="lbl">根</span>imag(想象) + e → 想象出来的样子 → 形象</div>          <div class="zt"><span class="lbl">真题</span>The white clothing conveyed an image of cleanliness, according to Carême—and in his realm，appearance was everything. 根据卡莱姆 的说法，白色的衣服传达了一种洁净的形 象——在他的领域里，外表就是一切。(2018)</div>          <div class="fam"><span class="lbl">族</span>imagine v. 想象 / imagery n. 意象</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">imagine</span>
+          <span class="ipa">/ı&#x27;mæd3ın/</span>
+          <span class="pos">v.</span>
+          <span class="cn">想象；设想；误以为；胡乱猜想；猜测</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>any picture she could imagine</div>          <div class="mnem"><span class="lbl">记</span>魔法(magic)都是想象(imagine) 出来的。</div>          <div class="root"><span class="lbl">根</span>imag(像) + ine → 在心里造出图像 → 想象</div>          <div class="zt"><span class="lbl">真题</span>I can imagine how many difficulties and obstacles you&#x27;ve conquered. 我可以想象你克服 了多少困难和障碍。(2016)</div>          <div class="fam"><span class="lbl">族</span>image n. 形象 / imagination n. 想象力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">infinite</span>
+          <span class="ipa">/&#x27;ınfinət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">无限的，无穷的；极大的，极多的 n. 无限 的事物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>art is infinite</div>          <div class="mnem"><span class="lbl">记</span>先认识 Infiniti，这是日产车英 菲尼迪，那这款车最大的特点是什么呢？空间 大。Infiniti很像 infinite(无限的)，那 fin当词 根的意思很明显了，是“范围”的意思。in可以 表示反义，那没有范围的，就是“无限的”。</div>          <div class="root"><span class="lbl">根</span>in(不) + fin(范围) + ite → 没有范围 → 无限的</div>          <div class="zt"><span class="lbl">真题</span>A teacher must be capable of infinite patience. 教师必须具有无限的耐心。</div>          <div class="fam"><span class="lbl">族</span>infinity n. 无限 / finite adj. 有限的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">define</span>
+          <span class="ipa">/dı&#x27;fain/</span>
+          <span class="pos">v.</span>
+          <span class="cn">解释(词语)的含义；给(词语)下定义；阐明； 明确；界定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He asked her to define beauty</div>          <div class="mnem"><span class="lbl">记</span>de 分开；fin 范围。把不同的范 围分开→使明确，下定义。</div>          <div class="root"><span class="lbl">根</span>de(分开) + fin(范围) + e → 把范围划开 → 下定义</div>          <div class="zt"><span class="lbl">真题</span>Supermarkets can technically be defined as giants housing 15, 000 to 60, 000 different products.(2023）从技术上讲，超市可以被定义 为容纳1.5万至6万种不同产品的巨型公司。</div>          <div class="fam"><span class="lbl">族</span>definition n. 定义 / definite adj. 明确的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">definite</span>
+          <span class="ipa">/&#x27;definət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">很明显，确定的，明确的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>confine it to a definite rule</div>          <div class="root"><span class="lbl">根</span>de(分开) + fin(范围) + ite → 范围划得很清楚 → 明确的</div>          <div class="zt"><span class="lbl">真题</span>Show some interest in them and they will definitely show some in you. 对他们表现出兴 趣，他们也一定会对你表现出兴趣。</div>          <div class="fam"><span class="lbl">族</span>definitely adv. 肯定地 / define v. 下定义</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">confine</span>
+          <span class="ipa">/kən&#x27;fain/</span>
+          <span class="pos">v.</span>
+          <span class="cn">限制；监禁，关押n.界限，范围；限制</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>nobody can confine it to a definite rule</div>          <div class="mnem"><span class="lbl">记</span>加强(con)范围(fin)→限制。</div>          <div class="root"><span class="lbl">根</span>con(加强) + fin(范围) + e → 圈进范围里 → 限制</div>          <div class="fam"><span class="lbl">族</span>confined adj. 受限的 / confinement n. 监禁</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">refine</span>
+          <span class="ipa">/ri&#x27;fain/</span>
+          <span class="pos">v.</span>
+          <span class="cn">精炼，提纯；改进，改善</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then to refine it until only the true part was left</div>          <div class="mnem"><span class="lbl">记</span>re再，又；fine就用“好”的意思 记忆。已经很好了，让它再好→提炼，精炼。</div>          <div class="root"><span class="lbl">根</span>re(再) + fine(好) → 让它再好一点 → 提炼</div>          <div class="zt"><span class="lbl">真题</span>Groups like these will help you refine your analytical skills and enable you to express yourself better. 像这样的小组将帮助你提高分 析能力，让你更好地表达自己。(2019)</div>          <div class="fam"><span class="lbl">族</span>refinery n. 炼油厂 / refinement n. 精炼</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">profession</span>
+          <span class="ipa">/prə&#x27;fe∫n/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;Painting is not a profession,&quot; her father said</div>          <div class="mnem"><span class="lbl">记</span>你的职业(profession)不就是你 专业的(professional)东西吗？</div>          <div class="root"><span class="lbl">根</span>pro(向前) + fess(说) + ion → 公开说自己会做的事</div>          <div class="zt"><span class="lbl">真题</span>It is necessary to use terms other than gamification for some professions. 对于某些职 业，有必要使用游戏化以外的术语。(2016)</div>          <div class="fam"><span class="lbl">族</span>professional adj. 专业的 / professor n. 教授</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">confess</span>
+          <span class="ipa">/kən&#x27;fes/</span>
+          <span class="pos">v.</span>
+          <span class="cn">承认，坦白；忏悔</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she will not confess to luck</div>          <div class="mnem"><span class="lbl">记</span>词根fess发音类似“帅死”，语 言是很有魅力的，那个男人站在讲台上，一开口 讲话，就魅力四射，帅死了，所以 fess 意为 speak (说)。一起(con)都说(fess)了→坦白。</div>          <div class="root"><span class="lbl">根</span>con(完全) + fess(说) → 全说出来 → 坦白</div>          <div class="fam"><span class="lbl">族</span>confession n. 坦白 / profess v. 声称</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">occupy</span>
+          <span class="ipa">/&#x27;pkjupai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使用，占用；忙着(做某事)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one small idea must never occupy your whole mind</div>          <div class="root"><span class="lbl">根</span>oc(加强) + cup(抓) + y → 抓住不放 → 占用</div>          <div class="zt"><span class="lbl">真题</span>People occupy valuable table space in quiet times. 在安静的时候，人们占用宝贵的餐 桌空间。(2020)</div>          <div class="fam"><span class="lbl">族</span>occupation n. 职业 / occupant n. 占用者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">occupation</span>
+          <span class="ipa">/pkju&#x27;pei∫(ə)n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">职业，工作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>your occupation becomes a cage</div>          <div class="mnem"><span class="lbl">记</span>occupy v. 占据；occupation 是 以ation结尾的名词。每天占据我们很多时间， 忙于的事情就是我们的“工作”。</div>          <div class="root"><span class="lbl">根</span>occupy(占用) + ation → 占去你时间的事 → 职业</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s commonly known that certain diseases are linked with occupations like lung disease in coal miners. 众所周知，某些疾病与 职业有关，比如煤矿工人的肺病。(2016)</div>          <div class="fam"><span class="lbl">族</span>occupy v. 占用 / occupational adj. 职业的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">philosopher</span>
+          <span class="ipa">/fə&#x27;la:səfər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">哲学家；深思的人；善于思考的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her teacher, an old philosopher</div>          <div class="mnem"><span class="lbl">记</span>单词前部分发音类似“费老”。 (205) 第八单元 费老是一个“善于思考的人”。</div>          <div class="root"><span class="lbl">根</span>philo(爱) + soph(智慧) + er(人) → 爱智慧的人</div>          <div class="zt"><span class="lbl">真题</span>“While we teach, we learn,&quot;said Roman philosopher Seneca.罗马哲学家塞内加说过： “当我们教的时候，我们就学会了。”(2018)</div>          <div class="fam"><span class="lbl">族</span>philosophy n. 哲学 / philosophical adj. 哲学的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">clarify</span>
+          <span class="ipa">/&#x27;klærəfai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">澄清，阐明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then to clarify it</div>          <div class="mnem"><span class="lbl">记</span>clear 干净的；ify 使……化。那 clarify就是“使干净”，引申为“澄清，阐明”。</div>          <div class="root"><span class="lbl">根</span>clar(清楚) + ify(使…) → 使清楚 → 澄清</div>          <div class="zt"><span class="lbl">真题</span>It is an attempt to clarify misunderstanding about the origin of language. 它试图澄清对语 言起源的误解。</div>          <div class="fam"><span class="lbl">族</span>clarity n. 清晰 / clear adj. 清楚的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">confirm</span>
+          <span class="ipa">/kən&#x27;f3:rm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证实，证明；批准 v. 使稳固，使牢固。confirm 就是都(con)牢固。 要把他杀人的罪名坐实，就是要“证明，证实”他 是杀人凶手啊。</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a firm in the city confirmed that it wanted to buy three of her paintings</div>          <div class="mnem"><span class="lbl">记</span>firm adj. 坚定的；牢固的</div>          <div class="root"><span class="lbl">根</span>con(加强) + firm(牢固) → 让结论站稳 → 证实</div>          <div class="zt"><span class="lbl">真题</span>Many scientists have studied the green sea slugs to confirm that they are actually able to create energy from sunlight. 许多科学家研 究了绿海蛞蝓，以证实它们确实能够从阳光中 产生能量。(2019)</div>          <div class="fam"><span class="lbl">族</span>confirmation n. 证实 / firm adj. 牢固的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">firm</span>
+          <span class="ipa">/f3:rm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">商行；商号；公司 adj.坚固的；坚硬的；结 实的；牢固的；稳固的；坚挺的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a firm in the city confirmed</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a law firm 律师事务所 / a firm belief 坚定的信念</div>          <div class="zt"><span class="lbl">真题</span>He doesn&#x27;t feel at ease in the firm. 他在 公司里感到不自在。</div>          <div class="fam"><span class="lbl">族</span>confirm v. 证实 / firmly adv. 坚定地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">affirm</span>
+          <span class="ipa">/ə&#x27;f3:m/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证实；确认；肯定，断言</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The news seemed to affirm everything she had believed about herself</div>          <div class="mnem"><span class="lbl">记</span>一再地（af）使它牢固，坚定 (firm)，就是“肯定”。</div>          <div class="root"><span class="lbl">根</span>af(一再) + firm(牢固) → 一再加固 → 肯定</div>          <div class="fam"><span class="lbl">族</span>affirmative adj. 肯定的 / affirmation n. 断言</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">claim</span>
+          <span class="ipa">/kleim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">声称；索取；赢得；夺去(生命) n.声称，主张；索赔</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her friends claim she was simply lucky</div>          <div class="mnem"><span class="lbl">记</span>词根 claim表示“声称，说，喊”。</div>          <div class="root"><span class="lbl">根</span>词根 claim(喊，说) → 大声说出自己的主张</div>          <div class="zt"><span class="lbl">真题</span>Some argued that humans weren&#x27;t producing enough greenhouse gases, while others claimed the effects would be tiny. —些 人认为人类没有产生足够的温室气体，而另一 些人则声称影响很小。(2020)</div>          <div class="fam"><span class="lbl">族</span>proclaim v. 宣告 / exclaim v. 呼喊</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 8 · Day 54</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

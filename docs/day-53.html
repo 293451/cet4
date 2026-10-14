@@ -1,0 +1,687 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 53 · The Restorer and the Queen</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 53 · 12/4 · Unit 8 第 1561-1590 词</div>
+  <h1>The Restorer and the Queen<span class="cn">修复师与女王</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-53.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5419"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">rules</span> <span class="w" data-s="341" data-e="512">of</span> <span class="w" data-s="555" data-e="640">the</span> <span class="w" data-s="683" data-e="939">palace</span> <span class="w" data-s="981" data-e="1280">workshop</span> <span class="w" data-s="1323" data-e="1579">were</span> <span class="w target" data-s="1621" data-e="1877" title="僵化的；坚硬的；死板的">rigid:</span> <span class="w" data-s="2133" data-e="2517">no</span> <span class="w" data-s="2560" data-e="2773">food,</span> <span class="w" data-s="3115" data-e="3285">no</span> <span class="w" data-s="3499" data-e="3755">music,</span> <span class="w" data-s="4053" data-e="4224">and</span> <span class="w" data-s="4395" data-e="4565">no</span> <span class="w" data-s="4608" data-e="4736">talking</span> <span class="w" data-s="4779" data-e="5120">after</span> <span class="w" data-s="5163" data-e="5419">eight.</span></p><p class="zh">宫廷作坊的规矩很死板：不准吃东西，不准放音乐，八点以后不许说话。</p></div>
+<div class="pair" data-s0="5632" data-s1="11008"><p class="en"><span class="w" data-s="5632" data-e="6656">Elena&#x27;s</span> <span class="w" data-s="6699" data-e="6869">teacher</span> <span class="w" data-s="6912" data-e="7040">was</span> <span class="w target" data-s="7083" data-e="7381" title="残酷的；严酷的；恶劣的；严厉的；艰苦的； 强烈刺眼的；丑陋的；刺耳的">harsh,</span> <span class="w" data-s="7509" data-e="7936">and</span> <span class="w" data-s="7979" data-e="8149">some</span> <span class="w" data-s="8192" data-e="8235">of</span> <span class="w" data-s="8277" data-e="8363">the</span> <span class="w" data-s="8405" data-e="8491">other</span> <span class="w" data-s="8533" data-e="9131">restorers</span> <span class="w" data-s="9173" data-e="9259">called</span> <span class="w" data-s="9301" data-e="9472">him</span> <span class="w target" data-s="9515" data-e="9899" title="残酷的；冷酷的；残忍的；残暴的；引起痛 苦的">cruel,</span> <span class="w" data-s="10027" data-e="10368">even</span> <span class="w target" data-s="10496" data-e="11008" title="残暴的；兽性的；直截了当的;冷酷的">brutal.</span></p><p class="zh">埃莱娜的老师很严厉，别的修复师里有人说他残酷，甚至残暴。</p></div>
+<div class="pair" data-s0="11486" data-s1="16179"><p class="en"><span class="w" data-s="11486" data-e="11699">Once</span> <span class="w" data-s="11742" data-e="11870">a</span> <span class="w" data-s="11912" data-e="12040">frame</span> <span class="w" data-s="12083" data-e="12296">fell</span> <span class="w" data-s="12339" data-e="12595">from</span> <span class="w" data-s="12638" data-e="12723">the</span> <span class="w" data-s="12766" data-e="12851">wall</span> <span class="w" data-s="12894" data-e="13235">and</span> <span class="w" data-s="13363" data-e="13534">left</span> <span class="w" data-s="13576" data-e="13704">a</span> <span class="w target" data-s="13747" data-e="13960" title="瘀青，伤痕v. 打击，挫伤">bruise</span> <span class="w" data-s="14003" data-e="14088">on</span> <span class="w" data-s="14131" data-e="14216">her</span> <span class="w" data-s="14259" data-e="14344">arm</span> <span class="w" data-s="14387" data-e="14686">and</span> <span class="w" data-s="14728" data-e="15198">a</span> <span class="w" data-s="15240" data-e="15326">long</span> <span class="w target" data-s="15368" data-e="15667" title="">wound</span> <span class="w" data-s="15710" data-e="15880">in</span> <span class="w" data-s="15923" data-e="15966">her</span> <span class="w" data-s="16008" data-e="16179">hand.</span></p><p class="zh">有一次一个画框从墙上掉下来，在她手臂上砸出淤青，在手上划出一道很深的伤口。</p></div>
+<div class="pair" data-s0="16478" data-s1="20104"><p class="en"><span class="w" data-s="16478" data-e="17075">She</span> <span class="w" data-s="17118" data-e="17288">was</span> <span class="w" data-s="17331" data-e="17416">his</span> <span class="w" data-s="17459" data-e="17630">only</span> <span class="w target" data-s="17672" data-e="18184" title="受抚养者(尤指孩子);靠他人生活者">dependant,</span> <span class="w" data-s="18398" data-e="18696">so</span> <span class="w" data-s="18739" data-e="18952">she</span> <span class="w" data-s="18995" data-e="19080">could</span> <span class="w" data-s="19123" data-e="19251">not</span> <span class="w" data-s="19294" data-e="19507">simply</span> <span class="w" data-s="19550" data-e="19806">walk</span> <span class="w" data-s="19848" data-e="20104">away.</span></p><p class="zh">她是老师唯一要养活的人，所以没法一走了之。</p></div>
+<div class="pair" data-s0="20488" data-s1="25182"><p class="en"><span class="w" data-s="20488" data-e="20574">For</span> <span class="w" data-s="20616" data-e="20744">six</span> <span class="w" data-s="20787" data-e="21000">months</span> <span class="w" data-s="21043" data-e="21470">she</span> <span class="w" data-s="21512" data-e="21683">was</span> <span class="w target" data-s="21726" data-e="22110" title="(使)隔离，孤立，脱离">isolated</span> <span class="w" data-s="22152" data-e="22366">in</span> <span class="w" data-s="22408" data-e="22451">the</span> <span class="w" data-s="22494" data-e="22579">north</span> <span class="w" data-s="22622" data-e="22835">room,</span> <span class="w" data-s="23048" data-e="23304">learning</span> <span class="w" data-s="23347" data-e="23603">to</span> <span class="w target" data-s="23646" data-e="24030" title="航行；导航；穿过；穿越">navigate</span> <span class="w" data-s="24072" data-e="24200">the</span> <span class="w" data-s="24243" data-e="24286">dark</span> <span class="w" data-s="24328" data-e="24712">stairs</span> <span class="w" data-s="24755" data-e="24840">with</span> <span class="w" data-s="24883" data-e="24968">a</span> <span class="w" data-s="25011" data-e="25182">lamp.</span></p><p class="zh">整整六个月，她一个人被隔离在北屋，学着提一盏灯走过那些漆黑的楼梯。</p></div>
+<div class="pair" data-s0="25999" data-s1="31161"><p class="en"><span class="w" data-s="25999" data-e="26084">The</span> <span class="w" data-s="26127" data-e="26255">floor</span> <span class="w target" data-s="26297" data-e="26852" title="振动，颤动，摇摆">vibrated</span> <span class="w" data-s="26895" data-e="27023">each</span> <span class="w" data-s="27065" data-e="27279">time</span> <span class="w" data-s="27321" data-e="27492">the</span> <span class="w" data-s="27535" data-e="27577">great</span> <span class="w" data-s="27620" data-e="27876">doors</span> <span class="w" data-s="27919" data-e="28089">opened,</span> <span class="w" data-s="28303" data-e="28516">and</span> <span class="w" data-s="28857" data-e="28985">she</span> <span class="w" data-s="29028" data-e="29156">sent</span> <span class="w" data-s="29199" data-e="29327">her</span> <span class="w" data-s="29369" data-e="29711">reports</span> <span class="w" data-s="29753" data-e="29839">to</span> <span class="w" data-s="29881" data-e="29967">the</span> <span class="w" data-s="30009" data-e="30137">office</span> <span class="w target" data-s="30180" data-e="30564" title="经由，经过；通过，凭借">via</span> <span class="w" data-s="30607" data-e="30777">a</span> <span class="w" data-s="30820" data-e="30905">young</span> <span class="w" data-s="30948" data-e="31161">guard.</span></p><p class="zh">每次大门打开，地板都会震动；她的报告则托一个年轻卫兵带出去。</p></div>
+<div class="pair" data-s0="31764" data-s1="38122"><p class="en"><span class="w" data-s="31764" data-e="31850">The</span> <span class="w" data-s="31892" data-e="32020">work</span> <span class="w" data-s="32063" data-e="32276">itself</span> <span class="w" data-s="32319" data-e="32660">was</span> <span class="w" data-s="32703" data-e="33044">a</span> <span class="w" data-s="33087" data-e="33428">portrait</span> <span class="w" data-s="33471" data-e="33514">of</span> <span class="w" data-s="33556" data-e="33599">a</span> <span class="w target" data-s="33642" data-e="33812" title="女王，女首领；王后">queen:</span> <span class="w" data-s="34068" data-e="34452">her</span> <span class="w target" data-s="34538" data-e="34922" title="王冠，冕；花冠">crown,</span> <span class="w" data-s="35178" data-e="35348">her</span> <span class="w target" data-s="35562" data-e="35860" title="皇家的 n. 王室成员">royal</span> <span class="w" data-s="35903" data-e="36031">dress,</span> <span class="w" data-s="36330" data-e="36628">and</span> <span class="w" data-s="36799" data-e="37012">a</span> <span class="w target" data-s="37055" data-e="37311" title="帝王的">regal,</span> <span class="w target" data-s="37439" data-e="37866" title="直立的;竖直的;正直的；诚实的">upright</span> <span class="w" data-s="37908" data-e="38122">face.</span></p><p class="zh">这幅作品本身是一位女王的肖像：她的王冠、她的王室礼服，还有一张端庄挺直的脸。</p></div>
+<div class="pair" data-s0="38420" data-s1="43242"><p class="en"><span class="w" data-s="38420" data-e="39530">Elena</span> <span class="w" data-s="39572" data-e="39658">had</span> <span class="w" data-s="39700" data-e="39786">to</span> <span class="w" data-s="39828" data-e="39914">stay</span> <span class="w target" data-s="39956" data-e="40298" title="忠诚的；忠实的">loyal</span> <span class="w" data-s="40340" data-e="40468">to</span> <span class="w" data-s="40511" data-e="40554">the</span> <span class="w" data-s="40596" data-e="40682">first</span> <span class="w" data-s="40724" data-e="41108">painter</span> <span class="w" data-s="41151" data-e="41322">and</span> <span class="w target" data-s="41364" data-e="42175" title="忠实的，忠诚的，忠贞的；可信任的，可信赖 的；如实的">faithful</span> <span class="w" data-s="42218" data-e="42388">to</span> <span class="w" data-s="42431" data-e="42644">every</span> <span class="w" data-s="42687" data-e="42943">brush</span> <span class="w" data-s="42986" data-e="43242">mark.</span></p><p class="zh">埃莱娜必须忠于最初的那位画家，忠实于每一道笔触。</p></div>
+<div class="pair" data-s0="43892" data-s1="47775"><p class="en"><span class="w" data-s="43892" data-e="43978">The</span> <span class="w target" data-s="44020" data-e="44276" title="女王，女首领；王后">queen</span> <span class="w" data-s="44319" data-e="44532">stood</span> <span class="w target" data-s="44575" data-e="44959" title="垂直的，直立的，纵向的">vertical</span> <span class="w" data-s="45002" data-e="45215">and</span> <span class="w" data-s="45258" data-e="45727">still</span> <span class="w" data-s="45770" data-e="45940">in</span> <span class="w" data-s="45983" data-e="46068">the</span> <span class="w" data-s="46111" data-e="46196">frame,</span> <span class="w target" data-s="46495" data-e="47178" title="">noble</span> <span class="w" data-s="47220" data-e="47476">and</span> <span class="w" data-s="47604" data-e="47775">calm.</span></p><p class="zh">画里的女王垂直而立，一动不动，高贵而平静。</p></div>
+<div class="pair" data-s0="48116" data-s1="52596"><p class="en"><span class="w" data-s="48116" data-e="48756">The</span> <span class="w" data-s="48799" data-e="49098">painting</span> <span class="w" data-s="49140" data-e="49311">had</span> <span class="w" data-s="49354" data-e="49439">a</span> <span class="w" data-s="49482" data-e="49567">fine</span> <span class="w target" data-s="49610" data-e="50122" title="名誉，名声">reputation,</span> <span class="w" data-s="50378" data-e="50932">though</span> <span class="w" data-s="51018" data-e="51188">its</span> <span class="w target" data-s="51231" data-e="51530" title="名声；声誉；名气">fame</span> <span class="w" data-s="51572" data-e="51786">had</span> <span class="w" data-s="51828" data-e="52127">faded</span> <span class="w" data-s="52170" data-e="52340">long</span> <span class="w" data-s="52383" data-e="52596">ago.</span></p><p class="zh">这幅画名声很好，虽然它的名气早已淡去。</p></div>
+<div class="pair" data-s0="52938" data-s1="57162"><p class="en"><span class="w" data-s="52938" data-e="53066">The</span> <span class="w" data-s="53108" data-e="53407">palace</span> <span class="w" data-s="53450" data-e="53578">wanted</span> <span class="w" data-s="53620" data-e="53791">its</span> <span class="w target" data-s="53834" data-e="54346" title="威信；声望">prestige</span> <span class="w" data-s="54388" data-e="54516">back,</span> <span class="w" data-s="54815" data-e="54943">and</span> <span class="w" data-s="55242" data-e="55370">the</span> <span class="w" data-s="55412" data-e="55498">old</span> <span class="w" data-s="55540" data-e="55839">teacher</span> <span class="w" data-s="55882" data-e="56095">wanted</span> <span class="w" data-s="56138" data-e="56308">the</span> <span class="w target" data-s="56351" data-e="56650" title="尊重；敬重 v. 尊重；敬重；把……看作">esteem</span> <span class="w" data-s="56692" data-e="56863">of</span> <span class="w" data-s="56906" data-e="56948">the</span> <span class="w" data-s="56991" data-e="57162">city.</span></p><p class="zh">宫殿想找回它的声望，老教师想得到全城的敬重。</p></div>
+<div class="pair" data-s0="58075" data-s1="64005"><p class="en"><span class="w" data-s="58075" data-e="58160">He</span> <span class="w" data-s="58203" data-e="58331">told</span> <span class="w" data-s="58373" data-e="58800">Elena</span> <span class="w" data-s="58843" data-e="58971">that</span> <span class="w" data-s="59013" data-e="59141">real</span> <span class="w target" data-s="59184" data-e="59525" title="优点；美德；价值">merit</span> <span class="w" data-s="59568" data-e="59653">is</span> <span class="w" data-s="59696" data-e="59824">not</span> <span class="w" data-s="59867" data-e="60123">praise</span> <span class="w" data-s="60165" data-e="60464">but</span> <span class="w target" data-s="60507" data-e="60848" title="高尚的道德；正直的品性；德行；美德；优秀品 质；良好习惯；优点；长处；用处">virtue,</span> <span class="w" data-s="61019" data-e="61232">and</span> <span class="w" data-s="61488" data-e="61659">that</span> <span class="w" data-s="61701" data-e="61787">a</span> <span class="w target" data-s="61829" data-e="62043" title="道德的;道德上的;品行端正的；有道德的">moral</span> <span class="w" data-s="62085" data-e="62597">restorer</span> <span class="w" data-s="62640" data-e="62811">must</span> <span class="w" data-s="62853" data-e="63024">be</span> <span class="w" data-s="63067" data-e="63237">honest</span> <span class="w" data-s="63280" data-e="63536">in</span> <span class="w" data-s="63579" data-e="63707">small</span> <span class="w" data-s="63749" data-e="64005">things.</span></p><p class="zh">他告诉埃莱娜，真正的价值不是赞美而是美德，一个有道德的修复师在小事上也必须诚实。</p></div>
+<div class="pair" data-s0="64304" data-s1="69381"><p class="en"><span class="w" data-s="64304" data-e="64944">One</span> <span class="w" data-s="64987" data-e="65200">night</span> <span class="w" data-s="65243" data-e="65413">a</span> <span class="w target" data-s="65456" data-e="65755" title="暴力的;猛烈的">violent</span> <span class="w" data-s="65797" data-e="66096">storm</span> <span class="w" data-s="66139" data-e="66352">shook</span> <span class="w" data-s="66395" data-e="66480">the</span> <span class="w" data-s="66523" data-e="66779">palace,</span> <span class="w" data-s="66949" data-e="67120">and</span> <span class="w" data-s="67205" data-e="67632">someone</span> <span class="w" data-s="67675" data-e="67931">tried</span> <span class="w" data-s="67973" data-e="68144">to</span> <span class="w target" data-s="68187" data-e="68528" title="违反；侵犯，妨碍；亵渎">violate</span> <span class="w" data-s="68571" data-e="68656">the</span> <span class="w" data-s="68699" data-e="68955">seals</span> <span class="w" data-s="68997" data-e="69125">on</span> <span class="w" data-s="69168" data-e="69253">the</span> <span class="w" data-s="69296" data-e="69381">door.</span></p><p class="zh">一天夜里，一场猛烈的暴风雨摇撼着宫殿，有人试图破坏门上的封条。</p></div>
+<div class="pair" data-s0="69723" data-s1="73477"><p class="en"><span class="w" data-s="69723" data-e="69808">By</span> <span class="w" data-s="69851" data-e="70021">morning</span> <span class="w" data-s="70064" data-e="70277">a</span> <span class="w" data-s="70320" data-e="70832">long</span> <span class="w target" data-s="70875" data-e="71301" title="队，行列 v. 排队">queue</span> <span class="w" data-s="71344" data-e="71387">of</span> <span class="w" data-s="71429" data-e="71728">visitors</span> <span class="w" data-s="71771" data-e="72155">waited</span> <span class="w" data-s="72197" data-e="72283">at</span> <span class="w" data-s="72325" data-e="72411">the</span> <span class="w" data-s="72453" data-e="72581">gate</span> <span class="w" data-s="72624" data-e="72880">to</span> <span class="w" data-s="72923" data-e="73051">see</span> <span class="w" data-s="73093" data-e="73221">the</span> <span class="w target" data-s="73264" data-e="73477" title="女王，女首领；王后">queen.</span></p><p class="zh">到早上，一长队游客在门口排队，等着看那位女王。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">rigid</span>
+          <span class="ipa">/&#x27;rıd3ıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">僵化的；坚硬的；死板的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The rules of the palace workshop were rigid</div>          <div class="root"><span class="lbl">根</span>rig(僵硬) + id → 僵硬的，死板的</div>          <div class="zt"><span class="lbl">真题</span>The old way of organising people is too rigid for both the modern marketplace and the expectations of employees. 对于现代市场和员 工的期望来说，旧的人员组织方式过于僵化。 (2017)</div>          <div class="fam"><span class="lbl">族</span>rigidity n. 僵化 / rigidly adv. 僵硬地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">harsh</span>
+          <span class="ipa">/ha:r∫/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">残酷的；严酷的；恶劣的；严厉的；艰苦的； 强烈刺眼的；丑陋的；刺耳的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elena&#x27;s teacher was harsh</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“吓死”。这“恶 劣的”环境把我吓死了。</div>          <div class="root"><span class="lbl">根</span>谐音：吓死 → 恶劣环境把人吓死</div>          <div class="zt"><span class="lbl">真题</span>If they think you aren&#x27;t working as hard as they think you should, their demands become increasingly louder and harsher. 如果 他们认为你没有像他们认为的那样努力工作， 他们的要求就会越来越高，越来越苛刻。</div>          <div class="fam"><span class="lbl">族</span>harshly adv. 严厉地 / harshness n. 严酷</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">cruel</span>
+          <span class="ipa">/&#x27;kru:əl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">残酷的；冷酷的；残忍的；残暴的；引起痛 苦的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>called him cruel, even brutal</div>          <div class="root"><span class="lbl">根</span>谐音：哭哦 → 让人哭 → 残酷的</div>          <div class="zt"><span class="lbl">真题</span>Hunting foxes with dogs is considered cruel and violent. 用狗猎狐狸被认为是残忍和 暴力的。</div>          <div class="fam"><span class="lbl">族</span>cruelty n. 残酷 / cruelly adv. 残酷地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">brutal</span>
+          <span class="ipa">/&#x27;bru:tl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">残暴的；兽性的；直截了当的;冷酷的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>called him cruel, even brutal</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“不如偷”。你 这“残暴的”行径还不如去偷去抢。 (198)</div>          <div class="root"><span class="lbl">根</span>谐音：不如偷 → 残暴得不如去偷</div>          <div class="zt"><span class="lbl">真题</span>The number of people opposed to fox hunting, because they think it is brutal, has risen sharply. 反对猎狐的人数急剧上升，因为 他们认为这是残忍的。</div>          <div class="fam"><span class="lbl">族</span>brutality n. 残暴 / brutally adv. 残暴地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">bruise</span>
+          <span class="ipa">/bru:z/</span>
+          <span class="pos"></span>
+          <span class="cn">瘀青，伤痕v. 打击，挫伤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>left a bruise on her arm</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“捂的”。“伤 口”不能总捂着，要不然会更严重。</div>          <div class="root"><span class="lbl">根</span>谐音：捂的 → 伤口总捂着会更严重</div>          <div class="zt"><span class="lbl">真题</span>But disasters can still wound us. 但灾难 仍然会伤害我们。(2021)</div>          <div class="fam"><span class="lbl">族</span>bruised adj. 青肿的 / bruising n. 淤伤</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">wound</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and a long wound in her hand</div>          <div class="root"><span class="lbl">根</span>联想：与 wind 只差一个字母，风一吹伤口疼</div>          <div class="fam"><span class="lbl">族</span>wounded adj. 受伤的 / wound v. 使受伤</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">dependant</span>
+          <span class="ipa">/dı&#x27;pendənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">受抚养者(尤指孩子);靠他人生活者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was his only dependant</div>          <div class="root"><span class="lbl">根</span>de(下) + pend(挂) + ant(人) → 挂在别人身上的人</div>          <div class="fam"><span class="lbl">族</span>depend v. 依靠 / dependent adj. 依赖的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">reputation</span>
+          <span class="ipa">/irepju&#x27;tei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">名誉，名声</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The painting had a fine reputation</div>          <div class="mnem"><span class="lbl">记</span>re(一再地)+put(放)十a(一) +tion(名词后缀)→一再地把一个人的名字放 到前面，说明他“名声”很大啊。</div>          <div class="root"><span class="lbl">根</span>re(一再) + put(放) + ation → 一再被放到前面</div>          <div class="zt"><span class="lbl">真题</span>Since the 1940s, southern California has had a reputation for smog. 自 20 世纪 40 年代 以来，南加州一直因雾霾闻名。(2018)</div>          <div class="fam"><span class="lbl">族</span>reputable adj. 声誉好的 / repute n. 名声</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">prestige</span>
+          <span class="ipa">/pre&#x27;sti:3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">威信；声望</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The palace wanted its prestige back</div>          <div class="mnem"><span class="lbl">记</span>pre 表示“提前”；stige发音类 似“死提哥(哥)”。连在一起就是：你的车被警 察查了，你就提前死提你的哥哥，为什么提你哥 哥？因为他有名气，有“声望”啊。</div>          <div class="root"><span class="lbl">根</span>pre(提前) + stige(谐音死提哥) → 提哥哥撑场面</div>          <div class="zt"><span class="lbl">真题</span>The preferences of these men bestowed prestige on certain works, which made the works more likely to be hung in galleries and printed in collections. 这些人的偏好赋予了某 些作品声望，这使得这些作品更有可能被挂在 (199) 第八单元 画廊和印刷成收藏品。</div>          <div class="fam"><span class="lbl">族</span>prestigious adj. 有声望的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">fame</span>
+          <span class="ipa">/feim/</span>
+          <span class="pos">n.</span>
+          <span class="cn">名声；声誉；名气</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>though its fame had faded long ago</div>          <div class="root"><span class="lbl">根</span>联想：famous 去掉 ous → 名气</div>          <div class="zt"><span class="lbl">真题</span>Its fame in high technology is incomparable. 它在高科技领域的名气是无与伦比的。(2015)</div>          <div class="fam"><span class="lbl">族</span>famous adj. 著名的 / famed adj. 有名的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">esteem</span>
+          <span class="ipa">/ı&#x27;sti:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">尊重；敬重 v. 尊重；敬重；把……看作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and the old teacher wanted the esteem of the city</div>          <div class="mnem"><span class="lbl">记</span>该单词的发音类似“一丝提门 (m 可以想象成门)”。如果你用一根丝线就能 把门提起来，那么你在方圆几里内一定很有名 气，所以受人“尊敬，尊重”。</div>          <div class="root"><span class="lbl">根</span>谐音：一丝提门 → 用丝线提门，有本事受人敬重</div>          <div class="fam"><span class="lbl">族</span>esteemed adj. 受敬重的 / self-esteem n. 自尊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">faithful</span>
+          <span class="ipa">/&#x27;ferθfl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">忠实的，忠诚的，忠贞的；可信任的，可信赖 的；如实的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and faithful to every brush mark</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词 faith 发音类似 “face(脸)”。我们常说：“看他的脸，就很可靠” →可信任的，可信赖的。</div>          <div class="root"><span class="lbl">根</span>faith(忠诚) + ful(充满) → 充满忠诚的</div>          <div class="zt"><span class="lbl">真题</span>Friends should always be faithful to each other. 朋友应该永远对彼此忠诚。</div>          <div class="fam"><span class="lbl">族</span>faith n. 信任 / faithfully adv. 忠实地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">loyal</span>
+          <span class="ipa">/&#x27;ləral/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">忠诚的；忠实的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elena had to stay loyal to the first painter</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“老友”。老朋 友才是对你“忠诚的”人。</div>          <div class="root"><span class="lbl">根</span>谐音：老友 → 老朋友最忠诚</div>          <div class="zt"><span class="lbl">真题</span>Consumers are loyal to certain brands. 消 费者对某些品牌很忠诚。(2017)</div>          <div class="fam"><span class="lbl">族</span>loyalty n. 忠诚 / loyally adv. 忠诚地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">royal</span>
+          <span class="ipa">/&#x27;roiəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">皇家的 n. 王室成员</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her crown, her royal dress</div>          <div class="mnem"><span class="lbl">记</span>对王室成员(royal)要忠诚(loyal)。</div>          <div class="root"><span class="lbl">根</span>联想：对王室成员(royal)要忠诚(loyal)</div>          <div class="zt"><span class="lbl">真题</span>He regards his royal duties as a burden. 他认为他的王室职责是一种负担。(2018)</div>          <div class="fam"><span class="lbl">族</span>royalty n. 王室 / royally adv. 皇家地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">noble</span>
+          <span class="ipa">/&#x27;nəubl/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>noble and calm</div>          <div class="mnem"><span class="lbl">记</span>不要（no）抱（ble发音类似 “抱”)，有些人看着是孤傲的、“高贵的”，让别人 不敢上前抱一下。</div>          <div class="root"><span class="lbl">根</span>no(不) + ble(想成“抱”) → 太高贵不敢抱</div>          <div class="zt"><span class="lbl">真题</span>He was not a noble, but the son of a leather trader.他不是一个贵族，而是一个皮革 商人的儿子。</div>          <div class="fam"><span class="lbl">族</span>nobility n. 贵族 / nobly adv. 高尚地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">crown</span>
+          <span class="ipa">/kraun/</span>
+          <span class="pos">n.</span>
+          <span class="cn">王冠，冕；花冠</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her crown, her royal dress</div>          <div class="mnem"><span class="lbl">记</span>超人(cr，超人拼音的首字母)拥 有自己的(own)王冠(crown)。</div>          <div class="root"><span class="lbl">根</span>cr(超人首字母) + own(自己的) → 超人自己的王冠</div>          <div class="fam"><span class="lbl">族</span>crowned adj. 加冕的 / crown v. 加冕</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">queen</span>
+          <span class="ipa">/kwi:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">女王，女首领；王后</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The work itself was a portrait of a queen</div>          <div class="root"><span class="lbl">根</span>谐音：奎因；与 queue 只差一个字母 → 女王</div>          <div class="zt"><span class="lbl">真题</span>The urban poor, usually personified as a woman of color, the “welfare queen politicians still too often reference. 城市贫民， 通常被拟人化为有色人种女性，即政客们仍然 经常提到的“福利女王”。(2020)</div>          <div class="fam"><span class="lbl">族</span>queenly adj. 女王般的 / kingdom n. 王国</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">queue</span>
+          <span class="ipa">/kju:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">队，行列 v. 排队</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>By morning a long queue of visitors waited at the gate</div>          <div class="mnem"><span class="lbl">记</span>该单词发音很像 queen(女王)。 女王干什么事也要“排队”啊，以显示自己没有 搞特殊，很亲民。</div>          <div class="root"><span class="lbl">根</span>发音同字母 Q → 队伍像 Q 的尾巴</div>          <div class="zt"><span class="lbl">真题</span>Discrimination by age, long-term unemployment, and the fact that they&#x27;re now at the end of the hiring queue just don&#x27;t make it sensible to invest in them. 年龄歧视、长期失 业，以及他们现在排在招聘队伍末尾的事实，这 些都让投资他们变得不明智。 (200)</div>          <div class="fam"><span class="lbl">族</span>queue v. 排队 / jump the queue 插队</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">regal</span>
+          <span class="ipa">/&#x27;ri:gl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">帝王的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and a regal, upright face</div>          <div class="mnem"><span class="lbl">记</span>legal法律的，法律允许的，合 法的。把1去掉换上r，就是这个单词。以前， “帝王的”话就是法律！r想成皇冠上的花形。</div>          <div class="root"><span class="lbl">根</span>legal(合法) 把 l 换成 r → 帝王的话就是法律</div>          <div class="zt"><span class="lbl">真题</span>The actor has a distinctive regal air about him.这位演员身上有一种独特的帝王气质。</div>          <div class="fam"><span class="lbl">族</span>regally adv. 帝王般地 / regalia n. 王权标志</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">upright</span>
+          <span class="ipa">/&#x27;Λprait/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">直立的;竖直的;正直的；诚实的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and a regal, upright face</div>          <div class="root"><span class="lbl">根</span>up(向上) + right(直) → 向上挺直 → 直立的；正直的</div>          <div class="zt"><span class="lbl">真题</span>They decide to try walking because there&#x27;s more to see and do when they stand upright.他们决定尝试走路，因为当他们站直时 能看到更多的东西，也能做更多的事情。</div>          <div class="fam"><span class="lbl">族</span>uprightly adv. 正直地 / uprightness n. 正直</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">vertical</span>
+          <span class="ipa">/&#x27;v3:tıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">垂直的，直立的，纵向的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The queen stood vertical and still in the frame</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“我踢科”，想象 科(人名)直立在那，我去踢他→直立的。</div>          <div class="root"><span class="lbl">根</span>vert(转) + ical → 转向顶点 → 垂直的</div>          <div class="zt"><span class="lbl">真题</span>In 2004, the completed CIS tower became Europe&#x27;s largest range of vertical solar panels. 2004 年，建成的CIS 塔成为欧洲最大的 垂直太阳能电池板。(2018)</div>          <div class="fam"><span class="lbl">族</span>vertically adv. 垂直地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">moral</span>
+          <span class="ipa">/&#x27;mərəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">道德的;道德上的;品行端正的；有道德的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and that a moral restorer must be honest in small things</div>          <div class="mnem"><span class="lbl">记</span>m想象成妈妈；oral 口头上。 妈妈口头上教育我们不能闯红灯，要有礼貌。 所以妈妈口头上的教育也是“有道德的”。</div>          <div class="root"><span class="lbl">根</span>m(想成妈妈) + oral(口头) → 妈妈口头教我们讲道德</div>          <div class="zt"><span class="lbl">真题</span>They make sensible decisions when facing moral dilemmas. 面对道德困境时，他们 会做出明智的决定。</div>          <div class="fam"><span class="lbl">族</span>morality n. 道德 / morally adv. 道德上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">merit</span>
+          <span class="ipa">/&#x27;merit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">优点；美德；价值</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that real merit is not praise but virtue</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以拆分为：我(me) 把一朵花(r想成花)送它(it)，说明它的“优点， 美德”很多啊。</div>          <div class="root"><span class="lbl">根</span>me(我) + r(花) + it(它) → 我送它一朵花 → 优点</div>          <div class="zt"><span class="lbl">真题</span>In social sciences, this is known as examining “near misses&quot; and “narrow wins&quot; in areas where merit is subjective. 在社会科学领 域，这被称为是对主观价值领域的“侥幸”和“险 胜”的测试。(2021)</div>          <div class="fam"><span class="lbl">族</span>meritorious adj. 有功的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">virtue</span>
+          <span class="ipa">/&#x27;vs:rt∫u:/</span>
+          <span class="pos"></span>
+          <span class="cn">高尚的道德；正直的品性；德行；美德；优秀品 质；良好习惯；优点；长处；用处</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that real merit is not praise but virtue</div>          <div class="mnem"><span class="lbl">记</span>六(vi,罗马数字六)朵花(r想象 成花)，小时候我们得到的小红花越多，说明我 们的“优点，美德”越多。</div>          <div class="root"><span class="lbl">根</span>vi(罗马数字六) + r(花) → 六朵小红花 → 美德</div>          <div class="zt"><span class="lbl">真题</span>Curiosity is a much-overlooked human virtue, crucial to our success, and that we are losing it. 好奇心是一种经常被忽视的人类美 德，它对我们的成功至关重要，但我们正在失 去它。</div>          <div class="fam"><span class="lbl">族</span>virtuous adj. 有美德的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">violent</span>
+          <span class="ipa">/&#x27;vaiələnt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">暴力的;猛烈的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One night a violent storm shook the palace</div>          <div class="mnem"><span class="lbl">记</span>vi六个(人)；o想象成一个圈； lent借。连在一起就是“六个人围成一个圈，找你 借钱”。是借钱吗？一看就是要打你→暴力的。</div>          <div class="root"><span class="lbl">根</span>vi(六个人) + o(圈) + lent(借) → 围圈找你借钱</div>          <div class="zt"><span class="lbl">真题</span>Do violent video games lead to violence? 暴力电子游戏会导致暴力吗？</div>          <div class="fam"><span class="lbl">族</span>violence n. 暴力 / violently adv. 猛烈地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">violate</span>
+          <span class="ipa">/&#x27;vaiəlert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">违反；侵犯，妨碍；亵渎</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and someone tried to violate the seals on the door</div>          <div class="mnem"><span class="lbl">记</span>该单词类似violent，但是该单 词是六个人围成一个圈，商量一起迟到(late)的 问题，这是在“违反，妨碍”学校的规章啊。 第八单元</div>          <div class="root"><span class="lbl">根</span>vi(六个人) + o(圈) + late(迟到) → 商量一起迟到</div>          <div class="zt"><span class="lbl">真题</span>When babies&#x27;expectations are violated in experiments like the ones performed with the cats, they react much like their animal friends. 当婴儿的期望在如同用猫执行的实验中那样被 违背时，他们的反应就像他们的动物朋友一样。 (2018)</div>          <div class="fam"><span class="lbl">族</span>violation n. 违反 / violator n. 违反者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">isolate</span>
+          <span class="ipa">/&#x27;aisəleit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)隔离，孤立，脱离</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>For six months she was isolated in the north room</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以解释为：爱得(i) 如此(so)晚(late)。听过刘若英的《后来》吗？ “后来终于在眼泪中明白，有些人一旦错过就不 在”，爱人不在了，你就“孤单，孤立”了。</div>          <div class="root"><span class="lbl">根</span>i(爱) + so(如此) + late(晚) → 爱得太晚 → 孤立</div>          <div class="zt"><span class="lbl">真题</span>This means that, without a smartphone, teens are likely to feel isolated from their peers.这意味着，没有智能手机，青少年可能会 感到与同龄人隔绝。</div>          <div class="fam"><span class="lbl">族</span>isolation n. 隔离 / isolated adj. 孤立的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">navigate</span>
+          <span class="ipa">/&#x27;nævigeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">航行；导航；穿过；穿越</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>learning to navigate the dark stairs with a lamp</div>          <div class="mnem"><span class="lbl">记</span>na 汉语拼音读成“那”；vi 六； gate门。连在一起就是：那六扇门。想象你在 海上游玩，被风卷到一个荒岛上，岛上荒芜人 烟。正在害怕的时候，你突然看到不远处有那 六扇门，第一反应是干什么？将六扇门做成船， 航行逃跑啊→航行。</div>          <div class="root"><span class="lbl">根</span>nav(船) + ig(走) + ate → 驾船走 → 航行</div>          <div class="zt"><span class="lbl">真题</span>He navigates around a swelling crowd at the Rialto Bridge. 他在里亚托桥拥挤的人群中 穿行。</div>          <div class="fam"><span class="lbl">族</span>navigation n. 航行 / navigator n. 领航员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">vibrate</span>
+          <span class="ipa">/vaı&#x27;breit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">振动，颤动，摇摆</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The floor vibrated each time the great doors opened</div>          <div class="root"><span class="lbl">根</span>vibr(震动) + ate(动词后缀) → 振动</div>          <div class="fam"><span class="lbl">族</span>vibration n. 振动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">via</span>
+          <span class="ipa">/&#x27;vaiə; &#x27;vi:ə/</span>
+          <span class="pos">prep.</span>
+          <span class="cn">经由，经过；通过，凭借</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and she sent her reports to the office via a young guard</div>          <div class="mnem"><span class="lbl">记</span>a想成小乌龟；vi六个。那就是 兔子要过河，从六个小乌龟身上“经过”。 (201)</div>          <div class="root"><span class="lbl">根</span>拉丁语 via = 路 → 经由</div>          <div class="zt"><span class="lbl">真题</span>Emergency workers have made contact with the miners via radio. 紧急救援人员通过无 线电与矿工取得了联系。(2016)</div>          <div class="fam"><span class="lbl">族</span>by way of 经由</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 8 · Day 53</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

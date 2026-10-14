@@ -1,0 +1,697 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 51 · The Post Office on the Corner</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 51 · 12/2 · Unit 8 第 1501-1530 词</div>
+  <h1>The Post Office on the Corner<span class="cn">街角的邮局</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-51.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4352"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">old</span> <span class="w target" data-s="341" data-e="811" title="邮递员">postman,</span> <span class="w" data-s="981" data-e="1109">Mr.</span> <span class="w" data-s="1195" data-e="1621">Zhao,</span> <span class="w" data-s="1792" data-e="1963">had</span> <span class="w" data-s="2261" data-e="2475">worked</span> <span class="w" data-s="2517" data-e="2731">in</span> <span class="w" data-s="2773" data-e="2816">the</span> <span class="w" data-s="2859" data-e="2944">little</span> <span class="w target" data-s="2987" data-e="3157" title="邮费，邮资；邮票；邮寄，邮递">post</span> <span class="w" data-s="3200" data-e="3456">office</span> <span class="w" data-s="3499" data-e="3840">for</span> <span class="w" data-s="3883" data-e="4181">forty</span> <span class="w" data-s="4224" data-e="4352">years.</span></p><p class="zh">老邮递员赵先生在那间小小的邮局里干了四十年。</p></div>
+<div class="pair" data-s0="4693" data-s1="7339"><p class="en"><span class="w" data-s="4693" data-e="4949">He</span> <span class="w" data-s="5248" data-e="5675">knew</span> <span class="w" data-s="5717" data-e="5803">the</span> <span class="w target" data-s="5845" data-e="6144" title="邮费，邮资；邮票；邮寄，邮递">postage</span> <span class="w" data-s="6187" data-e="6357">of</span> <span class="w" data-s="6400" data-e="6485">every</span> <span class="w" data-s="6528" data-e="6741">country</span> <span class="w" data-s="6784" data-e="7083">by</span> <span class="w" data-s="7125" data-e="7339">heart.</span></p><p class="zh">他凭记忆就知道每个国家的邮费。</p></div>
+<div class="pair" data-s0="8026" data-s1="11951"><p class="en"><span class="w" data-s="8026" data-e="8197">Every</span> <span class="w target" data-s="8239" data-e="8709" title="明信片">postcard</span> <span class="w" data-s="8751" data-e="8965">and</span> <span class="w" data-s="9007" data-e="9135">every</span> <span class="w target" data-s="9178" data-e="9519" title="(商品的)小包装纸袋，小硬纸板盒；(邮政)小 件包裹">packet</span> <span class="w" data-s="9562" data-e="9690">was</span> <span class="w target" data-s="9733" data-e="10074" title="收拾(行李)；装(箱) η.(商品的)纸包，纸 袋，纸盒 v. 把……打包，包装">packed,</span> <span class="w target" data-s="10245" data-e="10586" title="包，裹；用……绕住；使文字换行n.披肩， 围巾；包裹物">wrapped</span> <span class="w" data-s="10629" data-e="10799">and</span> <span class="w" data-s="10842" data-e="11226">sorted</span> <span class="w" data-s="11269" data-e="11397">by</span> <span class="w" data-s="11439" data-e="11567">his</span> <span class="w" data-s="11610" data-e="11738">own</span> <span class="w" data-s="11781" data-e="11951">hands.</span></p><p class="zh">每一张明信片、每一个小包，都是他亲手打包、包裹、分拣的。</p></div>
+<div class="pair" data-s0="12463" data-s1="14853"><p class="en"><span class="w" data-s="12463" data-e="13018">&quot;A</span> <span class="w target" data-s="13103" data-e="13530" title="包裹，小包，邮包">parcel</span> <span class="w" data-s="13573" data-e="13743">is</span> <span class="w" data-s="13786" data-e="13871">not</span> <span class="w" data-s="13914" data-e="14127">paper,&quot;</span> <span class="w" data-s="14639" data-e="14682">he</span> <span class="w" data-s="14725" data-e="14853">said.</span></p><p class="zh">“一个包裹不是纸，”他说。</p></div>
+<div class="pair" data-s0="15493" data-s1="16559"><p class="en"><span class="w" data-s="15493" data-e="15621">&quot;It</span> <span class="w" data-s="15791" data-e="15919">is</span> <span class="w" data-s="15962" data-e="16346">somebody&#x27;s</span> <span class="w" data-s="16389" data-e="16559">week.&quot;</span></p><p class="zh">“那是别人的一整个星期。”</p></div>
+<div class="pair" data-s0="17029" data-s1="19503"><p class="en"><span class="w" data-s="17029" data-e="17541">He</span> <span class="w" data-s="17583" data-e="17711">was</span> <span class="w" data-s="17754" data-e="17882">never</span> <span class="w target" data-s="17925" data-e="18351" title="缺席的；不存在的 adj. 心不在焉的 absence /&#x27;æbsəns/ n. 缺席">absent</span> <span class="w" data-s="18394" data-e="18650">and</span> <span class="w" data-s="18693" data-e="18991">always</span> <span class="w target" data-s="19034" data-e="19503" title="严守时刻的，准时的">punctual.</span></p><p class="zh">他从不缺席，也总是准时。</p></div>
+<div class="pair" data-s0="20154" data-s1="25572"><p class="en"><span class="w" data-s="20154" data-e="20239">If</span> <span class="w" data-s="20282" data-e="20367">a</span> <span class="w" data-s="20410" data-e="20538">train</span> <span class="w" data-s="20580" data-e="20794">was</span> <span class="w" data-s="20836" data-e="21007">late,</span> <span class="w" data-s="21263" data-e="21434">he</span> <span class="w" data-s="21732" data-e="21818">would</span> <span class="w" data-s="21860" data-e="21988">not</span> <span class="w target" data-s="22031" data-e="22500" title="延迟；延期；展缓">postpone</span> <span class="w" data-s="22543" data-e="22671">the</span> <span class="w" data-s="22714" data-e="23055">delivery;</span> <span class="w" data-s="23268" data-e="23610">a</span> <span class="w target" data-s="23652" data-e="23951" title="延期；耽搁；延误v. 延迟；延期；推迟">delay</span> <span class="w" data-s="23994" data-e="24122">of</span> <span class="w" data-s="24164" data-e="24250">one</span> <span class="w" data-s="24292" data-e="24463">hour</span> <span class="w" data-s="24506" data-e="24762">was</span> <span class="w" data-s="24804" data-e="24932">a</span> <span class="w" data-s="24975" data-e="25103">small</span> <span class="w" data-s="25146" data-e="25572">crime.</span></p><p class="zh">如果火车晚点，他也不会推迟投递；在他看来，耽搁一个小时就是小罪过。</p></div>
+<div class="pair" data-s0="25786" data-s1="28900"><p class="en"><span class="w" data-s="25786" data-e="26127">He</span> <span class="w" data-s="26170" data-e="26340">could</span> <span class="w target" data-s="26383" data-e="26682" title="弄清楚，查明">ascertain</span> <span class="w" data-s="26724" data-e="26980">at</span> <span class="w" data-s="27023" data-e="27151">once</span> <span class="w" data-s="27194" data-e="27492">which</span> <span class="w" data-s="27535" data-e="27748">letter</span> <span class="w" data-s="27791" data-e="28004">had</span> <span class="w" data-s="28047" data-e="28132">been</span> <span class="w" data-s="28175" data-e="28303">written</span> <span class="w" data-s="28346" data-e="28516">in</span> <span class="w" data-s="28559" data-e="28687">a</span> <span class="w" data-s="28730" data-e="28900">hurry.</span></p><p class="zh">他一眼就能查明哪封信是匆匆忙忙写的。</p></div>
+<div class="pair" data-s0="29419" data-s1="31125"><p class="en"><span class="w" data-s="29419" data-e="29547">This</span> <span class="w" data-s="29589" data-e="29760">spring</span> <span class="w" data-s="29803" data-e="30144">he</span> <span class="w" data-s="30229" data-e="30443">decided</span> <span class="w" data-s="30485" data-e="30741">to</span> <span class="w" data-s="30784" data-e="31125">retire.</span></p><p class="zh">今年春天，他决定退休。</p></div>
+<div class="pair" data-s0="31381" data-s1="35392"><p class="en"><span class="w" data-s="31381" data-e="31467">The</span> <span class="w" data-s="31509" data-e="31595">town</span> <span class="w" data-s="31637" data-e="31936">wanted</span> <span class="w" data-s="31979" data-e="32149">to</span> <span class="w target" data-s="32192" data-e="32363" title="颁发；授予；显示，表现；提出，陈述n. 礼物； 目前 adj.现存的；当前的；出现的；在场的">present</span> <span class="w" data-s="32405" data-e="32619">him</span> <span class="w" data-s="32661" data-e="32832">with</span> <span class="w" data-s="32875" data-e="32917">a</span> <span class="w" data-s="32960" data-e="33131">gift,</span> <span class="w" data-s="33301" data-e="33728">and</span> <span class="w" data-s="33771" data-e="33899">the</span> <span class="w" data-s="33941" data-e="34197">mayor</span> <span class="w" data-s="34240" data-e="34368">would</span> <span class="w target" data-s="34411" data-e="34581" title="代表；作为……的代言人；维护……的利益">represent</span> <span class="w" data-s="34624" data-e="35008">the</span> <span class="w" data-s="35051" data-e="35136">whole</span> <span class="w" data-s="35179" data-e="35392">town.</span></p><p class="zh">镇上想送他一份礼物，仪式由镇长代表全镇来办。</p></div>
+<div class="pair" data-s0="36160" data-s1="40768"><p class="en"><span class="w" data-s="36160" data-e="36203">&quot;On</span> <span class="w target" data-s="36245" data-e="36501" title="代表；利益；维护，支持">behalf</span> <span class="w" data-s="36544" data-e="36715">of</span> <span class="w" data-s="36757" data-e="37013">everyone,&quot;</span> <span class="w" data-s="37440" data-e="37611">the</span> <span class="w" data-s="37653" data-e="37867">mayor</span> <span class="w" data-s="37909" data-e="38037">said,</span> <span class="w" data-s="38336" data-e="38507">&quot;we</span> <span class="w" data-s="38677" data-e="38848">ask</span> <span class="w" data-s="38891" data-e="39147">for</span> <span class="w" data-s="39189" data-e="39275">your</span> <span class="w target" data-s="39317" data-e="39573" title="同意；准许；允许">consent</span> <span class="w" data-s="39616" data-e="39872">to</span> <span class="w" data-s="39915" data-e="40000">a</span> <span class="w" data-s="40043" data-e="40128">small</span> <span class="w" data-s="40171" data-e="40768">ceremony.&quot;</span></p><p class="zh">“代表所有人，”镇长说，“我们请求你同意办一场小小的仪式。”</p></div>
+<div class="pair" data-s0="41152" data-s1="44616"><p class="en"><span class="w" data-s="41152" data-e="41408">But</span> <span class="w" data-s="41451" data-e="41621">Mr.</span> <span class="w" data-s="42568" data-e="42952">Zhao</span> <span class="w target" data-s="42995" data-e="43336" title="怨恨；感到气愤；愤愤不平">resented</span> <span class="w" data-s="43379" data-e="43507">the</span> <span class="w" data-s="43550" data-e="43720">idea</span> <span class="w" data-s="43763" data-e="44019">of</span> <span class="w" data-s="44062" data-e="44104">a</span> <span class="w" data-s="44147" data-e="44616">ceremony.</span></p><p class="zh">可赵先生对这种仪式感到气愤。</p></div>
+<div class="pair" data-s0="44744" data-s1="47518"><p class="en"><span class="w" data-s="44744" data-e="45299">He</span> <span class="w" data-s="45342" data-e="45640">did</span> <span class="w" data-s="45683" data-e="45811">not</span> <span class="w" data-s="45854" data-e="46024">want</span> <span class="w" data-s="46067" data-e="46195">to</span> <span class="w" data-s="46238" data-e="46323">be</span> <span class="w" data-s="46366" data-e="46451">a</span> <span class="w target" data-s="46494" data-e="46963" title="代表；典型 adj. 代表的；典型的">representative</span> <span class="w" data-s="47006" data-e="47262">of</span> <span class="w" data-s="47304" data-e="47518">anything.</span></p><p class="zh">他不想当任何人的代表。</p></div>
+<div class="pair" data-s0="47816" data-s1="53022"><p class="en"><span class="w" data-s="47816" data-e="48030">His</span> <span class="w" data-s="48414" data-e="48968">granddaughter</span> <span class="w" data-s="49011" data-e="49310">Lin</span> <span class="w" data-s="49352" data-e="49694">worked</span> <span class="w" data-s="49822" data-e="50035">at</span> <span class="w" data-s="50078" data-e="50163">the</span> <span class="w target" data-s="50206" data-e="50547" title="">embassy</span> <span class="w" data-s="50590" data-e="50718">in</span> <span class="w" data-s="50760" data-e="50803">the</span> <span class="w" data-s="50846" data-e="50974">capital,</span> <span class="w" data-s="51315" data-e="51528">as</span> <span class="w" data-s="51656" data-e="51955">an</span> <span class="w" data-s="51998" data-e="52382">assistant</span> <span class="w" data-s="52424" data-e="52552">to</span> <span class="w" data-s="52595" data-e="52680">a</span> <span class="w target" data-s="52723" data-e="53022" title="外交官">diplomat.</span></p><p class="zh">他的孙女林在首都的大使馆工作，给一位外交官当助理。</p></div>
+<div class="pair" data-s0="53611" data-s1="60992"><p class="en"><span class="w" data-s="53611" data-e="53739">She</span> <span class="w" data-s="53781" data-e="53952">came</span> <span class="w" data-s="53995" data-e="54208">home</span> <span class="w" data-s="54251" data-e="54507">with</span> <span class="w" data-s="54549" data-e="54720">three</span> <span class="w" data-s="54763" data-e="55104">papers</span> <span class="w" data-s="55147" data-e="55317">in</span> <span class="w" data-s="55360" data-e="55445">her</span> <span class="w" data-s="55488" data-e="55616">bag:</span> <span class="w" data-s="56000" data-e="56299">a</span> <span class="w target" data-s="56341" data-e="56853" title="证书，证明书 n. 大使馆 classes and obtain professional certificates for free.他们可以免费参加该平台的所有课程，并 获得专业证书。(2023) n. 执照，许可证">certificate</span> <span class="w" data-s="56896" data-e="56981">for</span> <span class="w" data-s="57024" data-e="57152">her</span> <span class="w" data-s="57195" data-e="57323">language</span> <span class="w" data-s="57365" data-e="57621">course,</span> <span class="w" data-s="57920" data-e="58133">a</span> <span class="w target" data-s="58304" data-e="58688" title="毕业文凭；学位证书 (193) 第八单元">diploma</span> <span class="w" data-s="58731" data-e="58859">from</span> <span class="w" data-s="58901" data-e="58987">the</span> <span class="w" data-s="59029" data-e="59072">night</span> <span class="w" data-s="59115" data-e="59371">school,</span> <span class="w" data-s="59584" data-e="59797">and</span> <span class="w" data-s="59925" data-e="60053">a</span> <span class="w" data-s="60096" data-e="60139">new</span> <span class="w" data-s="60181" data-e="60651">driver&#x27;s</span> <span class="w target" data-s="60693" data-e="60992" title="">license.</span></p><p class="zh">她回家时包里带着三张纸：一张语言课程的证书、一张夜校的文凭，还有一本新的驾照。</p></div>
+<div class="pair" data-s0="61163" data-s1="63808"><p class="en"><span class="w" data-s="61163" data-e="61760">Next</span> <span class="w" data-s="61803" data-e="61973">week</span> <span class="w" data-s="62016" data-e="62315">the</span> <span class="w" data-s="62357" data-e="62613">school</span> <span class="w" data-s="62656" data-e="62912">would</span> <span class="w target" data-s="62955" data-e="63296" title="证明">certify</span> <span class="w" data-s="63339" data-e="63509">her</span> <span class="w" data-s="63552" data-e="63808">results.</span></p><p class="zh">下周学校会为她的成绩出具证明。</p></div>
+<div class="pair" data-s0="64589" data-s1="66381"><p class="en"><span class="w" data-s="64589" data-e="64717">She</span> <span class="w" data-s="64760" data-e="64973">also</span> <span class="w" data-s="65016" data-e="65229">had</span> <span class="w" data-s="65272" data-e="65357">a</span> <span class="w" data-s="65400" data-e="65485">question</span> <span class="w" data-s="65528" data-e="65827">to</span> <span class="w target" data-s="65869" data-e="66381" title="调查；研究">investigate.</span></p><p class="zh">她还有一个问题要调查。</p></div>
+<div class="pair" data-s0="66595" data-s1="69112"><p class="en"><span class="w" data-s="66595" data-e="66851">How</span> <span class="w" data-s="67192" data-e="67363">many</span> <span class="w" data-s="67405" data-e="67576">people</span> <span class="w" data-s="67619" data-e="67875">in</span> <span class="w" data-s="67917" data-e="68003">town</span> <span class="w" data-s="68045" data-e="68387">still</span> <span class="w" data-s="68429" data-e="68685">wrote</span> <span class="w" data-s="68728" data-e="69112">letters?</span></p><p class="zh">镇上还有多少人写信？</p></div>
+<div class="pair" data-s0="69283" data-s1="71075"><p class="en"><span class="w" data-s="69283" data-e="69880">The</span> <span class="w target" data-s="69923" data-e="70264" title="统计数字；统计资料；统计学；(一项)统计 数据">statistic</span> <span class="w" data-s="70307" data-e="70776">surprised</span> <span class="w" data-s="70819" data-e="71075">her.</span></p><p class="zh">统计数字让她吃了一惊。</p></div>
+<div class="pair" data-s0="71288" data-s1="72909"><p class="en"><span class="w" data-s="71288" data-e="71928">Only</span> <span class="w" data-s="71971" data-e="72099">nine</span> <span class="w" data-s="72141" data-e="72568">percent</span> <span class="w" data-s="72611" data-e="72909">did.</span></p><p class="zh">只有百分之九。</p></div>
+<div class="pair" data-s0="73606" data-s1="79835"><p class="en"><span class="w" data-s="73606" data-e="73862">Before</span> <span class="w" data-s="73904" data-e="74118">leaving,</span> <span class="w" data-s="74374" data-e="74587">she</span> <span class="w target" data-s="74758" data-e="75056" title="收拾(行李)；装(箱) η.(商品的)纸包，纸 袋，纸盒 v. 把……打包，包装">packed</span> <span class="w" data-s="75099" data-e="75184">a</span> <span class="w" data-s="75227" data-e="75312">bag,</span> <span class="w" data-s="75611" data-e="75952">bought</span> <span class="w" data-s="75995" data-e="76166">a</span> <span class="w target" data-s="76208" data-e="76464" title="毛巾，手巾">towel</span> <span class="w" data-s="76507" data-e="76592">for</span> <span class="w" data-s="76635" data-e="76720">the</span> <span class="w" data-s="76763" data-e="76848">trip,</span> <span class="w" data-s="77104" data-e="77232">and</span> <span class="w" data-s="77446" data-e="77830">climbed</span> <span class="w" data-s="77872" data-e="77958">the</span> <span class="w" data-s="78000" data-e="78086">old</span> <span class="w target" data-s="78128" data-e="78512" title="塔；塔楼 v. 屹立，高耸">tower</span> <span class="w" data-s="78555" data-e="78683">to</span> <span class="w" data-s="78726" data-e="78811">take</span> <span class="w" data-s="78854" data-e="79195">photos</span> <span class="w" data-s="79238" data-e="79366">of</span> <span class="w" data-s="79408" data-e="79451">the</span> <span class="w" data-s="79494" data-e="79835">roofs.</span></p><p class="zh">走之前，她收拾了行李，为这趟行程买了条毛巾，还爬上那座老塔，拍了几张屋顶的照片。</p></div>
+<div class="pair" data-s0="79963" data-s1="84059"><p class="en"><span class="w" data-s="79963" data-e="80518">On</span> <span class="w" data-s="80560" data-e="80646">the</span> <span class="w" data-s="80688" data-e="80816">last</span> <span class="w" data-s="80859" data-e="81072">evening,</span> <span class="w" data-s="81414" data-e="81755">the</span> <span class="w" data-s="81840" data-e="82182">mayor</span> <span class="w" data-s="82224" data-e="82438">lifted</span> <span class="w" data-s="82480" data-e="82566">a</span> <span class="w" data-s="82608" data-e="82822">cloth</span> <span class="w" data-s="82864" data-e="83078">to</span> <span class="w target" data-s="83120" data-e="83419" title="为……揭幕;公布">unveil</span> <span class="w" data-s="83462" data-e="83632">a</span> <span class="w" data-s="83675" data-e="83760">stone</span> <span class="w" data-s="83803" data-e="84059">sign.</span></p><p class="zh">最后一个晚上，镇长揭开一块布，为一块石牌揭幕。</p></div>
+<div class="pair" data-s0="84787" data-s1="87048"><p class="en"><span class="w" data-s="84787" data-e="84872">For</span> <span class="w" data-s="84915" data-e="85043">a</span> <span class="w" data-s="85085" data-e="85171">moment</span> <span class="w" data-s="85213" data-e="85512">a</span> <span class="w target" data-s="85555" data-e="85725" title="(尤指女用的)面纱，面罩v. 戴面纱；戴面 罩；遮掩；掩饰">veil</span> <span class="w" data-s="85768" data-e="85896">of</span> <span class="w" data-s="85939" data-e="86067">rain</span> <span class="w" data-s="86109" data-e="86536">hung</span> <span class="w" data-s="86579" data-e="86664">over</span> <span class="w" data-s="86707" data-e="86835">the</span> <span class="w" data-s="86877" data-e="87048">street.</span></p><p class="zh">有那么一会儿，一层雨幕似的水汽挂在街道上方。</p></div>
+<div class="pair" data-s0="87304" data-s1="91315"><p class="en"><span class="w" data-s="87304" data-e="87944">Mr.</span> <span class="w" data-s="88115" data-e="88456">Zhao</span> <span class="w" data-s="88499" data-e="88669">read</span> <span class="w" data-s="88712" data-e="88883">the</span> <span class="w" data-s="88925" data-e="89011">words,</span> <span class="w" data-s="89309" data-e="89608">said</span> <span class="w" data-s="89651" data-e="89949">nothing,</span> <span class="w" data-s="90205" data-e="90419">and</span> <span class="w" data-s="90589" data-e="90760">took</span> <span class="w" data-s="90803" data-e="90931">off</span> <span class="w" data-s="90973" data-e="91144">his</span> <span class="w" data-s="91187" data-e="91315">cap.</span></p><p class="zh">赵先生读了读上面的字，什么也没说，摘下了帽子。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">investigate</span>
+          <span class="ipa">/ın&#x27;vestigeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">调查；研究</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She also had a question to investigate</div>          <div class="mnem"><span class="lbl">记</span>这个单词比投资（invest)多了 igate,那投资前我(i)在门口(gate)，先干吗？投 资需谨慎，所以该单词的意思是“调查，研究”。</div>          <div class="root"><span class="lbl">根</span>in(进入) + vestig(足迹) + ate → 顺着足迹进去 → 调查</div>          <div class="zt"><span class="lbl">真题</span>I first began to investigate the basis of human motivation—and how people persevere after setbacks. 我首先开始研究人类动机的基 础—以及人们在遭遇挫折后如何坚持下去。 (2016)</div>          <div class="fam"><span class="lbl">族</span>investigation n. 调查 / investigator n. 调查员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">statistic</span>
+          <span class="ipa">/stə&#x27;tistık/</span>
+          <span class="pos">n.</span>
+          <span class="cn">统计数字；统计资料；统计学；(一项)统计 数据</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The statistic surprised her</div>          <div class="mnem"><span class="lbl">记</span>该单词可以用音标记忆，发音 和拼写是完全一致的。</div>          <div class="root"><span class="lbl">根</span>stat(站立) + istic → 站得住的事实 → 统计数据</div>          <div class="zt"><span class="lbl">真题</span>A man who can recite sports statistics (191) 第八单元 from 30 years ago, may not remember to drop a letter in the mailbox. 一个能背诵 30 年前体 育统计数据的人，可能不记得要往邮箱里投一 封信。</div>          <div class="fam"><span class="lbl">族</span>statistical adj. 统计的 / statistics n. 统计学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">consent</span>
+          <span class="ipa">/kən&#x27;sent/</span>
+          <span class="pos"></span>
+          <span class="cn">同意；准许；允许</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we ask for your consent to a small ceremony</div>          <div class="mnem"><span class="lbl">记</span>都(con)送(sent)给你吧。有一 天我问你：“能不能把你收藏的蒙奇奇都送给 我？”你说：“好的，都送你吧！”这就说明你“同 意”了！</div>          <div class="root"><span class="lbl">根</span>con(共同) + sent(感觉) → 感觉一致 → 同意</div>          <div class="zt"><span class="lbl">真题</span>You should not be afraid to show it or drastically change your behaviors—just ask for consent beforehand！你不应该害怕表现出来或 彻底改变你的行为—只要事先征得同意就 行了！</div>          <div class="fam"><span class="lbl">族</span>consensus n. 共识 / consent v. 同意</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">resent</span>
+          <span class="ipa">/ri&#x27;zent/</span>
+          <span class="pos">v.</span>
+          <span class="cn">怨恨；感到气愤；愤愤不平</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>But Mr. Zhao resented the idea of a ceremony</div>          <div class="mnem"><span class="lbl">记</span>re(再一次，重复)+sent(送)→ 广告反复发送，真是让人心烦，生气。→厌恶， 怨恨。</div>          <div class="root"><span class="lbl">根</span>re(一再) + sent(感觉) → 一再感到不爽 → 怨恨</div>          <div class="fam"><span class="lbl">族</span>resentment n. 怨恨 / resentful adj. 愤恨的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">present</span>
+          <span class="ipa">/&#x27;preznt, prı&#x27;zent/</span>
+          <span class="pos">v.</span>
+          <span class="cn">颁发；授予；显示，表现；提出，陈述n. 礼物； 目前 adj.现存的；当前的；出现的；在场的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The town wanted to present him with a gift</div>          <div class="mnem"><span class="lbl">记</span>提前（pre)送（sent)。提前“出 席”的人介绍了自己，给在座的各位“提出”了一 些建议，“在场”的人都很高兴，“授予”他一些 “礼物”，他“表现”得很开心。</div>          <div class="root"><span class="lbl">根</span>pre(前) + sent(存在) → 出现在面前 → 提出；颁发；在场的</div>          <div class="zt"><span class="lbl">真题</span>They present their views clearly and explicitly. 他们清楚而明确地提出自己的观点。 (2015)</div>          <div class="fam"><span class="lbl">族</span>presence n. 出席 / presentation n. 展示</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">represent</span>
+          <span class="ipa">/ireprı&#x27;zent/</span>
+          <span class="pos">v.</span>
+          <span class="cn">代表；作为……的代言人；维护……的利益</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mayor would represent the whole town</div>          <div class="mnem"><span class="lbl">记</span>re(一再，重复）十 present（出 席；呈现，出现)→一再地为某人出席→代表，作 为代言人。</div>          <div class="root"><span class="lbl">根</span>re(一再) + present(出席) → 一再替人出席 → 代表</div>          <div class="zt"><span class="lbl">真题</span>Red, however, does not always represent good luck and happiness. 然而，红色并不总是 代表好运和幸福。(2016)</div>          <div class="fam"><span class="lbl">族</span>representation n. 代表 / representative n. 代表</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">representative</span>
+          <span class="ipa">/ireprı&#x27;zentətiv/</span>
+          <span class="pos">n.</span>
+          <span class="cn">代表；典型 adj. 代表的；典型的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He did not want to be a representative of anything</div>          <div class="root"><span class="lbl">根</span>represent(代表) + ative(人/物) → 代表者；典型的</div>          <div class="zt"><span class="lbl">真题</span>Only one representative, Jad Tabet from Lebanon，tried to raise the issue. 只有一位代 表试图提出这个问题，他就是黎巴嫩的贾德· 塔贝特。(2018)</div>          <div class="fam"><span class="lbl">族</span>represent v. 代表 / representatively adv. 典型地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">behalf</span>
+          <span class="ipa">/br&#x27;hæf/</span>
+          <span class="pos">n.</span>
+          <span class="cn">代表；利益；维护，支持</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;On behalf of everyone,&quot; the mayor said</div>          <div class="mnem"><span class="lbl">记</span>be(be动词，是)；half一半。 behalf就是“是一半”。我“代表”你，所以我的 出现就是“代表”你的一半。</div>          <div class="root"><span class="lbl">根</span>be(是) + half(一半) → 我代表你，就是你的另一半 → 代表</div>          <div class="zt"><span class="lbl">真题</span>It has ignored campaigns on behalf of the left-handed.它忽视了代表左撇子的运动。 (2021)</div>          <div class="fam"><span class="lbl">族</span>on behalf of 代表 / behalf n. 利益</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">absent</span>
+          <span class="ipa">/&#x27;æbsənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">缺席的；不存在的 adj. 心不在焉的 absence /&#x27;æbsəns/ n. 缺席</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was never absent and always punctual</div>          <div class="mnem"><span class="lbl">记</span>ab表示否定；sent 表示“送”。 absent就是不送。因为我今天不送我女儿去上 学，所以她就“缺席”了。</div>          <div class="root"><span class="lbl">根</span>ab(离开) + sent(存在) → 不在这里 → 缺席的</div>          <div class="zt"><span class="lbl">真题</span>The man was absent from the weekly meeting. 这个人缺席了周会。</div>          <div class="fam"><span class="lbl">族</span>absence n. 缺席 / absentee n. 缺席者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">punctual</span>
+          <span class="ipa">/&#x27;psgkt∫uəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">严守时刻的，准时的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never absent and always punctual</div>          <div class="mnem"><span class="lbl">记</span>该单词的发音类似“胖客车”。 胖客车今天“准时”到达。</div>          <div class="root"><span class="lbl">根</span>punct(点) + ual → 正好卡在点上 → 准时的</div>          <div class="zt"><span class="lbl">真题</span>They should make sure their children are always punctual for school. 他们应该确保他们 的孩子总是准时上学。</div>          <div class="fam"><span class="lbl">族</span>punctuality n. 准时 / punctually adv. 准时地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">postpone</span>
+          <span class="ipa">/peu&#x27;spəun/</span>
+          <span class="pos">v.</span>
+          <span class="cn">延迟；延期；展缓</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would not postpone the delivery</div>          <div class="root"><span class="lbl">根</span>post(在后) + pone(放) → 往后放 → 推迟</div>          <div class="zt"><span class="lbl">真题</span>Millennials seem to be extending this phase of life as they postpone marriage. 千禧— 代似乎通过推迟结婚来延长这一人生阶段。</div>          <div class="fam"><span class="lbl">族</span>postponement n. 延期 / delay v. 推迟</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">postman</span>
+          <span class="ipa">/&#x27;pəustmən/</span>
+          <span class="pos"></span>
+          <span class="cn">邮递员</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old postman, Mr. Zhao, had worked in the little post office</div>          <div class="mnem"><span class="lbl">记</span>post 邮政，邮递；man 人。连 到一起就是“邮递员”。</div>          <div class="root"><span class="lbl">根</span>post(邮政) + man(人) → 送信的人 → 邮递员</div>          <div class="fam"><span class="lbl">族</span>post n. 邮政 / postwoman n. 女邮递员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">postage</span>
+          <span class="ipa">/&#x27;pəustidz/</span>
+          <span class="pos"></span>
+          <span class="cn">邮费，邮资；邮票；邮寄，邮递</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He knew the postage of every country by heart</div>          <div class="mnem"><span class="lbl">记</span>邮寄（post）东西的那个年代 (age)，需要“邮费”啊。</div>          <div class="root"><span class="lbl">根</span>post(邮政) + age(费用) → 邮寄要付的费用 → 邮费</div>          <div class="zt"><span class="lbl">真题</span>The virtues of physical fitness are shown on magazine covers, postage stamps, and television ads. 杂志封面、邮票、电视广告里都 展示了健身的优点。</div>          <div class="fam"><span class="lbl">族</span>post n. 邮件 / postage stamp 邮票</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">postcard</span>
+          <span class="ipa">/&#x27;pəustka:rd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">明信片</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every postcard and every packet was packed</div>          <div class="root"><span class="lbl">根</span>post(邮政) + card(卡片) → 邮寄用的卡片 → 明信片</div>          <div class="zt"><span class="lbl">真题</span>Every day, USPS processes, on average, 493.4 million pieces of mail—anything from postcards to Social Security checks to medicine. 美国邮政平均每天处理4.934 亿封邮件——从 明信片到社会安全支票再到药品，无所不包。</div>          <div class="fam"><span class="lbl">族</span>post n. 邮件 / card n. 卡片</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">delay</span>
+          <span class="ipa">/dı&#x27;lei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">延期；耽搁；延误v. 延迟；延期；推迟</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a delay of one hour was a small crime</div>          <div class="mnem"><span class="lbl">记</span>该单词可以记忆为：往下（de） 放(lay放置)。把一件事情往下放，就是“推迟， 延期”。</div>          <div class="root"><span class="lbl">根</span>de(往下) + lay(放) → 往下放一放 → 推迟，耽搁</div>          <div class="zt"><span class="lbl">真题</span>They should learn to delay gratification (192) (快乐) so that they can pursue abstract goals, like going to college. 他们应该学会延迟满足， 这样他们就可以追求抽象的目标，比如上大学。 (2015)</div>          <div class="fam"><span class="lbl">族</span>delayed adj. 延误的 / delay n. 延误</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">ascertain</span>
+          <span class="ipa">/æsə&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">弄清楚，查明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could ascertain at once which letter had been written in a hurry</div>          <div class="mnem"><span class="lbl">记</span>一再地(as)确定(certain)，那就 是“弄清楚，查明”。</div>          <div class="root"><span class="lbl">根</span>as(一再) + certain(确定) → 一再确定 → 查明</div>          <div class="fam"><span class="lbl">族</span>certain adj. 确定的 / certainly adv. 当然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">certify</span>
+          <span class="ipa">/&#x27;s3:rtifar/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Next week the school would certify her results</div>          <div class="root"><span class="lbl">根</span>cert(确定) + ify(使) → 使变成确定的 → 证明</div>          <div class="fam"><span class="lbl">族</span>certificate n. 证书 / certified adj. 认证的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">certificate</span>
+          <span class="ipa">/sər&#x27;tifikət/</span>
+          <span class="pos">n.</span>
+          <span class="cn">证书，证明书 n. 大使馆 classes and obtain professional certificates for free.他们可以免费参加该平台的所有课程，并 获得专业证书。(2023) n. 执照，许可证</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a certificate for her language course</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“来审视”。听 过审驾照和“执照”吗？</div>          <div class="root"><span class="lbl">根</span>cert(确定) + ific + ate → 用来确认的东西 → 证书</div>          <div class="zt"><span class="lbl">真题</span>You also have to take the time to apply for your marriage license. 你还得花点时间去申 请结婚证。(2023)</div>          <div class="fam"><span class="lbl">族</span>certify v. 证明 / certification n. 认证</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">license</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and a new driver&#x27;s license</div>          <div class="root"><span class="lbl">根</span>lic(允许) + ense → 被允许的凭证 → 执照，许可证</div>          <div class="fam"><span class="lbl">族</span>licensed adj. 有执照的 / licensee n. 持照人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">diploma</span>
+          <span class="ipa">/dr&#x27;pləumə/</span>
+          <span class="pos">n.</span>
+          <span class="cn">毕业文凭；学位证书 (193) 第八单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a diploma from the night school</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“弟(di)扑了 (plo)妈(ma)”。弟弟成绩一向糟糕，竟然能够 顺利大学毕业，拿到了“毕业证”，于是他激动地 扑向了妈妈。</div>          <div class="root"><span class="lbl">根</span>di(二) + plo(折) + ma → 对折的公文 → 文凭</div>          <div class="zt"><span class="lbl">真题</span>They would like to use a driverless car compared with 38 percent of those with a high- school diploma or less. 相比之下，只有 38%的 高中或以下学历的人愿意使用无人驾驶汽车。 (2016)</div>          <div class="fam"><span class="lbl">族</span>diplomat n. 外交官 / diplomatic adj. 外交的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">diplomat</span>
+          <span class="ipa">/&#x27;dıpləmæt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">外交官</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>as an assistant to a diplomat</div>          <div class="mnem"><span class="lbl">记</span>diploma文凭，毕业证书。这个 单词发音类似“弟(弟)扑了妈(妈)”。弟弟大学 毕业了，高兴地扑向妈妈。他毕业后参加工作， 成了他(t想成“他”)一直想成为的“外交官”。</div>          <div class="root"><span class="lbl">根</span>diploma(公文) + t(人) → 拿着公文办事的人 → 外交官</div>          <div class="zt"><span class="lbl">真题</span>Carême&#x27;s creations soon captured the discriminating eye of a French diplomat. 卡莱 姆的作品很快就吸引了一位有鉴赏力的法国外 交官的注意。</div>          <div class="fam"><span class="lbl">族</span>diplomacy n. 外交 / diplomatic adj. 外交的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">embassy</span>
+          <span class="ipa">/&#x27;embəsi/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His granddaughter Lin worked at the embassy in the capital</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：使(em)爸爸 (ba)思(ssy)。发生战乱的时候，爸爸思念国 家，于是前往“大使馆”，请求得到庇护。</div>          <div class="root"><span class="lbl">根</span>em(使) + bass(使者) + y(地方) → 使者的驻地 → 大使馆</div>          <div class="fam"><span class="lbl">族</span>ambassador n. 大使 / ambassadorial adj. 大使的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">pack</span>
+          <span class="ipa">/pæk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">收拾(行李)；装(箱) η.(商品的)纸包，纸 袋，纸盒 v. 把……打包，包装</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was packed, wrapped and sorted by his own hands</div>          <div class="root"><span class="lbl">根</span>靠搭配记：pack a bag 收拾行李 / a pack of 一包</div>          <div class="zt"><span class="lbl">真题</span>One had to quit abruptly on a given day, going from about a pack a day to zero. 一 个人 必须在某一天突然戒烟，从每天一包到零。 (2017)</div>          <div class="fam"><span class="lbl">族</span>package n. 包裹 / packet n. 小包</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">packet</span>
+          <span class="ipa">/&#x27;pækit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(商品的)小包装纸袋，小硬纸板盒；(邮政)小 件包裹</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every packet was packed</div>          <div class="mnem"><span class="lbl">记</span>pack v.打包，包装，把……裹 起来；那 packet就是打包起来的东西→小件 包裹。</div>          <div class="root"><span class="lbl">根</span>pack(打包) + et(小) → 打好的小包 → 小包裹</div>          <div class="zt"><span class="lbl">真题</span>PepsiCo claims a packet of its chips now contains less salt than a slice of white bread. 百 事公司声称，现在一袋薯片的含盐量比一片白 面包还少。</div>          <div class="fam"><span class="lbl">族</span>pack v. 打包 / package n. 包裹</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">parcel</span>
+          <span class="ipa">/&#x27;pa:sl/</span>
+          <span class="pos"></span>
+          <span class="cn">包裹，小包，邮包</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;A parcel is not paper,&quot; he said.</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“怕馊”。妈妈 怕饭馊了，就用袋子把食物“包裹”起来并放入 冰箱。</div>          <div class="root"><span class="lbl">根</span>part(部分) + cel(小) → 分成小份包起来 → 包裹</div>          <div class="zt"><span class="lbl">真题</span>It can be hard to identify which parcels are carrying crucial items. 很难确定哪些包裹 里装的是关键物品。(2019)</div>          <div class="fam"><span class="lbl">族</span>part n. 部分 / package n. 包裹</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">wrap</span>
+          <span class="ipa">/ræp/</span>
+          <span class="pos">v.</span>
+          <span class="cn">包，裹；用……绕住；使文字换行n.披肩， 围巾；包裹物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>packed, wrapped and sorted by his own hands</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“外婆”。外婆冬 天总是用围巾“包裹”着头，防止受风寒。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：外婆 → 外婆用围巾把头包裹起来</div>          <div class="zt"><span class="lbl">真题</span>He seemed wrapped in sadness. 他似乎沉 浸在悲伤之中。</div>          <div class="fam"><span class="lbl">族</span>wrapper n. 包装纸 / wrapping n. 包装材料</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">towel</span>
+          <span class="ipa">/&#x27;tauəl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">毛巾，手巾</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she packed a bag, bought a towel for the trip</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“套哦”。很多 西北人在头上套个“毛巾”。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：套哦 → 往头上一套 → 毛巾</div>          <div class="fam"><span class="lbl">族</span>paper towel 纸巾 / towelette n. 湿巾</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">tower</span>
+          <span class="ipa">/&#x27;tauer/</span>
+          <span class="pos">n.</span>
+          <span class="cn">塔；塔楼 v. 屹立，高耸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>climbed the old tower to take photos of the roofs</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“塔窝”。就是有 很多“塔”啊。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：塔窝 → 塔扎堆的地方 → 塔</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s possible to drive in a matter of minutes from sleek(光亮的) office towers near the airport. 从机场附近光鲜亮丽的办公大楼开 车几分钟就可以到达。(2020)</div>          <div class="fam"><span class="lbl">族</span>towering adj. 高耸的 / tower v. 屹立</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">veil</span>
+          <span class="ipa">/verl/</span>
+          <span class="pos"></span>
+          <span class="cn">(尤指女用的)面纱，面罩v. 戴面纱；戴面 罩；遮掩；掩饰</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>For a moment a veil of rain hung over the street</div>          <div class="mnem"><span class="lbl">记</span>v(罗马数字五)十e(鹅)十il(想 象成ill，生病了)→五只鹅生病了，需要佩戴“面 罩”，防传染。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：帷 → 遮住脸的帷子 → 面纱，遮掩物</div>          <div class="zt"><span class="lbl">真题</span>They see a benefit to successfully veiling their contempt for you. 他们认为成功地掩饰他 们对你的蔑视是有好处的。(2016)</div>          <div class="fam"><span class="lbl">族</span>veiled adj. 掩饰的 / unveil v. 揭幕</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">unveil</span>
+          <span class="ipa">/Δn&#x27;verl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">为……揭幕;公布</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mayor lifted a cloth to unveil a stone sign</div>          <div class="root"><span class="lbl">根</span>un(去掉) + veil(面纱) → 去掉面纱 → 揭幕，公布</div>          <div class="zt"><span class="lbl">真题</span>The cause of the disappearance has been unveiled.失踪的原因已被揭开。(2015)</div>          <div class="fam"><span class="lbl">族</span>veil n. 面纱 / unveiling n. 揭幕仪式</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 8 · Day 51</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

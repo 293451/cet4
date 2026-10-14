@@ -43,9 +43,13 @@ def _strip(w: str) -> str:
     2. `-e` 要剥（revolve→revolv，才能和 revolved→revolv 对上）。
     """
     w = w.lower()
-    for s in SUFFIXES:
-        if len(w) > len(s) + 2 and w.endswith(s):
-            return w[: -len(s)]
+    # 先处理 -ied / -ies：还原成 y（buried ← bury，carries ← carry）
+    for suf in ("ied", "ies"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)] + "y"
+    for suf in SUFFIXES:
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)]
     return w
 
 

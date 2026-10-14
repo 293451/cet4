@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 50 · The Cartoon in the Fishing Town</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 50 · 12/1 · Unit 7~8 第 1471-1500 词</div>
+  <h1>The Cartoon in the Fishing Town<span class="cn">渔村里的动画片</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-50.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3797"><p class="en"><span class="w" data-s="43" data-e="256">Last</span> <span class="w" data-s="299" data-e="512">summer</span> <span class="w" data-s="555" data-e="725">a</span> <span class="w" data-s="768" data-e="853">film</span> <span class="w" data-s="896" data-e="1237">crew</span> <span class="w" data-s="1280" data-e="1365">came</span> <span class="w" data-s="1408" data-e="1536">to</span> <span class="w" data-s="1579" data-e="1664">our</span> <span class="w" data-s="1707" data-e="1835">town</span> <span class="w" data-s="1877" data-e="2091">to</span> <span class="w" data-s="2133" data-e="2219">make</span> <span class="w" data-s="2261" data-e="2347">a</span> <span class="w target" data-s="2389" data-e="2731" title="(报刊中与政治或时事有关的)漫画，讽刺画； 动画片；卡通片">cartoon</span> <span class="w" data-s="2773" data-e="2987">about</span> <span class="w" data-s="3029" data-e="3157">the</span> <span class="w" data-s="3200" data-e="3285">old</span> <span class="w" data-s="3328" data-e="3797">fishermen.</span></p><p class="zh">去年夏天，一个摄制组来到我们镇上，要拍一部关于老渔民的动画片。</p></div>
+<div class="pair" data-s0="3968" data-s1="6144"><p class="en"><span class="w" data-s="3968" data-e="4395">The</span> <span class="w" data-s="4437" data-e="4565">director</span> <span class="w" data-s="4608" data-e="4907">wanted</span> <span class="w" data-s="4949" data-e="5120">to</span> <span class="w target" data-s="5163" data-e="5419" title="描写，描述；画(人物、景象等)">portray</span> <span class="w" data-s="5461" data-e="5589">their</span> <span class="w" data-s="5632" data-e="5760">life</span> <span class="w" data-s="5803" data-e="6144">honestly.</span></p><p class="zh">导演想诚实地描绘他们的生活。</p></div>
+<div class="pair" data-s0="6923" data-s1="11446"><p class="en"><span class="w" data-s="6923" data-e="7136">Every</span> <span class="w" data-s="7179" data-e="7435">morning</span> <span class="w" data-s="7478" data-e="7734">a</span> <span class="w" data-s="7776" data-e="7947">small</span> <span class="w target" data-s="7990" data-e="8203" title="流行音乐乐队；带；箍；条纹；条饰">band</span> <span class="w" data-s="8246" data-e="8587">played</span> <span class="w" data-s="8630" data-e="8758">on</span> <span class="w" data-s="8800" data-e="8886">the</span> <span class="w" data-s="8928" data-e="9099">beach,</span> <span class="w" data-s="9270" data-e="9526">and</span> <span class="w" data-s="9696" data-e="9952">a</span> <span class="w target" data-s="9995" data-e="10123" title="一帮，一群，一伙">gang</span> <span class="w" data-s="10166" data-e="10294">of</span> <span class="w" data-s="10336" data-e="10464">children</span> <span class="w" data-s="10507" data-e="10848">ran</span> <span class="w" data-s="10891" data-e="11062">after</span> <span class="w" data-s="11104" data-e="11275">the</span> <span class="w" data-s="11318" data-e="11446">camera.</span></p><p class="zh">每天早上都有一支小乐队在海滩上演奏，一帮孩子追着摄像机跑。</p></div>
+<div class="pair" data-s0="11744" data-s1="13750"><p class="en"><span class="w" data-s="11744" data-e="12470">Even</span> <span class="w" data-s="12512" data-e="12640">the</span> <span class="w" data-s="12683" data-e="12854">gulls</span> <span class="w target" data-s="12896" data-e="13280" title="(羊或鸟)群；一大群 v. 群集">flocked</span> <span class="w" data-s="13323" data-e="13408">to</span> <span class="w" data-s="13451" data-e="13536">the</span> <span class="w" data-s="13579" data-e="13750">boats.</span></p><p class="zh">连海鸥都成群地飞向渔船。</p></div>
+<div class="pair" data-s0="13920" data-s1="16736"><p class="en"><span class="w" data-s="13920" data-e="14603">The</span> <span class="w" data-s="14646" data-e="14816">story</span> <span class="w" data-s="14859" data-e="15115">was</span> <span class="w" data-s="15158" data-e="15286">a</span> <span class="w target" data-s="15328" data-e="15414" title="战役 v. 斗争">battle</span> <span class="w" data-s="15456" data-e="15755">against</span> <span class="w" data-s="15798" data-e="15968">a</span> <span class="w target" data-s="16011" data-e="16224" title="兽，野兽；牲畜">beast</span> <span class="w" data-s="16267" data-e="16395">from</span> <span class="w" data-s="16438" data-e="16566">the</span> <span class="w" data-s="16608" data-e="16736">hills.</span></p><p class="zh">故事讲的是与山里一头野兽的战役。</p></div>
+<div class="pair" data-s0="17518" data-s1="18713"><p class="en"><span class="w" data-s="17518" data-e="17646">The</span> <span class="w" data-s="17689" data-e="18030">fishermen</span> <span class="w" data-s="18073" data-e="18158">had</span> <span class="w" data-s="18201" data-e="18286">to</span> <span class="w target" data-s="18329" data-e="18500" title="防止；减轻；战斗 n. 战斗">combat</span> <span class="w" data-s="18542" data-e="18713">it.</span></p><p class="zh">渔民们必须与它搏斗。</p></div>
+<div class="pair" data-s0="18841" data-s1="21358"><p class="en"><span class="w" data-s="18841" data-e="19438">They</span> <span class="w target" data-s="19481" data-e="19609" title="打，敲；打败；赢">beat</span> <span class="w" data-s="19652" data-e="20036">drums</span> <span class="w" data-s="20078" data-e="20164">and</span> <span class="w target" data-s="20206" data-e="20292" title="(用手或器具)击，打；撞到；达到 n. 打；击；很受欢迎的人或事物 (189) 第八单元">hit</span> <span class="w" data-s="20334" data-e="20420">the</span> <span class="w" data-s="20462" data-e="20548">water</span> <span class="w" data-s="20590" data-e="20804">with</span> <span class="w" data-s="20846" data-e="21017">long</span> <span class="w" data-s="21060" data-e="21358">poles.</span></p><p class="zh">他们敲鼓，用长竿打水。</p></div>
+<div class="pair" data-s0="21614" data-s1="24132"><p class="en"><span class="w" data-s="21614" data-e="22212">The</span> <span class="w" data-s="22254" data-e="22425">young</span> <span class="w" data-s="22468" data-e="22638">hero</span> <span class="w" data-s="22681" data-e="22937">never</span> <span class="w" data-s="22980" data-e="23150">used</span> <span class="w" data-s="23193" data-e="23364">a</span> <span class="w target" data-s="23406" data-e="23620" title="锤子，榔头 v. 锤打；敲打">hammer</span> <span class="w" data-s="23662" data-e="23790">or</span> <span class="w" data-s="23833" data-e="23961">a</span> <span class="w target" data-s="24004" data-e="24132" title="重拳击打；用力的捶打 v. 拳打；以拳痛击">punch.</span></p><p class="zh">年轻的男主角从没用过锤子，也没挥过拳头。</p></div>
+<div class="pair" data-s0="24345" data-s1="28228"><p class="en"><span class="w" data-s="24345" data-e="24729">He</span> <span class="w" data-s="24857" data-e="25070">only</span> <span class="w" data-s="25113" data-e="25369">tied</span> <span class="w" data-s="25412" data-e="25454">a</span> <span class="w target" data-s="25497" data-e="25753" title="">bandage</span> <span class="w" data-s="25796" data-e="26009">around</span> <span class="w" data-s="26052" data-e="26180">the</span> <span class="w" data-s="26222" data-e="26521">animal&#x27;s</span> <span class="w" data-s="26564" data-e="26649">leg,</span> <span class="w" data-s="26905" data-e="27118">and</span> <span class="w" data-s="27161" data-e="27545">the</span> <span class="w target" data-s="27588" data-e="27716" title="兽，野兽；牲畜">beast</span> <span class="w" data-s="27758" data-e="27929">walked</span> <span class="w" data-s="27972" data-e="28228">away.</span></p><p class="zh">他只是把一条绷带缠在野兽的腿上，那头野兽就走开了。</p></div>
+<div class="pair" data-s0="28915" data-s1="34035"><p class="en"><span class="w" data-s="28915" data-e="29085">In</span> <span class="w" data-s="29128" data-e="29384">July</span> <span class="w" data-s="29427" data-e="29725">the</span> <span class="w" data-s="29768" data-e="29896">town</span> <span class="w" data-s="29939" data-e="30109">is</span> <span class="w" data-s="30152" data-e="30195">a</span> <span class="w" data-s="30237" data-e="30365">quiet</span> <span class="w target" data-s="30408" data-e="30792" title="求助，诉诸，求助(凭借)的对象；(度假)胜地 v. (～to)求助于，诉诸，采取">resort,</span> <span class="w" data-s="30963" data-e="31261">and</span> <span class="w" data-s="31304" data-e="31432">the</span> <span class="w" data-s="31475" data-e="31560">director</span> <span class="w" data-s="31603" data-e="31944">was</span> <span class="w" data-s="31987" data-e="32072">a</span> <span class="w target" data-s="32115" data-e="32456" title="最优秀的；第一流的；典型的 n.(书、电 影或歌曲的)经典作品，名著，杰作">classic</span> <span class="w" data-s="32499" data-e="32669">city</span> <span class="w" data-s="32712" data-e="32883">man</span> <span class="w" data-s="32925" data-e="33224">from</span> <span class="w" data-s="33267" data-e="33352">a</span> <span class="w target" data-s="33395" data-e="33693" title="中产阶级的；中等收入阶层的；典型中产阶 级特色的;带有中产阶级传统观念的；古板的">middle-class</span> <span class="w" data-s="33736" data-e="34035">family.</span></p><p class="zh">七月里小镇是个安静的度假胜地，而导演是个典型的中产阶级出身的城里人。</p></div>
+<div class="pair" data-s0="34333" data-s1="36893"><p class="en"><span class="w" data-s="34333" data-e="34803">He</span> <span class="w" data-s="34845" data-e="35187">liked</span> <span class="w" data-s="35229" data-e="35357">to</span> <span class="w target" data-s="35400" data-e="35784" title="将……分类；将……归类">classify</span> <span class="w" data-s="35827" data-e="36040">people</span> <span class="w" data-s="36083" data-e="36339">by</span> <span class="w" data-s="36381" data-e="36509">their</span> <span class="w" data-s="36552" data-e="36893">jobs.</span></p><p class="zh">他喜欢按职业给人分类。</p></div>
+<div class="pair" data-s0="37064" data-s1="40691"><p class="en"><span class="w" data-s="37064" data-e="37661">With</span> <span class="w" data-s="37704" data-e="37917">money</span> <span class="w" data-s="37960" data-e="38131">from</span> <span class="w" data-s="38173" data-e="38259">the</span> <span class="w" data-s="38301" data-e="38429">city</span> <span class="w" data-s="38472" data-e="38685">he</span> <span class="w" data-s="38728" data-e="38941">also</span> <span class="w" data-s="38984" data-e="39240">wanted</span> <span class="w" data-s="39283" data-e="39453">to</span> <span class="w target" data-s="39496" data-e="39837" title="使(机器、计算机系统等)升级；提高；改进；提 升;提拔">upgrade</span> <span class="w" data-s="39880" data-e="40008">the</span> <span class="w" data-s="40051" data-e="40179">old</span> <span class="w" data-s="40221" data-e="40691">cinema.</span></p><p class="zh">带着城里来的钱，他还想把老电影院升级一下。</p></div>
+<div class="pair" data-s0="40947" data-s1="45128"><p class="en"><span class="w" data-s="40947" data-e="41075">One</span> <span class="w" data-s="41117" data-e="41331">evening</span> <span class="w" data-s="41373" data-e="41587">there</span> <span class="w" data-s="41629" data-e="42141">was</span> <span class="w" data-s="42184" data-e="42227">a</span> <span class="w" data-s="42269" data-e="42355">long</span> <span class="w target" data-s="42397" data-e="42781" title="(各自发表不同意见的)争论，辩论，讨论 v.(尤指正式)讨论，辩论">debate,</span> <span class="w" data-s="42952" data-e="43464">almost</span> <span class="w" data-s="43507" data-e="43763">a</span> <span class="w target" data-s="43805" data-e="44189" title="争论；辩论；争端；纠纷v.对……提出质 询;对……表示异议(或怀疑)">dispute,</span> <span class="w" data-s="44317" data-e="44744">about</span> <span class="w" data-s="44787" data-e="44957">the</span> <span class="w" data-s="45000" data-e="45128">ending.</span></p><p class="zh">一天晚上，关于结局有一场漫长的争论，几乎算得上争吵。</p></div>
+<div class="pair" data-s0="46035" data-s1="47315"><p class="en"><span class="w" data-s="46035" data-e="46120">A</span> <span class="w" data-s="46163" data-e="46334">young</span> <span class="w" data-s="46376" data-e="46718">editor</span> <span class="w" data-s="46760" data-e="46974">gave</span> <span class="w" data-s="47016" data-e="47144">a</span> <span class="w target" data-s="47187" data-e="47315" title="&amp; v. 暗示，提示">hint.</span></p><p class="zh">一位年轻剪辑师给了个暗示。</p></div>
+<div class="pair" data-s0="47955" data-s1="49406"><p class="en"><span class="w" data-s="47955" data-e="47998">&quot;Do</span> <span class="w" data-s="48040" data-e="48211">not</span> <span class="w" data-s="48254" data-e="48424">just</span> <span class="w" data-s="48467" data-e="48595">say</span> <span class="w" data-s="48638" data-e="48851">it,&quot;</span> <span class="w" data-s="49107" data-e="49192">he</span> <span class="w" data-s="49235" data-e="49406">said.</span></p><p class="zh">“别只是说出来，”他说。</p></div>
+<div class="pair" data-s0="50003" data-s1="52563"><p class="en"><span class="w target" data-s="50003" data-e="50472" title="证明；证实；论证；说明，表现；显露">&quot;Demonstrate</span> <span class="w" data-s="50515" data-e="50686">it.</span> <span class="w target" data-s="50814" data-e="51582" title="(用示例、图画等)说明，解释">Illustrate</span> <span class="w" data-s="51624" data-e="51710">it</span> <span class="w" data-s="51752" data-e="51880">with</span> <span class="w" data-s="51923" data-e="52008">a</span> <span class="w" data-s="52051" data-e="52136">short</span> <span class="w target" data-s="52179" data-e="52563" title="集会示威;游行示威；示范；样品 v. 试用；演示">demo.&quot;</span></p><p class="zh">“要演示出来。用一个短短的样品展示出来。”</p></div>
+<div class="pair" data-s0="52904" data-s1="57043"><p class="en"><span class="w" data-s="52904" data-e="53374">His</span> <span class="w" data-s="53416" data-e="53587">words</span> <span class="w" data-s="53630" data-e="53971">seemed</span> <span class="w" data-s="54014" data-e="54184">to</span> <span class="w target" data-s="54227" data-e="54483" title="暗示；暗指；表明">imply</span> <span class="w" data-s="54526" data-e="54739">a</span> <span class="w" data-s="54782" data-e="55123">warning,</span> <span class="w" data-s="55208" data-e="55464">though</span> <span class="w" data-s="55678" data-e="55848">the</span> <span class="w" data-s="55891" data-e="56147">warning</span> <span class="w" data-s="56190" data-e="56318">was</span> <span class="w" data-s="56360" data-e="56531">only</span> <span class="w target" data-s="56574" data-e="57043" title="含蓄的;不直接的；固有的；无疑问的">implicit.</span></p><p class="zh">他话里似乎暗示着一个警告，尽管那警告只是含蓄的。</p></div>
+<div class="pair" data-s0="57607" data-s1="58545"><p class="en"><span class="w" data-s="57607" data-e="57692">He</span> <span class="w" data-s="57735" data-e="57820">was</span> <span class="w" data-s="57863" data-e="57991">never</span> <span class="w target" data-s="58033" data-e="58545" title="明确的；清楚的；直截了当的;不隐晦的">explicit.</span></p><p class="zh">他从不明说。</p></div>
+<div class="pair" data-s0="58844" data-s1="62385"><p class="en"><span class="w" data-s="58844" data-e="59740">&quot;Every</span> <span class="w" data-s="59783" data-e="60039">picture</span> <span class="w" data-s="60081" data-e="60380">must</span> <span class="w target" data-s="60423" data-e="60849" title="传达；输送；传送；表达">convey</span> <span class="w" data-s="60892" data-e="61063">one</span> <span class="w" data-s="61105" data-e="61404">feeling,&quot;</span> <span class="w" data-s="61788" data-e="62129">he</span> <span class="w" data-s="62172" data-e="62385">added.</span></p><p class="zh">“每一幅画面都必须传达一种情绪，”他补充道。</p></div>
+<div class="pair" data-s0="62599" data-s1="66268"><p class="en"><span class="w" data-s="62599" data-e="62983">A</span> <span class="w target" data-s="63025" data-e="63751" title="">survey</span> <span class="w" data-s="63793" data-e="63879">of</span> <span class="w" data-s="63921" data-e="64007">the</span> <span class="w" data-s="64049" data-e="64092">town</span> <span class="w" data-s="64135" data-e="64519">showed</span> <span class="w" data-s="64561" data-e="64775">that</span> <span class="w" data-s="64817" data-e="64945">most</span> <span class="w" data-s="64988" data-e="65201">people</span> <span class="w" data-s="65244" data-e="65500">wanted</span> <span class="w" data-s="65543" data-e="65799">the</span> <span class="w" data-s="65841" data-e="65927">happy</span> <span class="w" data-s="65969" data-e="66268">ending.</span></p><p class="zh">镇上的一项调查显示，大多数人想要那个圆满结局。</p></div>
+<div class="pair" data-s0="66567" data-s1="69340"><p class="en"><span class="w" data-s="66567" data-e="66737">So</span> <span class="w" data-s="66780" data-e="66865">the</span> <span class="w" data-s="66908" data-e="67079">crew</span> <span class="w" data-s="67121" data-e="67249">decided</span> <span class="w" data-s="67292" data-e="67548">to</span> <span class="w target" data-s="67591" data-e="67761" title="投资，投入；授予，给予">invest</span> <span class="w" data-s="67804" data-e="67975">the</span> <span class="w" data-s="68017" data-e="68145">rest</span> <span class="w" data-s="68188" data-e="68273">of</span> <span class="w" data-s="68316" data-e="68401">the</span> <span class="w" data-s="68444" data-e="68572">money</span> <span class="w" data-s="68615" data-e="68785">in</span> <span class="w" data-s="68828" data-e="68913">a</span> <span class="w" data-s="68956" data-e="69041">second</span> <span class="w" data-s="69084" data-e="69340">episode.</span></p><p class="zh">于是剧组决定把剩下的钱投进第二集。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">cartoon</span>
+          <span class="ipa">/ka:r&#x27;tu:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(报刊中与政治或时事有关的)漫画，讽刺画； 动画片；卡通片</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to make a cartoon about the old fishermen</div>          <div class="root"><span class="lbl">根</span>cart(纸) + oon → 画在纸上的东西 → 漫画，动画片</div>          <div class="zt"><span class="lbl">真题</span>As a child I used to love the Scooby-Doo cartoons. 当我还是个孩子的时候，我很喜欢史 酷比卡通。(2022)</div>          <div class="fam"><span class="lbl">族</span>cartoonist n. 漫画家 / cartoonish adj. 卡通式的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">portray</span>
+          <span class="ipa">/pə:r&#x27;trei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">描写，描述；画(人物、景象等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The director wanted to portray their life honestly</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“破tree”(也就 是一棵破树)。美术老师让我们描述操场旁边 的那颗老树，结果铁锤自言自语地说：一棵破 树，有什么可“描述”的啊？</div>          <div class="root"><span class="lbl">根</span>por(pro 向前) + tray(拉，画) → 把形象拉出来 → 描绘</div>          <div class="zt"><span class="lbl">真题</span>The report portrays an overall optimism borne by the recent healthy real-estate “upcycle” and improving economy. 该报告描绘 了近期健康的房地产“上升周期”和经济改善带 来的整体乐观情绪。(2017)</div>          <div class="fam"><span class="lbl">族</span>portrait n. 肖像 / portrayal n. 描绘</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">gang</span>
+          <span class="ipa">/gæn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一帮，一群，一伙</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a gang of children ran after the camera</div>          <div class="root"><span class="lbl">根</span>谐音/联想：gang 读着像“钢”，一群人凑成一股劲 → 一帮</div>          <div class="fam"><span class="lbl">族</span>gangster n. 匪徒 / a gang of 一帮……</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">flock</span>
+          <span class="ipa">/fla:k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(羊或鸟)群；一大群 v. 群集</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Even the gulls flocked to the boats</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“妇唠嗑”。 “一大群”妇人在唠嗑。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：妇唠嗑 → 一大群妇人一起唠嗑 → 一群</div>          <div class="zt"><span class="lbl">真题</span>At this event, people flocked to talks about weather, traffic jams and vending- machine sounds, among other sleep-inducing topics.在这次活动中，人们成群结队地谈论天 气、交通堵塞和自动售货机的声音，以及其他诱 发睡眠的话题。(2020)</div>          <div class="fam"><span class="lbl">族</span>flock n. 群 / a flock of 一群……</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">band</span>
+          <span class="ipa">/bænd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">流行音乐乐队；带；箍；条纹；条饰</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small band played on the beach</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“帮（ban的发 音类似汉语拼音bang)的”。一帮人在台上唱 歌，他们是一个“乐队”啊。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：“帮的” → 一帮人在台上唱歌 → 乐队</div>          <div class="zt"><span class="lbl">真题</span>The watch comes equipped with a standard battery and a nylon band. 这款手表配 有标准电池和尼龙表带。 例 The Beatles, the most famous British band of the 1960s, traveled worldwide for many years. 披头士乐队是 20 世纪 60 年代英国最著 名的乐队，多年来一直在世界各地巡演。 (186)</div>          <div class="fam"><span class="lbl">族</span>bandage n. 绷带 / band n. 带子</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">bandage</span>
+          <span class="ipa">/&#x27;bændıd3/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He only tied a bandage around the animal&#x27;s leg</div>          <div class="mnem"><span class="lbl">记</span>bandage发音有点像邦迪，邦迪 是一款创可贴的名字，创可贴就是小“绷带”，止 血啊。</div>          <div class="root"><span class="lbl">根</span>band(带子) + age(名词后缀) → 一条带子 → 绷带</div>          <div class="fam"><span class="lbl">族</span>band n. 带子 / bind v. 捆，绑</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">resort</span>
+          <span class="ipa">/r&#x27;zəirt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">求助，诉诸，求助(凭借)的对象；(度假)胜地 v. (～to)求助于，诉诸，采取</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In July the town is a quiet resort</div>          <div class="mnem"><span class="lbl">记</span>re 发音似“阿姨”;sort 意为“分 类”。你读过这则童话故事吗？后母让灰姑娘 把绿豆、红豆、芝麻分类后才能参加王子的舞 会，灰姑娘为了分类，就求助于那些小松鼠、小 老鼠。所以，resort的意思是“求助”。</div>          <div class="root"><span class="lbl">根</span>re(一再) + sort(分类) → 分不过来只好求人 → 求助；胜地</div>          <div class="zt"><span class="lbl">真题</span>They resort to different means to survive the bitter cold. 他们采取了不同的手段来度过 严寒。(2017) 例 The beach is a popular tourist resort. 海滩 是一个受欢迎的旅游胜地。(2019)</div>          <div class="fam"><span class="lbl">族</span>resort to 求助于 / tourist resort 旅游胜地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">classic</span>
+          <span class="ipa">/&#x27;klæsık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">最优秀的；第一流的；典型的 n.(书、电 影或歌曲的)经典作品，名著，杰作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the director was a classic city man</div>          <div class="mnem"><span class="lbl">记</span>class等级，加 ic 变成形容词， 上等级的→上品啊→优秀的，一流的。</div>          <div class="root"><span class="lbl">根</span>class(等级) + ic → 属于上等级的 → 一流的，经典的</div>          <div class="zt"><span class="lbl">真题</span>Older adults, especially those with limited mobility or difficulty driving on their own, are one of the classic use-cases for driverless cars. 老年人，尤其是那些行动不便或 (187) 第七单元 难以自主驾驶的老年人，是无人驾驶汽车的典 型用户之一。(2016)</div>          <div class="fam"><span class="lbl">族</span>classical adj. 古典的 / classify v. 分类</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">classify</span>
+          <span class="ipa">/&#x27;klæsifai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">将……分类；将……归类</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He liked to classify people by their jobs</div>          <div class="mnem"><span class="lbl">记</span>class 是班级，ify 动词后缀，表 示“……化”。小朋友上学都要分班的，某个年 龄段的小朋友在一个班级，因此 classify 就是 “分类，归类”。</div>          <div class="root"><span class="lbl">根</span>class(类别) + ify(使……化) → 使归入类别 → 分类</div>          <div class="zt"><span class="lbl">真题</span>There is not enough evidence to classify it as a disease. 目前还没有足够的证据将它归 类为一种疾病。</div>          <div class="fam"><span class="lbl">族</span>classification n. 分类 / class n. 等级</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">middle-class</span>
+          <span class="ipa">/mıdl &#x27;klæs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">中产阶级的；中等收入阶层的；典型中产阶 级特色的;带有中产阶级传统观念的；古板的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>from a middle-class family</div>          <div class="root"><span class="lbl">根</span>middle(中间) + class(阶层) → 处在中间的阶层 → 中产的</div>          <div class="zt"><span class="lbl">真题</span>A good education has been the most important thing for middle-class households. 良好的教育对中产阶级家庭来说是最重要的 事情。</div>          <div class="fam"><span class="lbl">族</span>class n. 阶层 / working-class adj. 工人阶级的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">upgrade</span>
+          <span class="ipa">/&#x27;apgreid/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使(机器、计算机系统等)升级；提高；改进；提 升;提拔</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he also wanted to upgrade the old cinema</div>          <div class="mnem"><span class="lbl">记</span>up 意为“向上”；grade意为“等 级；年级”。那upgrade就是使你的等级往上啊 →升级，提升。 第八单元 你一定要做个内心有光的人， 口 这束光叫“希望”！</div>          <div class="root"><span class="lbl">根</span>up(向上) + grade(等级) → 把等级往上提 → 升级</div>          <div class="zt"><span class="lbl">真题</span>Fast technological change makes it necessary for one to constantly upgrade their skills. 快速的技术变革使人们有必要不断地提 高自己的技能。</div>          <div class="fam"><span class="lbl">族</span>downgrade v. 降级 / grade n. 等级</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">beat</span>
+          <span class="ipa">/bi:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打，敲；打败；赢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They beat drums</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“逼他”。怎么逼 他呢？就是“打”啊。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：逼他 → 怎么逼他？就是打他 → 打；打败</div>          <div class="zt"><span class="lbl">真题</span>Their children must excel and beat their white peers in academic settings so they have the same chances to excel later. 他们的孩子必 须在学业上超越并打败他们的白人同龄人，这 样他们以后才有同样的机会出类拔萃。(2018)</div>          <div class="fam"><span class="lbl">族</span>beating n. 痛打 / beat n. 节拍</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">beast</span>
+          <span class="ipa">/bi:st/</span>
+          <span class="pos">n.</span>
+          <span class="cn">兽，野兽；牲畜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The story was a battle against a beast from the hills</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“逼死他”。把别 人都逼死了，是“野兽”的行径。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：逼死他 → 把人往死里逼的是野兽</div>          <div class="zt"><span class="lbl">真题</span>The villagers finally banded together and scared the beast away with firecrackers(爆竹) and drums. 村民们最终团结起来，用爆竹和鼓 把野兽吓跑了。(2023)</div>          <div class="fam"><span class="lbl">族</span>beastly adj. 野兽般的 / beast n. 牲畜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">battle</span>
+          <span class="ipa">/&#x27;bætl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">战役 v. 斗争</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The story was a battle against a beast</div>          <div class="mnem"><span class="lbl">记</span>bat = beat 打，那 battle 就是 “战斗，斗争”。</div>          <div class="root"><span class="lbl">根</span>bat(打) + tle → 打起来 → 战役，斗争</div>          <div class="zt"><span class="lbl">真题</span>In the battle against weight gain, people should pay more attention to exercise and less to what they eat and drink. 在对抗体重增加的 战斗中，人们应该多注意锻炼，少注意饮食。 (2021)</div>          <div class="fam"><span class="lbl">族</span>battlefield n. 战场 / battle v. 斗争</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">combat</span>
+          <span class="ipa">/&#x27;ka:mbæt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">防止；减轻；战斗 n. 战斗</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The fishermen had to combat it</div>          <div class="mnem"><span class="lbl">记</span>这个单词是都(com)打(bat)→ 战斗。</div>          <div class="root"><span class="lbl">根</span>com(一起) + bat(打) → 一起打 → 战斗；防止</div>          <div class="zt"><span class="lbl">真题</span>As a result, Los Angeles now has its best chance in decades to combat homelessness. 因此， 洛杉矶现在有了几十年来解决无家可归问题的 最好机会。(2023)</div>          <div class="fam"><span class="lbl">族</span>combative adj. 好斗的 / battle n. 战役</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">hit</span>
+          <span class="ipa">/hit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用手或器具)击，打；撞到；达到 n. 打；击；很受欢迎的人或事物 (189) 第八单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They beat drums and hit the water with long poles</div>          <div class="root"><span class="lbl">根</span>联想：本义是“打”，打红了就成了“热门作品”</div>          <div class="zt"><span class="lbl">真题</span>The Britannic hit a naval mine in 1916 and subsequently sank as well. “大不列颠号” 在1916年撞上了一枚水雷，随后也沉没了。</div>          <div class="fam"><span class="lbl">族</span>hitting n. 击打 / hit n. 很受欢迎的事物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">hammer</span>
+          <span class="ipa">/&#x27;hæmər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">锤子，榔头 v. 锤打；敲打</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The young hero never used a hammer or a punch</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“海摸”。警察 在大海里摸犯罪工具——一把“锤子”。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：海摸 → 在海里摸出一把锤子</div>          <div class="fam"><span class="lbl">族</span>hammer v. 锤打 / hammering n. 锤击</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">punch</span>
+          <span class="ipa">/p^nt∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">重拳击打；用力的捶打 v. 拳打；以拳痛击</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>never used a hammer or a punch</div>          <div class="mnem"><span class="lbl">记</span>该单词发音有点类似拳头打到 麻袋上的声音“pangchi”。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：pangchi → 拳头砸在麻袋上的声音 → 拳打</div>          <div class="zt"><span class="lbl">真题</span>He also figured out a new way to make a punch look real. 他还想出一个新办法，让出拳 看起来像真的一样。</div>          <div class="fam"><span class="lbl">族</span>punchy adj. 有力的 / punch n. 重拳</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">debate</span>
+          <span class="ipa">/dı&#x27;beit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(各自发表不同意见的)争论，辩论，讨论 v.(尤指正式)讨论，辩论</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One evening there was a long debate</div>          <div class="mnem"><span class="lbl">记</span>往下（de）打（把 bate想成 beat)，把对手往下打→争论，辩论。</div>          <div class="root"><span class="lbl">根</span>de(向下) + bate(打) → 把对手往下打 → 辩论</div>          <div class="zt"><span class="lbl">真题</span>In the age of the internet, there&#x27;s no such thing as a private debate. 在互联网时代， 没有所谓的私人辩论。(2022)</div>          <div class="fam"><span class="lbl">族</span>debater n. 辩手 / debatable adj. 有争议的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">dispute</span>
+          <span class="ipa">/&#x27;dispju:t;dı&#x27;spju:t/</span>
+          <span class="pos"></span>
+          <span class="cn">争论；辩论；争端；纠纷v.对……提出质 询;对……表示异议(或怀疑)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>almost a dispute, about the ending</div>          <div class="mnem"><span class="lbl">记</span>往下(dis表示“往下或否定”) 放(put)，你把我往下放，我把你往下放，是不是 两个人在“辩论”或“争吵”？</div>          <div class="root"><span class="lbl">根</span>dis(分开) + pute(想) → 各想各的 → 争论，争端</div>          <div class="zt"><span class="lbl">真题</span>What&#x27;s indisputable is that it&#x27;s growing very quickly. 毋庸置疑的是，它正在迅速发展。</div>          <div class="fam"><span class="lbl">族</span>disputable adj. 有争议的 / dispute n. 争端</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">hint</span>
+          <span class="ipa">/hint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 暗示，提示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A young editor gave a hint</div>          <div class="mnem"><span class="lbl">记</span>谐音：恨他。恨他不需要说出 来，眼神就能“暗示”出来。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：恨他 → 恨不用说出口，给个眼神就是暗示</div>          <div class="fam"><span class="lbl">族</span>hint at 暗示 / hint n. 提示</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">demonstrate</span>
+          <span class="ipa">/&#x27;demənstreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证明；证实；论证；说明，表现；显露</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;Demonstrate it.</div>          <div class="mnem"><span class="lbl">记</span>demon的发音类似“地门”，把 从地门爬出来的东西想象成蚂蚁。设想一群蚂 蚁在街上(st街道的缩写)以很快的速度(rate) 奔跑，“说明，证明”天要下雨了。</div>          <div class="root"><span class="lbl">根</span>de(完全) + monstr(显示) + ate → 完全显示 → 证明</div>          <div class="zt"><span class="lbl">真题</span>New research demonstrates why playing with blocks might have been time better spent. 新的研究证明了为什么玩积木可以更好地消磨 时间。(2020)</div>          <div class="fam"><span class="lbl">族</span>demonstration n. 演示 / demonstrator n. 示威者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">illustrate</span>
+          <span class="ipa">/&#x27;ıləstreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用示例、图画等)说明，解释</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Illustrate it with a short demo</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“一路死追 她”。→学生有问题不明白，于是一路上死追着 大雁老师，大雁老师给学生举例说明，解释清楚 了→说明，解释。</div>          <div class="root"><span class="lbl">根</span>il(使) + lustr(光) + ate → 把光照上去 → 说明</div>          <div class="zt"><span class="lbl">真题</span>Airbnb&#x27;s success clearly illustrates the emergence of a huge sharing economy. Airbnb 的成功清楚地说明了一种巨大的共享经济的出 现。(2013)</div>          <div class="fam"><span class="lbl">族</span>illustration n. 插图 / illustrator n. 插画家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">demo</span>
+          <span class="ipa">/&#x27;deməu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">集会示威;游行示威；示范；样品 v. 试用；演示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a short demo</div>          <div class="root"><span class="lbl">根</span>dem(人民) + o → 做给人民看 → 演示；示威</div>          <div class="zt"><span class="lbl">真题</span>&quot;Digital textbooks are not going to catch on,&quot; says Inkling CEO Matt Maclnnis as he&#x27;s giving me a demo over coffee. Inkling 的首席执 行官马特·麦克尼斯边喝咖啡边给我演示，他 说：“数字化教科书不会流行起来。”</div>          <div class="fam"><span class="lbl">族</span>demonstrate v. 证明 / demonstration n. 游行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">imply</span>
+          <span class="ipa">/ım&#x27;pla1/</span>
+          <span class="pos">v.</span>
+          <span class="cn">暗示；暗指；表明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His words seemed to imply a warning</div>          <div class="root"><span class="lbl">根</span>im(里面) + ply(折) → 话折在里面 → 暗示</div>          <div class="zt"><span class="lbl">真题</span>What does the author imply about the classes at present?关于目前的课程，作者暗示 了什么？</div>          <div class="fam"><span class="lbl">族</span>implication n. 含义 / implicit adj. 含蓄的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">implicit</span>
+          <span class="ipa">/ım&#x27;plısit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">含蓄的;不直接的；固有的；无疑问的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>though the warning was only implicit</div>          <div class="root"><span class="lbl">根</span>im(里面) + plic(折) + it → 折在里面的 → 含蓄的</div>          <div class="zt"><span class="lbl">真题</span>The point is to use the results of this study to open up meaningful dialogues on implicit gender bias. 关键在于利用这项研究的 结果，就隐含的性别偏见展开有意义的对话。</div>          <div class="fam"><span class="lbl">族</span>imply v. 暗示 / implication n. 暗示</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">explicit</span>
+          <span class="ipa">/ık&#x27;splisit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明确的；清楚的；直截了当的;不隐晦的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was never explicit.</div>          <div class="mnem"><span class="lbl">记</span>往外(ex)警察(plic 想成 police) 它(it)，连到一起编成一句话就是：警察已经认 准目标，且证据充分，“明确地，直截了当地”指 向了它。它的反义词是implicit(含蓄的)。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + plic(折) + it → 折在外面的 → 明确的</div>          <div class="zt"><span class="lbl">真题</span>Parents and teachers can help children by providing explicit instruction regarding the mind as a learning machine. 父母和老师可以通 过提供明确的指导来帮助孩子，将大脑视为学 习机器。(2016)</div>          <div class="fam"><span class="lbl">族</span>explicitly adv. 明确地 / explicitness n. 明确</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">convey</span>
+          <span class="ipa">/kən&#x27;vei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">传达；输送；传送；表达</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;Every picture must convey one feeling,&quot; he added.</div>          <div class="mnem"><span class="lbl">记</span>con 表示“所有的”；vey 发音类 似 way，就当作是 way。这个单词可以理解为： 你家的东西都在路上，干什么呢？→输送， 传送。 (190)</div>          <div class="root"><span class="lbl">根</span>con(一起) + vey(路) → 一起上路带走 → 运送，传达</div>          <div class="zt"><span class="lbl">真题</span>This is your chance to convey boundless enthusiasm for the subject. 这是你表达对这门 学科无限热情的机会。(2016)</div>          <div class="fam"><span class="lbl">族</span>conveyance n. 运输 / convey v. 传达</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">survey</span>
+          <span class="ipa">/&#x27;s3:vei, sə&#x27;vei/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A survey of the town showed</div>          <div class="mnem"><span class="lbl">记</span>sur 表示“上面”；vey 发音类似 于way，就当作是 way。这个单词可以理解为： 在路上。站在路的上面，往下看，意思就是“俯 瞰”，引申为“调查”。</div>          <div class="root"><span class="lbl">根</span>sur(上面) + vey(路) → 站在路上面往下看 → 俯瞰；调查</div>          <div class="zt"><span class="lbl">真题</span>The survey allowed for reading materials on a digital device. 这项调查允许在数字设备上 阅读材料。(2021)</div>          <div class="fam"><span class="lbl">族</span>surveyor n. 测量员 / survey v. 调查</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">invest</span>
+          <span class="ipa">/ın&#x27;vest/</span>
+          <span class="pos">v.</span>
+          <span class="cn">投资，投入；授予，给予</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>decided to invest the rest of the money in a second episode</div>          <div class="mnem"><span class="lbl">记</span>in里面；vest 发音类似 west。 那就是在西部里面，听过西部大开发这个说法 吧。那既然西部大开发，你去西部干吗？“投 资”啊。</div>          <div class="root"><span class="lbl">根</span>in(进入) + vest(衣服) → 给人穿上衣服 → 授予；投入</div>          <div class="zt"><span class="lbl">真题</span>They need to invest more in hospital staff and facilities. 他们需要在医院人员和设施方面 加大投资。(2022)</div>          <div class="fam"><span class="lbl">族</span>investment n. 投资 / investor n. 投资者</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7~8 · Day 50</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

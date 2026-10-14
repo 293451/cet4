@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 43 · The Old Theatre on River Street</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 43 · 11/24 · Unit 7 第 1261-1290 词</div>
+  <h1>The Old Theatre on River Street<span class="cn">河街老剧院</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-43.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2517"><p class="en"><span class="w" data-s="43" data-e="213">The</span> <span class="w" data-s="256" data-e="384">old</span> <span class="w" data-s="427" data-e="811">theatre</span> <span class="w" data-s="853" data-e="896">on</span> <span class="w" data-s="939" data-e="1109">River</span> <span class="w" data-s="1152" data-e="1365">Street</span> <span class="w" data-s="1408" data-e="1579">had</span> <span class="w" data-s="1621" data-e="1749">been</span> <span class="w" data-s="1792" data-e="1920">closed</span> <span class="w" data-s="1963" data-e="2261">for</span> <span class="w" data-s="2304" data-e="2517">years.</span></p><p class="zh">河街上的那座老剧院已经关门好几年了。</p></div>
+<div class="pair" data-s0="2816" data-s1="7168"><p class="en"><span class="w" data-s="2816" data-e="3456">Our</span> <span class="w target" data-s="3499" data-e="3840" title="副手；副职；代理；警官">deputy</span> <span class="w" data-s="3883" data-e="4224">manager,</span> <span class="w" data-s="4395" data-e="4651">Ms.</span> <span class="w" data-s="4736" data-e="5035">Chen,</span> <span class="w" data-s="5248" data-e="5632">could</span> <span class="w target" data-s="5717" data-e="6059" title="预见；预知">previse</span> <span class="w" data-s="6101" data-e="6315">trouble</span> <span class="w" data-s="6357" data-e="6656">before</span> <span class="w" data-s="6699" data-e="6912">it</span> <span class="w" data-s="6955" data-e="7168">arrived.</span></p><p class="zh">我们的副经理陈女士能事先预见麻烦。</p></div>
+<div class="pair" data-s0="7898" data-s1="13743"><p class="en"><span class="w" data-s="7898" data-e="8026">From</span> <span class="w" data-s="8069" data-e="8111">the</span> <span class="w" data-s="8154" data-e="8239">back</span> <span class="w" data-s="8282" data-e="8495">row</span> <span class="w" data-s="8538" data-e="8794">she</span> <span class="w" data-s="8837" data-e="9178">studied</span> <span class="w" data-s="9221" data-e="9263">the</span> <span class="w target" data-s="9306" data-e="9434" title="看法，见解；景色，风景v.看待；观看，观察">view,</span> <span class="w" data-s="9605" data-e="9818">and</span> <span class="w" data-s="10117" data-e="10287">the</span> <span class="w target" data-s="10330" data-e="10501" title="视力的；视觉的 n. 视觉资料">visual</span> <span class="w" data-s="10543" data-e="10714">problem</span> <span class="w" data-s="10757" data-e="11098">was</span> <span class="w" data-s="11141" data-e="11311">easy</span> <span class="w" data-s="11354" data-e="11567">to</span> <span class="w" data-s="11610" data-e="11695">see:</span> <span class="w" data-s="11951" data-e="12463">the</span> <span class="w target" data-s="12506" data-e="12677" title="听众，观众">audience</span> <span class="w" data-s="12719" data-e="13189">seats</span> <span class="w" data-s="13231" data-e="13359">were</span> <span class="w" data-s="13402" data-e="13530">too</span> <span class="w" data-s="13573" data-e="13743">low.</span></p><p class="zh">她从后排打量整个视野，视觉上的问题一眼就能看出来：观众席太低了。</p></div>
+<div class="pair" data-s0="13999" data-s1="18479"><p class="en"><span class="w" data-s="13999" data-e="14511">She</span> <span class="w" data-s="14554" data-e="14725">asked</span> <span class="w" data-s="14767" data-e="14895">an</span> <span class="w" data-s="14938" data-e="15279">engineer</span> <span class="w" data-s="15322" data-e="15493">to</span> <span class="w target" data-s="15535" data-e="15749" title="设计，发明；想出">devise</span> <span class="w" data-s="15791" data-e="15919">a</span> <span class="w" data-s="15962" data-e="16047">new</span> <span class="w" data-s="16090" data-e="16218">plan</span> <span class="w" data-s="16261" data-e="16602">and</span> <span class="w" data-s="16773" data-e="16986">to</span> <span class="w" data-s="17029" data-e="17114">bring</span> <span class="w" data-s="17157" data-e="17285">his</span> <span class="w target" data-s="17327" data-e="17669" title="仪器；设备；手段；方法；花招">devices</span> <span class="w" data-s="17711" data-e="17967">and</span> <span class="w target" data-s="18010" data-e="18479" title="器械，仪器">apparatus.</span></p><p class="zh">她请一位工程师设计新方案，并带上他的设备和仪器。</p></div>
+<div class="pair" data-s0="18735" data-s1="22234"><p class="en"><span class="w" data-s="18735" data-e="18821">He</span> <span class="w" data-s="18863" data-e="18991">would</span> <span class="w target" data-s="19034" data-e="19247" title="安装;设置；建立(程序)；(常以正式仪式)使 就职，任命；安顿；安置 n. 空气调节系统">install</span> <span class="w target" data-s="19290" data-e="19973" title="">air-conditioning</span> <span class="w" data-s="20015" data-e="20229">above</span> <span class="w" data-s="20271" data-e="20485">the</span> <span class="w" data-s="20527" data-e="20613">stage</span> <span class="w" data-s="20655" data-e="20997">and</span> <span class="w" data-s="21039" data-e="21338">repair</span> <span class="w" data-s="21381" data-e="21551">the</span> <span class="w" data-s="21594" data-e="21722">old</span> <span class="w" data-s="21765" data-e="22234">projector.</span></p><p class="zh">他要给舞台上方装空调，还要修好那台老放映机。</p></div>
+<div class="pair" data-s0="22405" data-s1="23898"><p class="en"><span class="w" data-s="22405" data-e="22618">Then</span> <span class="w" data-s="23002" data-e="23258">came</span> <span class="w" data-s="23301" data-e="23514">the</span> <span class="w" data-s="23557" data-e="23642">pretty</span> <span class="w" data-s="23685" data-e="23898">work.</span></p><p class="zh">接下来是些好看的活儿。</p></div>
+<div class="pair" data-s0="24847" data-s1="29753"><p class="en"><span class="w" data-s="24847" data-e="24932">We</span> <span class="w" data-s="24975" data-e="25060">had</span> <span class="w" data-s="25103" data-e="25188">to</span> <span class="w target" data-s="25231" data-e="25444" title="">furnish</span> <span class="w" data-s="25487" data-e="25572">the</span> <span class="w" data-s="25615" data-e="25700">hall</span> <span class="w" data-s="25743" data-e="25871">with</span> <span class="w" data-s="25913" data-e="26255">chairs,</span> <span class="w target" data-s="26425" data-e="27151" title="装饰，装修">decorate</span> <span class="w" data-s="27193" data-e="27279">the</span> <span class="w" data-s="27321" data-e="27535">walls,</span> <span class="w" data-s="27791" data-e="28004">and</span> <span class="w" data-s="28132" data-e="28260">hang</span> <span class="w" data-s="28303" data-e="28473">one</span> <span class="w" data-s="28516" data-e="28900">golden</span> <span class="w target" data-s="28943" data-e="29241" title="装饰品；装饰；摆设；点缀；首饰；饰物 v. 装饰；点缀；美化 n. 上涨，增高v. 上升，增长;起身;起义，反抗；升起 v. 起来；出现">ornament</span> <span class="w target" data-s="29284" data-e="29455" title="全面的;综合的;总体的 adv. 总计；总体 上n. 外套；工装服">over</span> <span class="w" data-s="29497" data-e="29583">the</span> <span class="w" data-s="29625" data-e="29753">door.</span></p><p class="zh">我们得给大厅配上椅子，装饰墙面，还在门上挂一件金色的装饰品。</p></div>
+<div class="pair" data-s0="29967" data-s1="32143"><p class="en"><span class="w" data-s="29967" data-e="30265">On</span> <span class="w" data-s="30351" data-e="30479">the</span> <span class="w" data-s="30521" data-e="30692">opening</span> <span class="w" data-s="30735" data-e="30905">morning</span> <span class="w" data-s="30948" data-e="31247">we</span> <span class="w" data-s="31289" data-e="31503">watched</span> <span class="w" data-s="31545" data-e="31716">the</span> <span class="w" data-s="31759" data-e="31972">curtain</span> <span class="w target" data-s="32015" data-e="32143" title="">rise.</span></p><p class="zh">开演那天早上，我们看着幕布升起。</p></div>
+<div class="pair" data-s0="33004" data-s1="36759"><p class="en"><span class="w" data-s="33004" data-e="33260">Small</span> <span class="w" data-s="33303" data-e="33473">problems</span> <span class="w target" data-s="33516" data-e="33985" title="">arise</span> <span class="w" data-s="34028" data-e="34327">in</span> <span class="w" data-s="34369" data-e="34497">any</span> <span class="w" data-s="34540" data-e="34711">old</span> <span class="w" data-s="34753" data-e="34924">building,</span> <span class="w" data-s="35223" data-e="35479">and</span> <span class="w" data-s="35607" data-e="35991">this</span> <span class="w" data-s="36033" data-e="36204">one</span> <span class="w" data-s="36247" data-e="36375">was</span> <span class="w" data-s="36417" data-e="36545">no</span> <span class="w" data-s="36588" data-e="36759">different.</span></p><p class="zh">任何老楼里都会冒出些小问题，这座楼也不例外。</p></div>
+<div class="pair" data-s0="37015" data-s1="41495"><p class="en"><span class="w" data-s="37015" data-e="37271">The</span> <span class="w" data-s="37612" data-e="37996">manager</span> <span class="w target" data-s="38039" data-e="38209" title="加薪 v. 举；升起；引起；提出；饲养">raised</span> <span class="w" data-s="38252" data-e="38465">his</span> <span class="w" data-s="38508" data-e="38593">hand</span> <span class="w" data-s="38636" data-e="38807">for</span> <span class="w" data-s="38849" data-e="38977">quiet,</span> <span class="w" data-s="39276" data-e="39447">and</span> <span class="w" data-s="39575" data-e="39873">the</span> <span class="w" data-s="39916" data-e="40001">first</span> <span class="w" data-s="40044" data-e="40300">song</span> <span class="w target" data-s="40343" data-e="40855" title="唤醒；唤起；引起，激起">aroused</span> <span class="w" data-s="40897" data-e="41025">warm</span> <span class="w" data-s="41068" data-e="41495">applause.</span></p><p class="zh">经理举起手示意大家安静，第一首歌就激起了热烈的掌声。</p></div>
+<div class="pair" data-s0="42276" data-s1="45092"><p class="en"><span class="w" data-s="42276" data-e="42361">The</span> <span class="w" data-s="42404" data-e="42575">lights</span> <span class="w" data-s="42617" data-e="42831">and</span> <span class="w" data-s="42873" data-e="43044">the</span> <span class="w" data-s="43087" data-e="43172">music</span> <span class="w" data-s="43215" data-e="43599">were</span> <span class="w" data-s="43727" data-e="43940">enough</span> <span class="w" data-s="43983" data-e="44196">to</span> <span class="w target" data-s="44239" data-e="44495" title="醒来，唤醒">waken</span> <span class="w" data-s="44537" data-e="44665">the</span> <span class="w" data-s="44708" data-e="44793">whole</span> <span class="w" data-s="44836" data-e="45092">street.</span></p><p class="zh">灯光和音乐足以把整条街都唤醒。</p></div>
+<div class="pair" data-s0="45348" data-s1="47567"><p class="en"><span class="w" data-s="45348" data-e="45860">By</span> <span class="w" data-s="45903" data-e="46073">nine</span> <span class="w" data-s="46116" data-e="46372">o&#x27;clock</span> <span class="w" data-s="46415" data-e="46799">the</span> <span class="w" data-s="46927" data-e="47097">city</span> <span class="w" data-s="47140" data-e="47311">was</span> <span class="w target" data-s="47353" data-e="47567" title="醒着的 v. 唤醒">awake.</span></p><p class="zh">到九点，整座城市都醒着。</p></div>
+<div class="pair" data-s0="47737" data-s1="50980"><p class="en"><span class="w" data-s="47737" data-e="48249">After</span> <span class="w" data-s="48292" data-e="48505">the</span> <span class="w" data-s="48548" data-e="48633">show,</span> <span class="w" data-s="48889" data-e="49103">Ms.</span> <span class="w" data-s="49273" data-e="49529">Chen</span> <span class="w" data-s="49572" data-e="49785">wrote</span> <span class="w" data-s="49828" data-e="49956">a</span> <span class="w target" data-s="49999" data-e="50255" title="总结 adj. 总结性的">summary</span> <span class="w" data-s="50297" data-e="50468">for</span> <span class="w" data-s="50511" data-e="50596">the</span> <span class="w" data-s="50639" data-e="50724">town</span> <span class="w" data-s="50767" data-e="50980">office.</span></p><p class="zh">演出结束后，陈女士为镇政府写了一份总结。</p></div>
+<div class="pair" data-s0="51364" data-s1="54095"><p class="en"><span class="w" data-s="51364" data-e="51449">It</span> <span class="w" data-s="51492" data-e="51620">had</span> <span class="w" data-s="51663" data-e="51791">to</span> <span class="w target" data-s="51833" data-e="52089" title="包括；包含">include</span> <span class="w" data-s="52132" data-e="52388">every</span> <span class="w" data-s="52431" data-e="52687">cost</span> <span class="w" data-s="52729" data-e="53113">and</span> <span class="w target" data-s="53156" data-e="53796" title="不包括；不放在考虑之列；防止……进入；阻 止……参加；把……排斥在外">exclude</span> <span class="w" data-s="53839" data-e="54095">nothing.</span></p><p class="zh">它必须包含每一笔开销，什么都不能排除。</p></div>
+<div class="pair" data-s0="55087" data-s1="60121"><p class="en"><span class="w" data-s="55087" data-e="55172">To</span> <span class="w" data-s="55215" data-e="55385">save</span> <span class="w" data-s="55428" data-e="55641">money</span> <span class="w" data-s="55684" data-e="55897">we</span> <span class="w" data-s="55940" data-e="56068">had</span> <span class="w" data-s="56111" data-e="56196">to</span> <span class="w target" data-s="56239" data-e="56580" title="">eliminate</span> <span class="w" data-s="56623" data-e="56751">two</span> <span class="w" data-s="56793" data-e="56964">old</span> <span class="w" data-s="57007" data-e="57177">lights,</span> <span class="w" data-s="57476" data-e="57775">and</span> <span class="w" data-s="57903" data-e="58073">almost</span> <span class="w" data-s="58116" data-e="58372">every</span> <span class="w" data-s="58415" data-e="58671">plan</span> <span class="w" data-s="58713" data-e="58884">was</span> <span class="w" data-s="58927" data-e="59097">changed</span> <span class="w target" data-s="59140" data-e="59609" title="">except</span> <span class="w" data-s="59652" data-e="59823">the</span> <span class="w" data-s="59865" data-e="60121">roof.</span></p><p class="zh">为了省钱，我们不得不砍掉两盏旧灯，几乎每个方案都改了，只有屋顶除外。</p></div>
+<div class="pair" data-s0="60249" data-s1="63023"><p class="en"><span class="w" data-s="60249" data-e="60633">There</span> <span class="w" data-s="60676" data-e="60804">was</span> <span class="w" data-s="60847" data-e="60975">one</span> <span class="w target" data-s="61017" data-e="61401" title="一般情况以外的人(或事物)；例外">exception:</span> <span class="w" data-s="61657" data-e="61999">the</span> <span class="w" data-s="62041" data-e="62340">golden</span> <span class="w target" data-s="62383" data-e="62681" title="装饰品；装饰；摆设；点缀；首饰；饰物 v. 装饰；点缀；美化 n. 上涨，增高v. 上升，增长;起身;起义，反抗；升起 v. 起来；出现">ornament</span> <span class="w" data-s="62724" data-e="63023">stayed.</span></p><p class="zh">有一个例外：那件金色装饰品留下了。</p></div>
+<div class="pair" data-s0="63193" data-s1="66009"><p class="en"><span class="w" data-s="63193" data-e="64004">In</span> <span class="w" data-s="64047" data-e="64175">the</span> <span class="w" data-s="64217" data-e="64559">corridor</span> <span class="w" data-s="64601" data-e="64772">I</span> <span class="w target" data-s="64815" data-e="65113" title="偶然听到；无意中听到">overheard</span> <span class="w" data-s="65156" data-e="65369">two</span> <span class="w" data-s="65412" data-e="65625">young</span> <span class="w" data-s="65668" data-e="66009">actors.</span></p><p class="zh">在走廊里，我偶然听到两个年轻演员说话。</p></div>
+<div class="pair" data-s0="66704" data-s1="71013"><p class="en"><span class="w" data-s="66704" data-e="66789">They</span> <span class="w" data-s="66832" data-e="66960">had</span> <span class="w target" data-s="67002" data-e="67344" title="承担;从事">undertaken</span> <span class="w" data-s="67386" data-e="67600">the</span> <span class="w" data-s="67642" data-e="67941">hardest</span> <span class="w" data-s="67984" data-e="68154">work,</span> <span class="w" data-s="68368" data-e="68666">and</span> <span class="w" data-s="68837" data-e="68965">at</span> <span class="w" data-s="69008" data-e="69136">first</span> <span class="w" data-s="69178" data-e="69477">the</span> <span class="w" data-s="69520" data-e="69989">noise</span> <span class="w" data-s="70032" data-e="70160">seemed</span> <span class="w" data-s="70202" data-e="70373">to</span> <span class="w target" data-s="70416" data-e="70885" title="淹没；压倒，压垮">overwhelm</span> <span class="w" data-s="70928" data-e="71013">them.</span></p><p class="zh">他们承担了最辛苦的活，起初那些噪音似乎要把他们压垮。</p></div>
+<div class="pair" data-s0="71824" data-s1="74213"><p class="en"><span class="w target" data-s="71824" data-e="72165" title="全面的;综合的;总体的 adv. 总计；总体 上n. 外套；工装服">&quot;Overall,&quot;</span> <span class="w" data-s="72506" data-e="72634">Ms.</span> <span class="w" data-s="72677" data-e="72890">Chen</span> <span class="w target" data-s="72933" data-e="73445" title="断定；推断出；得出结论；结束">concluded,</span> <span class="w" data-s="73701" data-e="73957">&quot;it</span> <span class="w" data-s="74000" data-e="74213">worked.&quot;</span></p><p class="zh">“总的来说，”陈女士得出结论，“它成了。”</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">previse</span>
+          <span class="ipa">/prı&#x27;vaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">预见；预知</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Our deputy manager, Ms. Chen, could previse trouble</div>          <div class="mnem"><span class="lbl">记</span>提前(pre前面)看(vise)，我能 够提前看到你的命运和未来，我在预见你的命 运和未来→预知，预见。</div>          <div class="root"><span class="lbl">根</span>pre(提前) + vise(看) → 提前看到 → 预见</div>          <div class="fam"><span class="lbl">族</span>prevision n. 预见 / provide v. 提供</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">visual</span>
+          <span class="ipa">/&#x27;vızuəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">视力的；视觉的 n. 视觉资料</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the visual problem was easy to see</div>          <div class="mnem"><span class="lbl">记</span>使（ize动词后缀：使……化）可 视(vis看见)，使你们30年后的生活可视，现在 怎么可能看到？只能“想象，设想”。</div>          <div class="root"><span class="lbl">根</span>vis(看) + ual(形容词后缀) → 看的，视觉的</div>          <div class="zt"><span class="lbl">真题</span>They present the project with a funny video because good visuals and a sense of humor improved success. 他们用一个有趣的视 频来展示这个项目，因为好的视觉效果和幽默 感会提高成功的概率。(2019)</div>          <div class="fam"><span class="lbl">族</span>vision n. 视力 / visualize v. 想象</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">view</span>
+          <span class="ipa">/vju:/</span>
+          <span class="pos"></span>
+          <span class="cn">看法，见解；景色，风景v.看待；观看，观察</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From the back row she studied the view</div>          <div class="root"><span class="lbl">根</span>靠搭配记：in view of 鉴于</div>          <div class="zt"><span class="lbl">真题</span>Television passes information, and indiscriminately(不加区分地)，to all viewers alike，be they children or adults. 电视不加区分 地向所有观众传递信息，无论他们是儿童还是 成人。</div>          <div class="fam"><span class="lbl">族</span>viewer n. 观众 / review v. 复习</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">audience</span>
+          <span class="ipa">/&#x27;o:diəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">听众，观众</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the audience seats were too low</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“奥迪摁死”。 设想一辆奥迪车使劲摁喇叭，是不是“听众”受 不了？</div>          <div class="root"><span class="lbl">根</span>audi(听) + ence(名词后缀) → 听的人 → 观众</div>          <div class="zt"><span class="lbl">真题</span>Make sure to bring the audience into the conversation so that it is not one-sided. 确保让 听众参与到对话中来，这样对话就不会一边倒。 (2021)</div>          <div class="fam"><span class="lbl">族</span>audio adj. 音频的 / auditorium n. 礼堂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">devise</span>
+          <span class="ipa">/dı&#x27;vaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">设计，发明；想出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She asked an engineer to devise a new plan</div>          <div class="mnem"><span class="lbl">记</span>de表示“往下”；vise 表示“看” →往下看。小时候妈妈总说我“你一低头，眼睛 一转圈，就想出一个坏点子”，所以往下看，意为 “想出，设计”。</div>          <div class="root"><span class="lbl">根</span>de(向下) + vise(看) → 低头琢磨 → 想出，设计</div>          <div class="zt"><span class="lbl">真题</span>Employees with a growth mindset may be more likely to devise innovative ideas. 具有 成长心态的员工也许更有可能提出创新的 想法。</div>          <div class="fam"><span class="lbl">族</span>device n. 装置 / deviser n. 设计者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">deputy</span>
+          <span class="ipa">/&#x27;depjuti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">副手；副职；代理；警官</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Our deputy manager, Ms. Chen</div>          <div class="mnem"><span class="lbl">记</span>以后做了老板，一定得有个“副 手”，可以把工作往下(de)放给(put)他。</div>          <div class="root"><span class="lbl">根</span>de(向下) + put(放) + y → 把活放下给他的人 → 副手</div>          <div class="fam"><span class="lbl">族</span>deputize v. 代理 / deputy manager n. 副经理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">device</span>
+          <span class="ipa">/di&#x27;vais/</span>
+          <span class="pos"></span>
+          <span class="cn">仪器；设备；手段；方法；花招</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to bring his devices and apparatus</div>          <div class="mnem"><span class="lbl">记</span>de(向下)+ vice(= vis，看)→ 用于向下观看的东西→仪器，设备。</div>          <div class="root"><span class="lbl">根</span>de(向下) + vice(=vis 看) → 用来看的东西 → 装置</div>          <div class="zt"><span class="lbl">真题</span>More and more, young people choose spending time on their electronic devices over engaging in other activities, regardless of the type. 越来越多的年轻人选择把时间花在电子 设备上，而不是从事其他活动，不管是哪种形式 的活动。(2021)</div>          <div class="fam"><span class="lbl">族</span>devise v. 设计 / electronic device n. 电子设备</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">apparatus</span>
+          <span class="ipa">/æpə&#x27;reitəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">器械，仪器</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his devices and apparatus</div>          <div class="mnem"><span class="lbl">记</span>appar 想成 appear(出现);a(一 个)tus(吐丝)。连起来就是：以后不用春蚕吐 丝了，用一个“仪器，器械”来吐丝，这就是科技 的力量。</div>          <div class="root"><span class="lbl">根</span>ap(向) + par(准备) + atus → 准备好的工具 → 器械</div>          <div class="fam"><span class="lbl">族</span>prepare v. 准备 / preparation n. 准备</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">install</span>
+          <span class="ipa">/ın&#x27;sto:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">安装;设置；建立(程序)；(常以正式仪式)使 就职，任命；安顿；安置 n. 空气调节系统</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would install air-conditioning above the stage</div>          <div class="mnem"><span class="lbl">记</span>这个单词我们应该很熟悉，汽 车里都有这个按钮a/c，打开就是空调。</div>          <div class="root"><span class="lbl">根</span>in(进入) + stall(位置) → 放进位置 → 安装</div>          <div class="zt"><span class="lbl">真题</span>So, for example, you&#x27;ll just have to say (162) “a bit warmer&quot;, and the air conditioning will adjust automatically.所以，举个例子，你只需要 说“稍微暖和一点”，空调就会自动调节。</div>          <div class="fam"><span class="lbl">族</span>installation n. 安装 / installer n. 安装工</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">air conditioning</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would install air-conditioning above the stage</div>          <div class="root"><span class="lbl">根</span>air(空气) + conditioning(调节) → 空气调节 → 空调</div>          <div class="fam"><span class="lbl">族</span>conditioner n. 调节器 / condition n. 条件</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">furnish</span>
+          <span class="ipa">/&#x27;fa:rnıs/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>We had to furnish the hall with chairs</div>          <div class="root"><span class="lbl">根</span>furn(装备) + ish(动词后缀) → 给房子配装备 → 配家具</div>          <div class="zt"><span class="lbl">真题</span>The furnished apartment was inexpensive. 这间带家具的公寓很便宜。</div>          <div class="fam"><span class="lbl">族</span>furniture n. 家具 / furnished adj. 带家具的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">decorate</span>
+          <span class="ipa">/&#x27;dekəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">装饰，装修</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>decorate the walls, and hang one golden ornament</div>          <div class="mnem"><span class="lbl">记</span>把 de 想成弟弟，cor 想成 core (核心)，弟弟的核心想法就是房子→很多中国 人一辈子不就是为了一套房子吗？ate动词后 缀→弟弟买了一套房子，首先要对这套房子做 什么？→装饰，装修。</div>          <div class="root"><span class="lbl">根</span>decor(体面，好看) + ate(动词后缀) → 弄得好看 → 装饰</div>          <div class="zt"><span class="lbl">真题</span>It has walls decorated with jewels. 它的 墙上装饰着珠宝。(2018)</div>          <div class="fam"><span class="lbl">族</span>decoration n. 装饰 / decorative adj. 装饰性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">ornament</span>
+          <span class="ipa">/&#x27;oirnəmənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">装饰品；装饰；摆设；点缀；首饰；饰物 v. 装饰；点缀；美化 n. 上涨，增高v. 上升，增长;起身;起义，反抗；升起 v. 起来；出现</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one golden ornament over the door</div>          <div class="mnem"><span class="lbl">记</span>a一个；rise升起。一个太阳升 起的景象“出现”了。</div>          <div class="root"><span class="lbl">根</span>orn(装饰) + ament(名词后缀) → 用来装饰的东西 → 装饰品</div>          <div class="zt"><span class="lbl">真题</span>What problem may arise if classes go online？如果把课程放到网上可能会出现什么 问题？(2022)</div>          <div class="fam"><span class="lbl">族</span>ornamental adj. 装饰性的 / ornate adj. 华丽的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">rise</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we watched the curtain rise</div>          <div class="root"><span class="lbl">根</span>靠搭配记：rise early 早起</div>          <div class="fam"><span class="lbl">族</span>rising adj. 上升的 / arise v. 出现</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">arise</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Small problems arise in any old building</div>          <div class="root"><span class="lbl">根</span>a(向上) + rise(升) → 升起来 → 出现，发生</div>          <div class="fam"><span class="lbl">族</span>rise v. 上升 / arisen adj. 已发生的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">arouse</span>
+          <span class="ipa">/ə&#x27;rauz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">唤醒；唤起；引起，激起</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the first song aroused warm applause</div>          <div class="root"><span class="lbl">根</span>a(加强) + rouse(唤醒) → 把人叫起来 → 激起</div>          <div class="zt"><span class="lbl">真题</span>Most stores open with flowers, fruit and vegetables at the front as a breath of freshness to arouse our appetite. 大多数商店都把鲜花、 水果和蔬菜放在最前面，给人一种新鲜的感觉， 唤起我们的食欲。(2023) 例 My curiosity was fully aroused by his expression.我的好奇心被他的表情充分激发了 起来。</div>          <div class="fam"><span class="lbl">族</span>rouse v. 唤醒 / arousal n. 唤起</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">raise</span>
+          <span class="ipa">/reiz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">加薪 v. 举；升起；引起；提出；饲养</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The manager raised his hand for quiet</div>          <div class="mnem"><span class="lbl">记</span>用后羿射日的故事来讲解这组 单词：从前天帝有十个儿子，也就是十个太阳， 他们轮流在天空中升起，rise(ri汉语拼音就是 “日”，e表示“出去”，连在一起不就是太阳“升” 起来嘛)，后来这十个调皮的孩子就一个个(a) 升起在天空中，那他们就同时出现(arise)在天 空中，这就惹(arouse的第二个音类似“惹”)起 了人间的灾难，所以arouse就是“引起”的意思。 世间的人都生活在水深火热之中，开始举手表 决(raise 特别像 rise，意思也相近，raise 为及物 动词，rise为不及物动词，都意为“举起，升 起”)，最后，后羿举手表示要去射掉九个太阳。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：raise money 筹钱</div>          <div class="zt"><span class="lbl">真题</span>This has already raised privacy concerns. 这已经引起了人们对隐私的担忧。(2023) 例 He had been consulted and had raised no objections.他已经被征询意见，并没有提出 异议。</div>          <div class="fam"><span class="lbl">族</span>raise n. 加薪 / rise v. 上升</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">waken</span>
+          <span class="ipa">/&#x27;weikən/</span>
+          <span class="pos">v.</span>
+          <span class="cn">醒来，唤醒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>enough to waken the whole street</div>          <div class="mnem"><span class="lbl">记</span>wake up(唤醒，醒来)是我们很 熟悉的短语。</div>          <div class="root"><span class="lbl">根</span>wake(醒) + en(使……) → 使醒来</div>          <div class="zt"><span class="lbl">真题</span>They are wakened several times during the night. 他们在夜间被弄醒了好几次。</div>          <div class="fam"><span class="lbl">族</span>awake adj. 醒着的 / awakening n. 觉醒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">awake</span>
+          <span class="ipa">/ə&#x27;weik/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">醒着的 v. 唤醒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the city was awake</div>          <div class="root"><span class="lbl">根</span>a(加强) + wake(醒) → 醒着的</div>          <div class="zt"><span class="lbl">真题</span>I was barely able to stay awake. 我 几乎 无法保持清醒。</div>          <div class="fam"><span class="lbl">族</span>wake v. 醒来 / awaken v. 唤醒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">conclude</span>
+          <span class="ipa">/kən&#x27;klu:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">断定；推断出；得出结论；结束</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Ms. Chen concluded</div>          <div class="root"><span class="lbl">根</span>con(完全) + clud(关闭) + e → 完全关掉 → 结束；断定</div>          <div class="zt"><span class="lbl">真题</span>Most animals conclude that a situation is hopeless and beyond their control. 大多数动物 得出结论，情况是无望的，无法控制的。(2016)</div>          <div class="fam"><span class="lbl">族</span>conclusion n. 结论 / conclusive adj. 决定性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">summary</span>
+          <span class="ipa">/&#x27;saməri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">总结 adj. 总结性的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Ms. Chen wrote a summary for the town office</div>          <div class="mnem"><span class="lbl">记</span>这个单词如果不容易记忆，请 看这个短语：to sum up，总之，概括地说；那 sum 就是这个单词的缩写形式。</div>          <div class="root"><span class="lbl">根</span>sum(总和) + mary(名词后缀) → 归结起来的东西 → 总结</div>          <div class="fam"><span class="lbl">族</span>sum n. 总数 / summarize v. 总结</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">include</span>
+          <span class="ipa">/ın&#x27;klu:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">包括；包含</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It had to include every cost</div>          <div class="root"><span class="lbl">根</span>in(向内) + clud(关闭) + e → 关在里面 → 包括</div>          <div class="zt"><span class="lbl">真题</span>It is too inclusive and thus lacks clarity. 它的包容性太强，因而缺乏明确性。</div>          <div class="fam"><span class="lbl">族</span>inclusion n. 包含 / inclusive adj. 包括在内的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">exclude</span>
+          <span class="ipa">/ık&#x27;sklu:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">不包括；不放在考虑之列；防止……进入；阻 止……参加；把……排斥在外</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and exclude nothing</div>          <div class="root"><span class="lbl">根</span>ex(向外) + clud(关闭) + e → 关在外面 → 排除</div>          <div class="zt"><span class="lbl">真题</span>They exclude those who have stopped looking for a job. 他们排除了那些已经停止找 工作的人。</div>          <div class="fam"><span class="lbl">族</span>exclusion n. 排除 / exclusive adj. 独有的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">eliminate</span>
+          <span class="ipa">/t&#x27;lımineit/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>we had to eliminate two old lights</div>          <div class="mnem"><span class="lbl">记</span>e出去；limi限制（limi想成 limit);ate动词后缀。连在一起就是：把你从限 制中踢出去，那就“淘汰，排除”了你。</div>          <div class="root"><span class="lbl">根</span>e(出去) + limin(门槛) + ate → 赶出门槛 → 淘汰</div>          <div class="zt"><span class="lbl">真题</span>At first, you just eliminate the obvious distractions and explore the rest. 一开始，你只 需要排除那些明显的干扰，然后探索剩下的内 容。(2022)</div>          <div class="fam"><span class="lbl">族</span>elimination n. 淘汰 / preliminary adj. 初步的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">except</span>
+          <span class="ipa">/ık&#x27;sept/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>almost every plan was changed except the roof</div>          <div class="root"><span class="lbl">根</span>ex(向外) + cept(拿) → 拿出去 → 除……之外</div>          <div class="zt"><span class="lbl">真题</span>We were assured that, except for low grades or a raise in family income, no money 164 would be taken away.(他们)向我们保证，除了 成绩不佳或家庭收入增加外，任何钱都不会被 拿走。(2022)</div>          <div class="fam"><span class="lbl">族</span>exception n. 例外 / exceptional adj. 例外的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">exception</span>
+          <span class="ipa">/tk&#x27;sep∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">一般情况以外的人(或事物)；例外</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was one exception: the golden ornament stayed</div>          <div class="root"><span class="lbl">根</span>except(除外) + ion(名词后缀) → 被除掉的情况 → 例外</div>          <div class="zt"><span class="lbl">真题</span>Universities today are in the business of making money, and mine is no exception. 现在 的大学都以赚钱为业，我的大学也不例外。 (2022)</div>          <div class="fam"><span class="lbl">族</span>except prep. 除……之外 / exceptional adj. 杰出的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">overhear</span>
+          <span class="ipa">/əuvər&#x27;hir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">偶然听到；无意中听到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In the corridor I overheard two young actors</div>          <div class="mnem"><span class="lbl">记</span>over 从一边到另一边；hear听。 离得老远听到的，就是“无意中听到的”。</div>          <div class="root"><span class="lbl">根</span>over(越过) + hear(听) → 越过墙听到 → 偶然听到</div>          <div class="fam"><span class="lbl">族</span>hearing n. 听力 / overhear v. 无意中听到</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">overwhelm</span>
+          <span class="ipa">/əuvə&#x27;welm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">淹没；压倒，压垮</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the noise seemed to overwhelm them</div>          <div class="mnem"><span class="lbl">记</span>上面(over)有个“轮子”(whel 特别像 wheel 轮子)。想象一个大轮子压在人 (m 想成 man)身上，不把人“压倒”才怪呢！</div>          <div class="root"><span class="lbl">根</span>over(在上) + whelm(压) → 从上面压下来 → 压倒</div>          <div class="zt"><span class="lbl">真题</span>Obese people would be overwhelmed with anxiety. 肥胖的人会被焦虑淹没。(2021)</div>          <div class="fam"><span class="lbl">族</span>overwhelming adj. 压倒性的 / overwhelmed adj. 不知所措的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">undertake</span>
+          <span class="ipa">/iandər&#x27;teık/</span>
+          <span class="pos">v.</span>
+          <span class="cn">承担;从事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They had undertaken the hardest work</div>          <div class="mnem"><span class="lbl">记</span>从下面(under)拿着(take)，能 想到背负东西的感觉吗？那就是“承担”。 (165) 第七单元</div>          <div class="root"><span class="lbl">根</span>under(下面) + take(拿) → 从下面接住 → 承担</div>          <div class="zt"><span class="lbl">真题</span>Considering the way chores are undertaken around the world may change people&#x27;s thinking. 考虑到世界各地做家务的方式可能会改变人们 的想法。(2020)</div>          <div class="fam"><span class="lbl">族</span>undertaking n. 任务 / undertaker n. 承办人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">overall</span>
+          <span class="ipa">/evər&#x27;e:l; &#x27;verael/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">全面的;综合的;总体的 adv. 总计；总体 上n. 外套；工装服</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Overall, Ms. Chen concluded</div>          <div class="root"><span class="lbl">根</span>over(遍及) + all(全部) → 覆盖全部的 → 总体的</div>          <div class="zt"><span class="lbl">真题</span>The public overall is split on whether they&#x27;d like to use a driverless car. 对于是否愿 意使用无人驾驶汽车，公众总体上存在分歧。 (2016)</div>          <div class="fam"><span class="lbl">族</span>overalls n. 工装裤 / all-round adj. 全面的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 43</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

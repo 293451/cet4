@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 55 · The Singing Contest on Millbrook Radio</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 55 · 12/6 · Unit 8 第 1621-1650 词</div>
+  <h1>The Singing Contest on Millbrook Radio<span class="cn">米尔布鲁克电台的歌唱比赛</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-55.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5077"><p class="en"><span class="w" data-s="43" data-e="213">Every</span> <span class="w" data-s="256" data-e="725">autumn</span> <span class="w" data-s="768" data-e="853">the</span> <span class="w" data-s="896" data-e="1152">radio</span> <span class="w" data-s="1195" data-e="1408">station</span> <span class="w" data-s="1451" data-e="1707">in</span> <span class="w" data-s="1749" data-e="2133">Millbrook</span> <span class="w target" data-s="2176" data-e="2603" title="宣告，公布；声明">proclaims</span> <span class="w" data-s="2645" data-e="2688">a</span> <span class="w" data-s="2731" data-e="2987">singing</span> <span class="w" data-s="3029" data-e="3413">contest,</span> <span class="w" data-s="3669" data-e="3840">and</span> <span class="w" data-s="4011" data-e="4139">the</span> <span class="w" data-s="4181" data-e="4267">town</span> <span class="w" data-s="4309" data-e="4651">talks</span> <span class="w" data-s="4693" data-e="4864">for</span> <span class="w" data-s="4907" data-e="5077">weeks.</span></p><p class="zh">每年秋天，米尔布鲁克的电台都会宣布举办歌唱比赛，全镇人会聊上好几个星期。</p></div>
+<div class="pair" data-s0="5333" data-s1="9429"><p class="en"><span class="w" data-s="5333" data-e="5973">Last</span> <span class="w" data-s="6016" data-e="6187">year</span> <span class="w" data-s="6229" data-e="6443">the</span> <span class="w" data-s="6485" data-e="6613">host</span> <span class="w" data-s="6656" data-e="6827">walked</span> <span class="w" data-s="6869" data-e="7083">on</span> <span class="w" data-s="7125" data-e="7296">stage</span> <span class="w" data-s="7339" data-e="7637">and</span> <span class="w target" data-s="7680" data-e="7893" title="公布；宣布；宣告；表明">declared</span> <span class="w" data-s="7936" data-e="8107">that</span> <span class="w" data-s="8149" data-e="8405">anyone</span> <span class="w" data-s="8448" data-e="8661">over</span> <span class="w" data-s="8704" data-e="9088">twelve</span> <span class="w" data-s="9131" data-e="9259">could</span> <span class="w" data-s="9301" data-e="9429">enter.</span></p><p class="zh">去年，主持人走上台宣布，十二岁以上的人都能报名。</p></div>
+<div class="pair" data-s0="10116" data-s1="14724"><p class="en"><span class="w" data-s="10116" data-e="10244">When</span> <span class="w" data-s="10286" data-e="10414">the</span> <span class="w" data-s="10457" data-e="10500">first</span> <span class="w" data-s="10542" data-e="10756">girl</span> <span class="w" data-s="10798" data-e="11012">finished,</span> <span class="w" data-s="11268" data-e="11524">the</span> <span class="w" data-s="11652" data-e="11822">children</span> <span class="w target" data-s="11865" data-e="12420" title="呼喊，呼叫，大声说">exclaimed</span> <span class="w" data-s="12462" data-e="12718">and</span> <span class="w" data-s="12932" data-e="13060">the</span> <span class="w" data-s="13102" data-e="13145">old</span> <span class="w" data-s="13188" data-e="13358">women</span> <span class="w target" data-s="13401" data-e="13828" title="赞扬，称赞，喝彩n. 赞扬，高度评价">acclaimed</span> <span class="w" data-s="13870" data-e="13998">her</span> <span class="w" data-s="14041" data-e="14126">with</span> <span class="w" data-s="14169" data-e="14297">long</span> <span class="w" data-s="14340" data-e="14724">applause.</span></p><p class="zh">第一个女孩唱完时，孩子们惊呼起来，老太太们用长长的掌声为她喝彩。</p></div>
+<div class="pair" data-s0="15065" data-s1="21166"><p class="en"><span class="w" data-s="15065" data-e="15492">A</span> <span class="w" data-s="15705" data-e="16217">retired</span> <span class="w" data-s="16260" data-e="16686">teacher</span> <span class="w" data-s="16729" data-e="16900">who</span> <span class="w" data-s="16942" data-e="17070">loved</span> <span class="w" data-s="17113" data-e="17284">to</span> <span class="w target" data-s="17326" data-e="17540" title="演讲，朗读，慷慨陈词">declaim</span> <span class="w" data-s="17582" data-e="18094">poems</span> <span class="w" data-s="18137" data-e="18393">sat</span> <span class="w" data-s="18478" data-e="18692">as</span> <span class="w" data-s="18734" data-e="19033">judge,</span> <span class="w" data-s="19204" data-e="19460">and</span> <span class="w" data-s="19502" data-e="19929">everyone</span> <span class="w target" data-s="19972" data-e="20484" title="赞美，赞赏，钦佩">admired</span> <span class="w" data-s="20526" data-e="20697">his</span> <span class="w" data-s="20740" data-e="20868">calm</span> <span class="w" data-s="20910" data-e="21166">voice.</span></p><p class="zh">一位退休教师坐在台下当评委，他喜欢慷慨激昂地朗诵诗，大家都钦佩他那沉稳的嗓音。</p></div>
+<div class="pair" data-s0="22023" data-s1="26247"><p class="en"><span class="w" data-s="22023" data-e="22407">Nobody</span> <span class="w target" data-s="22450" data-e="22748" title="崇拜，爱慕；非常喜欢">adored</span> <span class="w" data-s="22791" data-e="22876">a</span> <span class="w" data-s="22919" data-e="23004">good</span> <span class="w" data-s="23047" data-e="23303">winner</span> <span class="w" data-s="23346" data-e="23474">more</span> <span class="w" data-s="23516" data-e="23644">than</span> <span class="w" data-s="23687" data-e="23772">he</span> <span class="w" data-s="23815" data-e="23986">did,</span> <span class="w" data-s="24156" data-e="24284">and</span> <span class="w" data-s="24540" data-e="24839">nobody</span> <span class="w" data-s="24882" data-e="25095">was</span> <span class="w" data-s="25138" data-e="25223">more</span> <span class="w target" data-s="25266" data-e="25607" title="妒忌的;猜疑的；爱惜的">jealous</span> <span class="w" data-s="25650" data-e="25778">of</span> <span class="w" data-s="25820" data-e="25863">a</span> <span class="w" data-s="25906" data-e="26034">bad</span> <span class="w" data-s="26076" data-e="26247">one.</span></p><p class="zh">没有人比他更爱慕唱得好的选手，也没有人比他更妒忌唱得差的。</p></div>
+<div class="pair" data-s0="26460" data-s1="30556"><p class="en"><span class="w" data-s="26460" data-e="27442">Forty</span> <span class="w" data-s="27484" data-e="27612">people</span> <span class="w target" data-s="27655" data-e="27954" title="申请；应用，适用">apply</span> <span class="w" data-s="27996" data-e="28295">each</span> <span class="w" data-s="28338" data-e="28594">year,</span> <span class="w" data-s="28807" data-e="28978">and</span> <span class="w" data-s="29106" data-e="29234">every</span> <span class="w target" data-s="29276" data-e="29746" title="申请人">applicant</span> <span class="w" data-s="29788" data-e="30002">sends</span> <span class="w" data-s="30044" data-e="30172">in</span> <span class="w" data-s="30215" data-e="30300">a</span> <span class="w" data-s="30343" data-e="30556">tape.</span></p><p class="zh">每年有四十个人申请，每个申请人都得寄一盘录音带。</p></div>
+<div class="pair" data-s0="30931" data-s1="36392"><p class="en"><span class="w" data-s="30931" data-e="31059">The</span> <span class="w" data-s="31101" data-e="31272">rules</span> <span class="w" data-s="31315" data-e="31528">were</span> <span class="w" data-s="31571" data-e="31656">short</span> <span class="w" data-s="31699" data-e="31997">and</span> <span class="w target" data-s="32040" data-e="32381" title="适用的;合适的">applicable</span> <span class="w" data-s="32424" data-e="32552">to</span> <span class="w" data-s="32595" data-e="32723">all:</span> <span class="w" data-s="32979" data-e="33576">no</span> <span class="w" data-s="33619" data-e="34003">drums,</span> <span class="w" data-s="34173" data-e="34387">and</span> <span class="w" data-s="34557" data-e="34685">no</span> <span class="w" data-s="34728" data-e="34941">electric</span> <span class="w target" data-s="34984" data-e="35453" title="(家用)电器，器具">appliance</span> <span class="w" data-s="35496" data-e="35880">louder</span> <span class="w" data-s="35923" data-e="36008">than</span> <span class="w" data-s="36051" data-e="36136">a</span> <span class="w" data-s="36179" data-e="36392">radio.</span></p><p class="zh">规则很短，对所有人都适用：不许用鼓，不许用比收音机更响的电器。</p></div>
+<div class="pair" data-s0="36605" data-s1="39592"><p class="en"><span class="w" data-s="36605" data-e="37587">Rosa</span> <span class="w" data-s="37629" data-e="37757">sent</span> <span class="w" data-s="37800" data-e="37928">her</span> <span class="w" data-s="37971" data-e="38184">tape</span> <span class="w" data-s="38227" data-e="38269">in</span> <span class="w" data-s="38312" data-e="38355">a</span> <span class="w" data-s="38397" data-e="38653">shoebox</span> <span class="w" data-s="38696" data-e="38952">and</span> <span class="w" data-s="38995" data-e="39592">waited.</span></p><p class="zh">罗莎把录音带装在一只鞋盒里寄了出去，然后等着。</p></div>
+<div class="pair" data-s0="39848" data-s1="45437"><p class="en"><span class="w" data-s="39848" data-e="39976">Three</span> <span class="w" data-s="40019" data-e="40147">days</span> <span class="w" data-s="40189" data-e="40403">later</span> <span class="w" data-s="40445" data-e="40744">the</span> <span class="w" data-s="40872" data-e="41043">station</span> <span class="w" data-s="41085" data-e="41341">sent</span> <span class="w" data-s="41384" data-e="41597">its</span> <span class="w target" data-s="41640" data-e="41896" title="回答；答复；回应；作出反应 n. 回答；答复">reply,</span> <span class="w" data-s="42109" data-e="42323">and</span> <span class="w" data-s="42579" data-e="42707">her</span> <span class="w" data-s="42749" data-e="42877">sister</span> <span class="w" data-s="42920" data-e="43219">ran</span> <span class="w" data-s="43261" data-e="43475">to</span> <span class="w target" data-s="43517" data-e="43773" title="接转，转送；播放，转播(电视或广播讯号) n.接力赛">relay</span> <span class="w" data-s="43816" data-e="43944">the</span> <span class="w" data-s="43987" data-e="44072">message</span> <span class="w" data-s="44115" data-e="44371">to</span> <span class="w" data-s="44413" data-e="44541">their</span> <span class="w" data-s="44584" data-e="44712">mother</span> <span class="w" data-s="44755" data-e="44968">in</span> <span class="w" data-s="45011" data-e="45096">the</span> <span class="w" data-s="45139" data-e="45437">fields.</span></p><p class="zh">三天后电台来了回信，妹妹一路跑到田里，把这个消息转告给妈妈。</p></div>
+<div class="pair" data-s0="46251" data-s1="52353"><p class="en"><span class="w" data-s="46251" data-e="46379">The</span> <span class="w" data-s="46422" data-e="46550">host</span> <span class="w" data-s="46593" data-e="46806">said</span> <span class="w" data-s="46849" data-e="47617">Rosa</span> <span class="w" data-s="47659" data-e="47787">was</span> <span class="w" data-s="47830" data-e="47915">a</span> <span class="w target" data-s="47958" data-e="48342" title="可信赖的；可靠的">reliable</span> <span class="w" data-s="48385" data-e="48726">singer</span> <span class="w" data-s="48769" data-e="48897">with</span> <span class="w" data-s="48939" data-e="49067">a</span> <span class="w target" data-s="49110" data-e="49323" title="可信的；可接受的，有效果的">credible</span> <span class="w" data-s="49366" data-e="49579">voice,</span> <span class="w" data-s="49835" data-e="50091">and</span> <span class="w" data-s="50177" data-e="50475">the</span> <span class="w" data-s="50518" data-e="50817">contest</span> <span class="w" data-s="50859" data-e="51115">was</span> <span class="w target" data-s="51158" data-e="51499" title="(法律上)有责任的，有义务的；可能(做某 事)，倾向于">liable</span> <span class="w" data-s="51542" data-e="51713">to</span> <span class="w" data-s="51755" data-e="51841">be</span> <span class="w" data-s="51883" data-e="51969">her</span> <span class="w" data-s="52011" data-e="52139">big</span> <span class="w" data-s="52182" data-e="52353">night.</span></p><p class="zh">主持人说罗莎是一位靠得住的歌手，嗓音可信，这场比赛很可能就是她的大日子。</p></div>
+<div class="pair" data-s0="52566" data-s1="56107"><p class="en"><span class="w" data-s="52566" data-e="53078">Her</span> <span class="w" data-s="53121" data-e="53249">friends</span> <span class="w" data-s="53291" data-e="53547">were</span> <span class="w" data-s="53590" data-e="53718">green</span> <span class="w" data-s="53761" data-e="54017">with</span> <span class="w target" data-s="54059" data-e="54358" title="&amp; v. 羡慕；忌妒">envy,</span> <span class="w" data-s="54486" data-e="54657">but</span> <span class="w" data-s="54870" data-e="55254">Rosa</span> <span class="w" data-s="55297" data-e="55553">only</span> <span class="w" data-s="55595" data-e="56107">smiled.</span></p><p class="zh">她的朋友们羡慕得眼睛都绿了，罗莎却只是笑了笑。</p></div>
+<div class="pair" data-s0="56449" data-s1="60289"><p class="en"><span class="w" data-s="56449" data-e="56577">Her</span> <span class="w target" data-s="56619" data-e="56918" title="意图，目的">intention</span> <span class="w" data-s="56961" data-e="57217">was</span> <span class="w" data-s="57259" data-e="57430">simple:</span> <span class="w" data-s="57686" data-e="57857">to</span> <span class="w" data-s="58369" data-e="58539">sing</span> <span class="w" data-s="58582" data-e="58795">one</span> <span class="w" data-s="58838" data-e="59094">song</span> <span class="w" data-s="59137" data-e="59435">her</span> <span class="w" data-s="59478" data-e="59606">mother</span> <span class="w" data-s="59649" data-e="59819">would</span> <span class="w" data-s="59862" data-e="60289">recognise.</span></p><p class="zh">她的打算很简单：唱一首妈妈听得懂的歌。</p></div>
+<div class="pair" data-s0="61279" data-s1="65417"><p class="en"><span class="w" data-s="61279" data-e="61364">That</span> <span class="w" data-s="61407" data-e="61663">spring</span> <span class="w" data-s="61705" data-e="62047">the</span> <span class="w" data-s="62089" data-e="62217">old</span> <span class="w" data-s="62260" data-e="62516">grain</span> <span class="w" data-s="62559" data-e="62729">store</span> <span class="w" data-s="62772" data-e="62985">was</span> <span class="w target" data-s="63028" data-e="63412" title="开垦；回收；再利用">reclaimed</span> <span class="w" data-s="63455" data-e="63668">and</span> <span class="w" data-s="63711" data-e="64223">became</span> <span class="w" data-s="64265" data-e="64436">a</span> <span class="w" data-s="64479" data-e="64777">studio</span> <span class="w" data-s="64820" data-e="64991">for</span> <span class="w" data-s="65033" data-e="65076">the</span> <span class="w" data-s="65119" data-e="65417">singers.</span></p><p class="zh">那年春天，那座旧粮仓被回收改造成了歌手们的排练室。</p></div>
+<div class="pair" data-s0="65631" data-s1="70452"><p class="en"><span class="w" data-s="65631" data-e="66313">Every</span> <span class="w" data-s="66356" data-e="66612">year</span> <span class="w" data-s="66655" data-e="66868">the</span> <span class="w" data-s="66911" data-e="66996">number</span> <span class="w" data-s="67039" data-e="67209">of</span> <span class="w" data-s="67252" data-e="67593">singers</span> <span class="w target" data-s="67636" data-e="67849" title="趋向；往往会">tends</span> <span class="w" data-s="67892" data-e="68020">to</span> <span class="w" data-s="68063" data-e="68191">grow;</span> <span class="w" data-s="68489" data-e="69087">this</span> <span class="w" data-s="69129" data-e="69300">year</span> <span class="w" data-s="69343" data-e="69641">the</span> <span class="w target" data-s="69727" data-e="70068" title="倾向，偏好；趋势">tendency</span> <span class="w" data-s="70111" data-e="70281">was</span> <span class="w" data-s="70324" data-e="70452">clear.</span></p><p class="zh">每年参赛的人数都趋于增长；而今年这种倾向特别明显。</p></div>
+<div class="pair" data-s0="70751" data-s1="72841"><p class="en"><span class="w" data-s="70751" data-e="71348">The</span> <span class="w" data-s="71391" data-e="71519">new</span> <span class="w target" data-s="71561" data-e="71689" title="倾向，趋势">trend</span> <span class="w" data-s="71732" data-e="71988">was</span> <span class="w" data-s="72031" data-e="72201">to</span> <span class="w" data-s="72244" data-e="72329">sing</span> <span class="w" data-s="72372" data-e="72543">in</span> <span class="w" data-s="72585" data-e="72841">pairs.</span></p><p class="zh">新的风气是两人一组对唱。</p></div>
+<div class="pair" data-s0="73488" data-s1="79291"><p class="en"><span class="w" data-s="73488" data-e="73573">The</span> <span class="w" data-s="73616" data-e="73701">stage</span> <span class="w" data-s="73744" data-e="73957">was</span> <span class="w target" data-s="74000" data-e="74341" title="延长，延伸，伸展">extended,</span> <span class="w" data-s="74555" data-e="74725">the</span> <span class="w" data-s="75024" data-e="75280">queue</span> <span class="w target" data-s="75323" data-e="75621" title="伸展；延伸 n. 伸展；弹性">stretched</span> <span class="w" data-s="75664" data-e="75835">along</span> <span class="w" data-s="75877" data-e="76048">the</span> <span class="w" data-s="76091" data-e="76176">road,</span> <span class="w" data-s="76432" data-e="76731">and</span> <span class="w" data-s="76773" data-e="77072">the</span> <span class="w" data-s="77115" data-e="77243">station</span> <span class="w" data-s="77285" data-e="77584">gave</span> <span class="w" data-s="77627" data-e="77797">the</span> <span class="w" data-s="77840" data-e="78181">contest</span> <span class="w target" data-s="78224" data-e="78736" title="广阔的，广泛的;大量的">extensive</span> <span class="w" data-s="78779" data-e="79291">coverage.</span></p><p class="zh">舞台扩建了，队伍一直排到马路边，电台对比赛做了大量的报道。</p></div>
+<div class="pair" data-s0="79461" data-s1="84667"><p class="en"><span class="w" data-s="79461" data-e="80528">Rosa&#x27;s</span> <span class="w" data-s="80571" data-e="80656">father</span> <span class="w target" data-s="80699" data-e="81168" title="打算，想要；意指">intended</span> <span class="w" data-s="81211" data-e="81424">to</span> <span class="w target" data-s="81467" data-e="81723" title="出席，参加；照顾；注意，专心">attend,</span> <span class="w" data-s="81936" data-e="82320">though</span> <span class="w" data-s="82533" data-e="82661">he</span> <span class="w" data-s="82704" data-e="82832">used</span> <span class="w" data-s="82875" data-e="83003">to</span> <span class="w target" data-s="83045" data-e="83301" title="主张，认为；竞争">contend</span> <span class="w" data-s="83344" data-e="83600">that</span> <span class="w" data-s="83643" data-e="84027">singing</span> <span class="w" data-s="84069" data-e="84453">wasted</span> <span class="w" data-s="84496" data-e="84667">time.</span></p><p class="zh">罗莎的父亲打算去参加，尽管他一向认为唱歌是浪费时间。</p></div>
+<div class="pair" data-s0="85442" data-s1="90391"><p class="en"><span class="w" data-s="85442" data-e="85570">On</span> <span class="w" data-s="85612" data-e="85698">the</span> <span class="w" data-s="85740" data-e="85826">night</span> <span class="w" data-s="85868" data-e="85996">of</span> <span class="w" data-s="86039" data-e="86082">the</span> <span class="w" data-s="86124" data-e="86295">final,</span> <span class="w" data-s="86551" data-e="86722">her</span> <span class="w" data-s="86935" data-e="87106">little</span> <span class="w" data-s="87148" data-e="87362">brother</span> <span class="w target" data-s="87404" data-e="87831" title="假装，佯装；模拟；自认为">pretended</span> <span class="w" data-s="87874" data-e="88044">to</span> <span class="w" data-s="88087" data-e="88172">be</span> <span class="w" data-s="88215" data-e="88258">a</span> <span class="w" data-s="88300" data-e="88428">star</span> <span class="w" data-s="88471" data-e="88812">and</span> <span class="w" data-s="88855" data-e="89324">sang</span> <span class="w" data-s="89367" data-e="89623">into</span> <span class="w" data-s="89666" data-e="89794">a</span> <span class="w" data-s="89836" data-e="90007">wooden</span> <span class="w" data-s="90050" data-e="90391">spoon.</span></p><p class="zh">决赛那天晚上，她的弟弟假装自己是明星，对着一把木勺唱了起来。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">proclaim</span>
+          <span class="ipa">/prə&#x27;kleim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">宣告，公布；声明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the radio station in Millbrook proclaims a singing contest</div>          <div class="mnem"><span class="lbl">记</span>pro 前面；claim 说。在前面大 声地说→如果有一个人在教室前面大声地说， 那估计是班主任在宣布一件事吧→宣布，公布。</div>          <div class="root"><span class="lbl">根</span>pro(在前面) + claim(喊) → 在前面大声说 → 宣告</div>          <div class="fam"><span class="lbl">族</span>proclamation n. 公告 / claim v. 声称</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">reclaim</span>
+          <span class="ipa">/r&#x27;kleım/</span>
+          <span class="pos">v.</span>
+          <span class="cn">开垦；回收；再利用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old grain store was reclaimed and became a studio</div>          <div class="mnem"><span class="lbl">记</span>re向后，相反；claim喊。喊回 来→回收。</div>          <div class="root"><span class="lbl">根</span>re(回) + claim(喊) → 喊回来 → 回收；开垦</div>          <div class="fam"><span class="lbl">族</span>reclamation n. 回收，开垦 / claim v. 索取</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">exclaim</span>
+          <span class="ipa">/ık&#x27;skleim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">呼喊，呼叫，大声说</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the children exclaimed</div>          <div class="mnem"><span class="lbl">记</span>ex 往外；claim 说。往外大声 地说→呼喊，呼叫。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + claim(喊) → 往外喊 → 呼喊</div>          <div class="zt"><span class="lbl">真题</span>The player proceeded to rub his gloves across his wet T-shirt and then exclaimed. 这 名球员开始在他的湿T恤衫上擦手套，然后大 叫起来。</div>          <div class="fam"><span class="lbl">族</span>exclamation n. 感叹 / claim v. 声称</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">acclaim</span>
+          <span class="ipa">/ə&#x27;kleim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">赞扬，称赞，喝彩n. 赞扬，高度评价</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old women acclaimed her with long applause</div>          <div class="mnem"><span class="lbl">记</span>ac 一再地；claim 说，喊。一再 地说，一再地喊，干什么呢？→欢呼，喝彩。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + claim(喊) → 一再叫好 → 赞扬</div>          <div class="fam"><span class="lbl">族</span>acclamation n. 喝彩 / claim v. 声称</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">declaim</span>
+          <span class="ipa">/dr&#x27;kleim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">演讲，朗读，慷慨陈词</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>loved to declaim poems</div>          <div class="mnem"><span class="lbl">记</span>把 de想成弟弟；claim 说，喊。 弟弟在家大声地说话，干什么？→练习“演讲”。</div>          <div class="root"><span class="lbl">根</span>de(加强) + claim(说) → 大声地讲 → 慷慨陈词</div>          <div class="fam"><span class="lbl">族</span>declamation n. 朗诵 / claim v. 声称</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">declare</span>
+          <span class="ipa">/dı&#x27;kler/</span>
+          <span class="pos">v.</span>
+          <span class="cn">公布；宣布；宣告；表明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the host walked on stage and declared that anyone over twelve could enter</div>          <div class="mnem"><span class="lbl">记</span>弟弟（de)可（c)拉（la)住阿姨 (re)，向阿姨“宣布”，以后当着外人的面不准再 欺负他，否则他会说出阿姨的秘密。</div>          <div class="root"><span class="lbl">根</span>de(完全) + clar(清楚) + e → 把话说清楚 → 宣布</div>          <div class="zt"><span class="lbl">真题</span>“Play is not silly behavior,&quot;the academy&#x27;s report declares. 该学院的报告宣称，“玩耍不是 愚蠢的行为。”</div>          <div class="fam"><span class="lbl">族</span>declaration n. 宣言 / clarify v. 澄清</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">admire</span>
+          <span class="ipa">/əd&#x27;maiə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">赞美，赞赏，钦佩</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>everyone admired his calm voice</div>          <div class="mnem"><span class="lbl">记</span>一再地(ad)妹妹(m)和我(i)围 着阿姨（re)，说明我们都很“钦佩，欣赏”阿 姨啊。</div>          <div class="root"><span class="lbl">根</span>ad(一再) + mir(惊奇) → 一再惊叹 → 钦佩</div>          <div class="zt"><span class="lbl">真题</span>But researchers have come to realize that being humble generally indicates the presence of deeply admirable personal qualities. 但研究 人员已经意识到，谦虚通常表明了深深令人钦 佩的个人品质的存在。(2021) (206)</div>          <div class="fam"><span class="lbl">族</span>admiration n. 钦佩 / admirable adj. 令人钦佩的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">adore</span>
+          <span class="ipa">/ə&#x27;də:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">崇拜，爱慕；非常喜欢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody adored a good winner more than he did</div>          <div class="mnem"><span class="lbl">记</span>ad 一再地；o想成一个圈；re 想 成阿姨。那就是所有人都围着阿姨，为什么？ “非常喜欢”阿姨啊！</div>          <div class="root"><span class="lbl">根</span>ad(一再) + or(说，祈祷) → 一再祈祷 → 崇拜</div>          <div class="fam"><span class="lbl">族</span>adoration n. 爱慕 / adorable adj. 可爱的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">envy</span>
+          <span class="ipa">/&#x27;envi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 羡慕；忌妒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her friends were green with envy</div>          <div class="mnem"><span class="lbl">记</span>他是一个贤明的君子，恩威 (envy谐音)并施，受到了邻国君主的“羡慕”。</div>          <div class="root"><span class="lbl">根</span>en(使) + vy(看) → 看着别人心里发酸 → 羡慕</div>          <div class="zt"><span class="lbl">真题</span>Being an information technology, or IT, worker is not a job I envy. 我并不美慕从事信 息技术(IT)工作的人。(2021)</div>          <div class="fam"><span class="lbl">族</span>envious adj. 羡慕的 / jealous adj. 嫉妒的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">jealous</span>
+          <span class="ipa">/&#x27;dzeləs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">妒忌的;猜疑的；爱惜的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>nobody was more jealous of a bad one</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“姐乐死”。太开 心时不要公开，因为会让其他人“妒忌”啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：姐乐死 → 别人看了就嫉妒</div>          <div class="zt"><span class="lbl">真题</span>Helen was much kinder to her youngest child than she was to the others, which of course，made the others jealous. 海伦对她最小 的孩子比对其他孩子好得多，这当然使其他人 嫉妒。</div>          <div class="fam"><span class="lbl">族</span>jealousy n. 嫉妒 / envy v. 羡慕</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">apply</span>
+          <span class="ipa">/ə&#x27;plai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">申请；应用，适用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Forty people apply each year</div>          <div class="root"><span class="lbl">根</span>ap(到) + ply(折，贴) → 把心思贴上去 → 申请；应用</div>          <div class="zt"><span class="lbl">真题</span>They learned about the growth mindset and how to apply it to schoolwork. 他们学习了 成长型思维模式，以及如何将其应用到学校作 业。(2016)</div>          <div class="fam"><span class="lbl">族</span>application n. 申请 / applicant n. 申请人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">applicant</span>
+          <span class="ipa">/&#x27;æplıkənt/</span>
+          <span class="pos"></span>
+          <span class="cn">申请人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every applicant sends in a tape</div>          <div class="root"><span class="lbl">根</span>apply(申请) + ant(人) → 提出申请的人</div>          <div class="zt"><span class="lbl">真题</span>It is impossible for a job applicant to have every expectation met. 对一个求职者来 说，满足每个期望是不可能的。(2022)</div>          <div class="fam"><span class="lbl">族</span>apply v. 申请 / application n. 申请</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">applicable</span>
+          <span class="ipa">/&#x27;æplıkəbl; ə&#x27;plıkəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">适用的;合适的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The rules were short and applicable to all</div>          <div class="root"><span class="lbl">根</span>apply(适用) + able(可…的) → 可以适用上的</div>          <div class="zt"><span class="lbl">真题</span>It is obvious that this new rule is applicable to everyone without exception. 很明 显，这条新规则适用于每个人，无一例外。</div>          <div class="fam"><span class="lbl">族</span>apply v. 适用 / application n. 应用</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">appliance</span>
+          <span class="ipa">/ə&#x27;plaiəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(家用)电器，器具</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>no electric appliance louder than a radio</div>          <div class="mnem"><span class="lbl">记</span>apply使用，运用。家里使用的 东西就是“家用电器”。</div>          <div class="root"><span class="lbl">根</span>apply(应用) + ance(名词后缀) → 家里用的东西 → 电器</div>          <div class="zt"><span class="lbl">真题</span>Consumers could use appliances in a more efficient way by adjusting the time of cooking to the type of food. 消费者可以根据食 物的种类调整烹饪时间，从而更有效地使用电 器。(2019)</div>          <div class="fam"><span class="lbl">族</span>apply v. 应用 / applicable adj. 适用的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">reply</span>
+          <span class="ipa">/rı&#x27;pla1/</span>
+          <span class="pos">v.</span>
+          <span class="cn">回答；答复；回应；作出反应 n. 回答；答复</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the station sent its reply</div>          <div class="mnem"><span class="lbl">记</span>阿姨(re)说不来(ply)。你吃火 锅，你问阿姨来不来吃，阿姨“回答”说不来。</div>          <div class="root"><span class="lbl">根</span>re(回) + ply(折) → 折回去 → 回答</div>          <div class="zt"><span class="lbl">真题</span>How often do people ask you to do something and you just reply,“Sure.&quot;？有多少 次人们让你做某事，而你只是回答：“当然。”？ (2022)</div>          <div class="fam"><span class="lbl">族</span>response n. 回应 / reply n. 答复</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">relay</span>
+          <span class="ipa">/&#x27;ri:leı, rı&#x27;lei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">接转，转送；播放，转播(电视或广播讯号) n.接力赛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her sister ran to relay the message to their mother in the fields</div>          <div class="mnem"><span class="lbl">记</span>阿姨(re)躺下（lay）了，阿姨跑 “接力赛”，太累了，累得都躺下了。</div>          <div class="root"><span class="lbl">根</span>re(再) + lay(放) → 再放一次 → 转播；接力</div>          <div class="fam"><span class="lbl">族</span>relay race 接力赛 / relay n. 接力赛</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">reliable</span>
+          <span class="ipa">/&#x27;laiəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可信赖的；可靠的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa was a reliable singer</div>          <div class="mnem"><span class="lbl">记</span>该单词源 于 rely v.(～ on/ upon)依赖，依靠。able(能)，所以reliable 就是 “可信赖的；可靠的”。</div>          <div class="root"><span class="lbl">根</span>rely(依靠) + able(能…) → 能依靠的 → 可靠的</div>          <div class="zt"><span class="lbl">真题</span>Online classes also require either a computer or laptop and a reliable Internet connection. 在线课程还需要一台电脑或笔记本 电脑和可靠的互联网连接。(2022)</div>          <div class="fam"><span class="lbl">族</span>rely v. 依靠 / reliability n. 可靠性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">credible</span>
+          <span class="ipa">/&#x27;kredəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可信的；可接受的，有效果的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a credible voice</div>          <div class="mnem"><span class="lbl">记</span>credit card 信用卡，所以 credit 就是该单词的名词，意思是“信用，信誉”； credible就是“可信的”。</div>          <div class="root"><span class="lbl">根</span>cred(相信) + ible(能…) → 能让人相信的 → 可信的</div>          <div class="fam"><span class="lbl">族</span>credit n. 信用 / credibility n. 可信度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">liable</span>
+          <span class="ipa">/&#x27;larəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(法律上)有责任的，有义务的；可能(做某 事)，倾向于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the contest was liable to be her big night</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆分为：li(力）+ able(能)→力所能及的→可能的，倾向于。</div>          <div class="root"><span class="lbl">根</span>li(捆) + able(能…) → 被绑住的 → 有责任的；倾向于</div>          <div class="zt"><span class="lbl">真题</span>A recent study of people with HSAM reveals that they are liable to fantasy and full absorption in an activity. 最近一项对患有超强 记忆症的人的研究表明，他们容易产生幻想，并 全身心地投入一项活动。(2017)</div>          <div class="fam"><span class="lbl">族</span>liability n. 责任 / rely v. 依靠</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">tend</span>
+          <span class="ipa">/tend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">趋向；往往会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the number of singers tends to grow</div>          <div class="root"><span class="lbl">根</span>词根 tend(伸出) → 心思朝那边伸 → 趋向</div>          <div class="zt"><span class="lbl">真题</span>People who prioritise breakfasts tend to have lower calorie but higher nutritional intake. 优先吃早餐的人往往摄入的热量较低， 但营养较高。(2019)</div>          <div class="fam"><span class="lbl">族</span>tendency n. 倾向 / extend v. 延伸</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">tendency</span>
+          <span class="ipa">/&#x27;tendənsi/</span>
+          <span class="pos"></span>
+          <span class="cn">倾向，偏好；趋势</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>this year the tendency was clear</div>          <div class="root"><span class="lbl">根</span>tend(趋向) + ency(名词后缀) → 倾向</div>          <div class="zt"><span class="lbl">真题</span>Great benefit and great harm can come from the same human tendency. 同样的人类倾 向可能带来巨大的利益，也可能带来巨大的危 害。(2022)</div>          <div class="fam"><span class="lbl">族</span>tend v. 趋向 / tendentious adj. 有倾向性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">trend</span>
+          <span class="ipa">/trend/</span>
+          <span class="pos"></span>
+          <span class="cn">倾向，趋势</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The new trend was to sing in pairs</div>          <div class="root"><span class="lbl">根</span>和 tend(趋向) 形近 → 大家朝一个方向走 → 趋势</div>          <div class="zt"><span class="lbl">真题</span>This is not necessarily a new trend, but it is a somewhat puzzling one. 这未必是一种新 趋势，但多少有点令人费解。</div>          <div class="fam"><span class="lbl">族</span>trendy adj. 时髦的 / tendency n. 倾向</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">extend</span>
+          <span class="ipa">/ık&#x27;stend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">延长，延伸，伸展</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The stage was extended</div>          <div class="mnem"><span class="lbl">记</span>词根 tend 表示“伸展，趋势”;ex 表示“出，外”。extend就是“朝外伸展”→延长， 伸展。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + tend(伸) → 往外伸 → 延长</div>          <div class="zt"><span class="lbl">真题</span>Another product extension strategy is called product modification. 另一种产品扩展策 略称为产品修改。</div>          <div class="fam"><span class="lbl">族</span>extension n. 延长 / extensive adj. 广泛的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">stretch</span>
+          <span class="ipa">/stret∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">伸展；延伸 n. 伸展；弹性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the queue stretched along the road</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“死拽扯”。“伸 展”你的手臂去拽扯对方。</div>          <div class="root"><span class="lbl">根</span>谐音联想：死拽扯 → 拽扯就拉长 → 伸展</div>          <div class="zt"><span class="lbl">真题</span>Economic instability stretches across race，gender，and geography. 经济不稳定跨越 种族、性别和地域。(2020)</div>          <div class="fam"><span class="lbl">族</span>stretchy adj. 有弹性的 / extend v. 延伸</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">extensive</span>
+          <span class="ipa">/ık&#x27;stensiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">广阔的，广泛的;大量的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the station gave the contest extensive coverage</div>          <div class="root"><span class="lbl">根</span>extend(延伸) + ive(形容词后缀) → 铺得很开的 → 广泛的</div>          <div class="zt"><span class="lbl">真题</span>It can also impact the extent to which they enjoy life. 它还会影响他们享受生活的 程度。</div>          <div class="fam"><span class="lbl">族</span>extend v. 延伸 / extent n. 程度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">attend</span>
+          <span class="ipa">/ə&#x27;tend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">出席，参加；照顾；注意，专心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa&#x27;s father intended to attend</div>          <div class="mnem"><span class="lbl">记</span>一再地(at)延伸(tend)，想象你 在我的课堂上一再地延伸你的手臂，就是举手， 你在干什么？在积极参与啊→参加。</div>          <div class="root"><span class="lbl">根</span>at(到) + tend(伸) → 把心思伸过去 → 出席</div>          <div class="zt"><span class="lbl">真题</span>Offering online classes certainly helps students who would otherwise not be able to attend classroom sessions. 提供在线课程当然 可以帮助那些无法参加课堂教学的学生。 (2022)</div>          <div class="fam"><span class="lbl">族</span>attendance n. 出席 / attention n. 注意</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">contend</span>
+          <span class="ipa">/kən&#x27;tend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">主张，认为；竞争</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he used to contend that singing wasted time</div>          <div class="mnem"><span class="lbl">记</span>都(con)伸展（tend)，课堂上所 有同学都举手，那我也只能提问一个同学，那 么，同学之间的关系就是“竞争”。</div>          <div class="root"><span class="lbl">根</span>con(一起) + tend(伸) → 都伸手去抢 → 竞争；主张</div>          <div class="zt"><span class="lbl">真题</span>An urban food myth contends that if food spends just a few seconds on the floor, dirt and germs won&#x27;t have much of a chance to contaminate it. 一个都市食物迷论认为，如果食 物只在地板上停留几秒钟，灰尘和细菌就不会 有太多机会污染它。</div>          <div class="fam"><span class="lbl">族</span>contention n. 争论 / contender n. 竞争者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">intend</span>
+          <span class="ipa">/ın&#x27;tend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打算，想要；意指</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa&#x27;s father intended to attend</div>          <div class="mnem"><span class="lbl">记</span>里面（in）伸展（tend），往里面 (心里)延伸(盘算)。我看上一条裙子，心里盘 算一下，买不买呢？→打算，想要。 (209) 第八单元</div>          <div class="root"><span class="lbl">根</span>in(往里) + tend(伸) → 心思往里盘算 → 打算</div>          <div class="zt"><span class="lbl">真题</span>It intends to keep its traditional diet. 它 打算保持传统饮食。</div>          <div class="fam"><span class="lbl">族</span>intention n. 意图 / intended adj. 故意的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">intention</span>
+          <span class="ipa">/ın&#x27;ten∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">意图，目的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her intention was simple</div>          <div class="root"><span class="lbl">根</span>intend(打算) + tion(名词后缀) → 心里的打算</div>          <div class="zt"><span class="lbl">真题</span>I was feeling so intentional and strong that I wasn&#x27;t going to let fear just take over. 我 感觉自己是如此有意识和强大，以至于我不会 让恐惧控制自己。(2017)</div>          <div class="fam"><span class="lbl">族</span>intend v. 打算 / intentional adj. 故意的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">pretend</span>
+          <span class="ipa">/prı&#x27;tend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">假装，佯装；模拟；自认为</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her little brother pretended to be a star</div>          <div class="mnem"><span class="lbl">记</span>提前(pre)就延伸(tend，此处的 延伸理解成举手)，我还没提问，你就举手要求 回答问题，装的吧→假装，伪装。</div>          <div class="root"><span class="lbl">根</span>pre(前) + tend(伸) → 提前伸出手 → 装样子 → 假装</div>          <div class="zt"><span class="lbl">真题</span>Whether it&#x27;s rough physical play, outdoor play or social or pretend play, kids derive important lessons from the chance to make things up as they go. 无论是粗暴的体力 游戏、户外游戏、社交游戏或装扮游戏，孩子们 都能从边玩边编故事的机会中学到重要的教 训。(2020)</div>          <div class="fam"><span class="lbl">族</span>pretence n. 假装 / pretended adj. 假装的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 8 · Day 55</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

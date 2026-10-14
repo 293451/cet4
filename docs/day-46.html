@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 46 · The Bird Under the Wheel</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 46 · 11/27 · Unit 7 第 1351-1380 词</div>
+  <h1>The Bird Under the Wheel<span class="cn">车轮下的小鸟</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-46.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5888"><p class="en"><span class="w" data-s="43" data-e="341">Stone</span> <span class="w" data-s="384" data-e="683">Creek</span> <span class="w" data-s="725" data-e="981">is</span> <span class="w" data-s="1067" data-e="1195">a</span> <span class="w" data-s="1237" data-e="1365">small</span> <span class="w" data-s="1408" data-e="1664">town</span> <span class="w" data-s="1707" data-e="1963">at</span> <span class="w" data-s="2005" data-e="2091">the</span> <span class="w" data-s="2133" data-e="2176">foot</span> <span class="w" data-s="2219" data-e="2389">of</span> <span class="w" data-s="2432" data-e="2517">a</span> <span class="w target" data-s="2560" data-e="2773" title="险峻的，陡峭的，过高的">steep</span> <span class="w target" data-s="2816" data-e="3200" title="斜坡 v.倾斜">slope,</span> <span class="w" data-s="3371" data-e="3627">and</span> <span class="w" data-s="3669" data-e="4011">the</span> <span class="w" data-s="4053" data-e="4181">only</span> <span class="w" data-s="4224" data-e="4480">road</span> <span class="w" data-s="4523" data-e="4693">out</span> <span class="w" data-s="4736" data-e="5205">runs</span> <span class="w" data-s="5248" data-e="5376">through</span> <span class="w" data-s="5419" data-e="5589">a</span> <span class="w target" data-s="5632" data-e="5888" title="地下通道;地道；隧道；(动物的)洞穴通道">tunnel.</span></p><p class="zh">石溪镇是个小镇，坐落在一道陡峭山坡的脚下，唯一通向外面的路要穿过一条隧道。</p></div>
+<div class="pair" data-s0="6016" data-s1="9685"><p class="en"><span class="w" data-s="6016" data-e="6997">Rainwater</span> <span class="w" data-s="7040" data-e="7424">runs</span> <span class="w" data-s="7467" data-e="7595">down</span> <span class="w" data-s="7637" data-e="7808">the</span> <span class="w" data-s="7851" data-e="8107">mountain</span> <span class="w" data-s="8149" data-e="8277">in</span> <span class="w" data-s="8320" data-e="8363">a</span> <span class="w" data-s="8405" data-e="8533">stone</span> <span class="w target" data-s="8576" data-e="8875" title="海峡；航道；频道">channel</span> <span class="w" data-s="8917" data-e="9387">beside</span> <span class="w" data-s="9429" data-e="9557">the</span> <span class="w" data-s="9600" data-e="9685">road.</span></p><p class="zh">雨水顺着山势，在路边的石砌水渠里流下来。</p></div>
+<div class="pair" data-s0="10417" data-s1="13532"><p class="en"><span class="w" data-s="10417" data-e="10673">Mei</span> <span class="w" data-s="10716" data-e="10972">drives</span> <span class="w" data-s="11015" data-e="11143">the</span> <span class="w" data-s="11185" data-e="11399">town&#x27;s</span> <span class="w" data-s="11441" data-e="11569">bus</span> <span class="w" data-s="11612" data-e="11953">and</span> <span class="w" data-s="12124" data-e="12295">must</span> <span class="w target" data-s="12337" data-e="12593" title="驾驶(船、汽车等);操纵；引导">steer</span> <span class="w" data-s="12636" data-e="12721">it</span> <span class="w" data-s="12764" data-e="12849">past</span> <span class="w" data-s="12892" data-e="13105">the</span> <span class="w" data-s="13148" data-e="13276">wet</span> <span class="w" data-s="13319" data-e="13532">stones.</span></p><p class="zh">梅开着镇上的公交车，得慢慢地驾驶它绕过那些湿石头。</p></div>
+<div class="pair" data-s0="13788" data-s1="17884"><p class="en"><span class="w" data-s="13788" data-e="14471">In</span> <span class="w" data-s="14513" data-e="14641">hard</span> <span class="w" data-s="14684" data-e="14897">rain</span> <span class="w" data-s="14940" data-e="15196">the</span> <span class="w" data-s="15239" data-e="15324">road</span> <span class="w" data-s="15367" data-e="15580">turns</span> <span class="w" data-s="15623" data-e="15793">into</span> <span class="w" data-s="15836" data-e="16007">a</span> <span class="w target" data-s="16049" data-e="16263" title="滑梯，滑倒v.滑行，滑动，下跌">slide</span> <span class="w" data-s="16305" data-e="16391">of</span> <span class="w" data-s="16433" data-e="16604">mud</span> <span class="w" data-s="16647" data-e="16903">and</span> <span class="w" data-s="16945" data-e="17287">the</span> <span class="w" data-s="17329" data-e="17372">bus</span> <span class="w" data-s="17415" data-e="17585">can</span> <span class="w target" data-s="17628" data-e="17884" title="滑跤；滑倒；下降；溜.疏漏，差错">slip.</span></p><p class="zh">雨大的时候，路面就变成一片泥滑梯，车子会打滑。</p></div>
+<div class="pair" data-s0="18055" data-s1="21852"><p class="en"><span class="w" data-s="18055" data-e="18737">Last</span> <span class="w" data-s="18780" data-e="18908">winter</span> <span class="w" data-s="18951" data-e="19249">she</span> <span class="w" data-s="19292" data-e="19463">fell</span> <span class="w" data-s="19505" data-e="19889">and</span> <span class="w" data-s="20017" data-e="20231">left</span> <span class="w" data-s="20273" data-e="20401">a</span> <span class="w" data-s="20444" data-e="20529">dark</span> <span class="w target" data-s="20572" data-e="20871" title="污点，污渍v. 玷污，给……染色">stain</span> <span class="w" data-s="20913" data-e="21127">on</span> <span class="w" data-s="21169" data-e="21255">her</span> <span class="w" data-s="21297" data-e="21425">blue</span> <span class="w" data-s="21468" data-e="21852">uniform.</span></p><p class="zh">去年冬天她摔了一跤，蓝色制服上留下一块深色的污渍。</p></div>
+<div class="pair" data-s0="22592" data-s1="26517"><p class="en"><span class="w" data-s="22592" data-e="22848">Still,</span> <span class="w" data-s="23061" data-e="23189">she</span> <span class="w" data-s="23701" data-e="24000">keeps</span> <span class="w" data-s="24043" data-e="24128">the</span> <span class="w" data-s="24171" data-e="24256">bus</span> <span class="w target" data-s="24299" data-e="24725" title="平稳的，持续的，牢固的，冷静的v.使平 稳，稳住 (173) 第七单元">steady,</span> <span class="w" data-s="24811" data-e="24981">and</span> <span class="w" data-s="25195" data-e="25451">the</span> <span class="w" data-s="25493" data-e="25579">old</span> <span class="w" data-s="25621" data-e="25835">engine</span> <span class="w" data-s="25877" data-e="26176">is</span> <span class="w target" data-s="26219" data-e="26517" title="(化学状态或原子状态)稳定的；稳固的；牢 固的η.(养马作特定用途的)养马场；马房">stable.</span></p><p class="zh">可她还是把车开得稳稳的，那台老发动机依然稳定。</p></div>
+<div class="pair" data-s0="26688" data-s1="29717"><p class="en"><span class="w" data-s="26688" data-e="27243">Her</span> <span class="w" data-s="27285" data-e="27797">grandfather</span> <span class="w" data-s="27840" data-e="28139">helped</span> <span class="w target" data-s="28181" data-e="28693" title="建立;创立；;设立">establish</span> <span class="w" data-s="28736" data-e="28864">the</span> <span class="w" data-s="28907" data-e="28992">bus</span> <span class="w" data-s="29035" data-e="29205">line</span> <span class="w" data-s="29248" data-e="29547">in</span> <span class="w" data-s="29589" data-e="29717">1965.</span></p><p class="zh">她的爷爷在1965年帮着建立了这条公交线。</p></div>
+<div class="pair" data-s0="31255" data-s1="36460"><p class="en"><span class="w" data-s="31255" data-e="31468">Old</span> <span class="w" data-s="31511" data-e="31596">people</span> <span class="w" data-s="31639" data-e="31895">say</span> <span class="w" data-s="31937" data-e="32151">a</span> <span class="w target" data-s="32193" data-e="32492" title="有害的；邪恶的；淘气的 n. 恶人">wicked</span> <span class="w" data-s="32535" data-e="32748">spirit</span> <span class="w" data-s="32791" data-e="33047">lives</span> <span class="w" data-s="33089" data-e="33345">in</span> <span class="w" data-s="33388" data-e="33473">the</span> <span class="w target" data-s="33516" data-e="33772" title="地下通道;地道；隧道；(动物的)洞穴通道">tunnel,</span> <span class="w" data-s="33900" data-e="34028">and</span> <span class="w" data-s="34199" data-e="34327">in</span> <span class="w target" data-s="34369" data-e="34583" title="恶意；怨恨. 故意使烦恼；存心使苦恼">spite</span> <span class="w" data-s="34625" data-e="34753">of</span> <span class="w" data-s="34796" data-e="34881">new</span> <span class="w" data-s="34924" data-e="35137">lights,</span> <span class="w" data-s="35393" data-e="35905">drivers</span> <span class="w" data-s="35948" data-e="36161">still</span> <span class="w target" data-s="36204" data-e="36460" title="祈祷；恳求">pray.</span></p><p class="zh">镇上的老人说，隧道里住着一个邪恶的精灵；尽管装了新灯，司机们进洞前还是会祈祷。</p></div>
+<div class="pair" data-s0="37313" data-s1="39197"><p class="en"><span class="w" data-s="37313" data-e="37356">&quot;It</span> <span class="w" data-s="37399" data-e="37484">is</span> <span class="w" data-s="37527" data-e="37655">not</span> <span class="w target" data-s="37697" data-e="37911" title="恶毒的；邪恶的 n. 邪恶；罪恶；恶行">evil,&quot;</span> <span class="w" data-s="38685" data-e="38813">Mei</span> <span class="w" data-s="38855" data-e="38941">tells</span> <span class="w" data-s="38983" data-e="39197">them.</span></p><p class="zh">“它并不邪恶，”梅对他们说，</p></div>
+<div class="pair" data-s0="39965" data-s1="41117"><p class="en"><span class="w" data-s="39965" data-e="40007">&quot;It</span> <span class="w" data-s="40050" data-e="40263">is</span> <span class="w" data-s="40306" data-e="40434">only</span> <span class="w" data-s="40477" data-e="40690">dark</span> <span class="w" data-s="40733" data-e="40946">and</span> <span class="w" data-s="40989" data-e="41117">cold.&quot;</span></p><p class="zh">“它只是又黑又冷。”</p></div>
+<div class="pair" data-s0="41629" data-s1="45042"><p class="en"><span class="w" data-s="41629" data-e="42098">One</span> <span class="w" data-s="42141" data-e="42354">morning</span> <span class="w" data-s="42397" data-e="42610">a</span> <span class="w" data-s="42653" data-e="42823">hawk</span> <span class="w" data-s="42866" data-e="43165">hunted,</span> <span class="w" data-s="43335" data-e="43506">and</span> <span class="w" data-s="43719" data-e="43805">its</span> <span class="w target" data-s="43847" data-e="44146" title="捕食；掠夺 . 捕获物；受害者；牺牲者">prey</span> <span class="w" data-s="44189" data-e="44317">ran</span> <span class="w" data-s="44359" data-e="44573">across</span> <span class="w" data-s="44615" data-e="44871">the</span> <span class="w" data-s="44914" data-e="45042">road.</span></p><p class="zh">一天早上，一只鹰在捕猎，它的猎物从路上跑了过去。</p></div>
+<div class="pair" data-s0="45298" data-s1="49991"><p class="en"><span class="w" data-s="45298" data-e="46023">Mei</span> <span class="w" data-s="46066" data-e="46151">hit</span> <span class="w" data-s="46194" data-e="46322">the</span> <span class="w" data-s="46365" data-e="46578">brake,</span> <span class="w" data-s="46706" data-e="47133">coffee</span> <span class="w target" data-s="47175" data-e="47602" title="(使)洒出，泼出，溢出 . 洒出(量)；泼出">spilled</span> <span class="w" data-s="47645" data-e="47773">from</span> <span class="w" data-s="47815" data-e="47943">her</span> <span class="w" data-s="47986" data-e="48114">cup,</span> <span class="w" data-s="48327" data-e="48498">and</span> <span class="w" data-s="48626" data-e="49010">a</span> <span class="w" data-s="49053" data-e="49095">bag</span> <span class="w" data-s="49138" data-e="49309">of</span> <span class="w" data-s="49351" data-e="49565">rice</span> <span class="w" data-s="49607" data-e="49735">fell</span> <span class="w" data-s="49778" data-e="49991">over.</span></p><p class="zh">梅一脚踩下刹车，杯里的咖啡洒了出来，一袋大米也翻倒了。</p></div>
+<div class="pair" data-s0="50600" data-s1="54013"><p class="en"><span class="w" data-s="50600" data-e="50770">Grain</span> <span class="w target" data-s="50813" data-e="51026" title="展开；打开；散布 n. 传播；散布；广泛">spread</span> <span class="w" data-s="51069" data-e="51282">across</span> <span class="w" data-s="51325" data-e="51581">the</span> <span class="w" data-s="51624" data-e="51752">floor,</span> <span class="w" data-s="51965" data-e="52178">and</span> <span class="w" data-s="52306" data-e="52733">some</span> <span class="w" data-s="52776" data-e="52989">had</span> <span class="w" data-s="53032" data-e="53202">already</span> <span class="w target" data-s="53245" data-e="53544" title="">spilt</span> <span class="w" data-s="53586" data-e="53757">by</span> <span class="w" data-s="53800" data-e="53885">the</span> <span class="w" data-s="53928" data-e="54013">door.</span></p><p class="zh">米粒撒了一地，有些早就从门边溢了出去。</p></div>
+<div class="pair" data-s0="54269" data-s1="56744"><p class="en"><span class="w" data-s="54269" data-e="54952">Then</span> <span class="w" data-s="54994" data-e="55250">she</span> <span class="w" data-s="55293" data-e="55464">saw</span> <span class="w" data-s="55506" data-e="55634">a</span> <span class="w" data-s="55677" data-e="55805">small</span> <span class="w" data-s="55848" data-e="56061">bird</span> <span class="w" data-s="56104" data-e="56317">under</span> <span class="w" data-s="56360" data-e="56488">the</span> <span class="w" data-s="56530" data-e="56744">wheel.</span></p><p class="zh">这时她看见车轮下有一只小鸟。</p></div>
+<div class="pair" data-s0="56914" data-s1="59858"><p class="en"><span class="w" data-s="56914" data-e="57512">Its</span> <span class="w target" data-s="57554" data-e="57640" title="翼，翅膀，翅">wing</span> <span class="w" data-s="57682" data-e="57853">was</span> <span class="w" data-s="57896" data-e="58024">broken,</span> <span class="w" data-s="58322" data-e="58536">and</span> <span class="w" data-s="58706" data-e="59005">it</span> <span class="w" data-s="59048" data-e="59090">was</span> <span class="w" data-s="59133" data-e="59218">too</span> <span class="w target" data-s="59261" data-e="59560" title="惊吓，受惊 n. 惊恐,恐慌">scared</span> <span class="w" data-s="59602" data-e="59688">to</span> <span class="w" data-s="59730" data-e="59858">move.</span></p><p class="zh">它的翅膀断了，吓得一动也不敢动。</p></div>
+<div class="pair" data-s0="60487" data-s1="62023"><p class="en"><span class="w" data-s="60487" data-e="60572">She</span> <span class="w" data-s="60615" data-e="60743">did</span> <span class="w" data-s="60785" data-e="60871">not</span> <span class="w target" data-s="60913" data-e="61169" title="(用手掌)打，拍，掴">slap</span> <span class="w" data-s="61212" data-e="61340">it</span> <span class="w" data-s="61383" data-e="61511">or</span> <span class="w" data-s="61553" data-e="61639">shout</span> <span class="w" data-s="61681" data-e="61895">at</span> <span class="w" data-s="61937" data-e="62023">it.</span></p><p class="zh">她没有拍它，也没有冲它喊。</p></div>
+<div class="pair" data-s0="62151" data-s1="68167"><p class="en"><span class="w" data-s="62151" data-e="62876">She</span> <span class="w" data-s="62919" data-e="63217">washed</span> <span class="w" data-s="63260" data-e="63345">its</span> <span class="w" data-s="63388" data-e="63644">wound</span> <span class="w" data-s="63687" data-e="63900">with</span> <span class="w" data-s="63943" data-e="64028">a</span> <span class="w target" data-s="64071" data-e="64241" title="喷，喷洒n. 浪花,水花">spray</span> <span class="w" data-s="64284" data-e="64455">of</span> <span class="w" data-s="64497" data-e="64625">warm</span> <span class="w" data-s="64668" data-e="64924">water</span> <span class="w" data-s="64967" data-e="65223">and</span> <span class="w" data-s="65265" data-e="65948">laid</span> <span class="w" data-s="65991" data-e="66033">it</span> <span class="w" data-s="66076" data-e="66119">in</span> <span class="w" data-s="66161" data-e="66204">a</span> <span class="w" data-s="66247" data-e="66332">box</span> <span class="w" data-s="66375" data-e="66716">under</span> <span class="w" data-s="66759" data-e="66929">a</span> <span class="w" data-s="66972" data-e="67057">rose</span> <span class="w" data-s="67100" data-e="67441">bush</span> <span class="w" data-s="67484" data-e="67655">with</span> <span class="w" data-s="67697" data-e="67783">a</span> <span class="w" data-s="67825" data-e="67911">thick</span> <span class="w target" data-s="67953" data-e="68167" title="植物的茎，干 v. 起源于，来自">stem.</span></p><p class="zh">她用一小股温水冲洗它的伤口，把它放进盒子，安置在一丛玫瑰下面——那丛玫瑰的茎很粗。</p></div>
+<div class="pair" data-s0="68508" data-s1="73628"><p class="en"><span class="w" data-s="68508" data-e="68593">That</span> <span class="w" data-s="68636" data-e="68807">evening</span> <span class="w" data-s="68849" data-e="69148">the</span> <span class="w" data-s="69191" data-e="69276">town</span> <span class="w" data-s="69319" data-e="69575">came</span> <span class="w" data-s="69617" data-e="69745">to</span> <span class="w" data-s="69788" data-e="69831">the</span> <span class="w" data-s="69873" data-e="70001">square,</span> <span class="w" data-s="70257" data-e="70471">and</span> <span class="w" data-s="70599" data-e="70940">when</span> <span class="w" data-s="70983" data-e="71068">she</span> <span class="w" data-s="71111" data-e="71196">put</span> <span class="w" data-s="71239" data-e="71367">the</span> <span class="w" data-s="71409" data-e="71495">bird</span> <span class="w" data-s="71537" data-e="71708">back</span> <span class="w" data-s="71751" data-e="71921">in</span> <span class="w" data-s="71964" data-e="72007">its</span> <span class="w" data-s="72049" data-e="72263">nest,</span> <span class="w" data-s="72476" data-e="72817">people</span> <span class="w" data-s="72860" data-e="73116">began</span> <span class="w" data-s="73159" data-e="73372">to</span> <span class="w target" data-s="73415" data-e="73628" title="鼓掌；轻拍 n. 拍手，鼓掌">clap.</span></p><p class="zh">那天傍晚，镇上的人都来到广场；当她把小鸟放回巢里时，人们开始拍手。</p></div>
+<div class="pair" data-s0="73841" data-s1="76103"><p class="en"><span class="w" data-s="73841" data-e="74396">An</span> <span class="w" data-s="74439" data-e="74567">old</span> <span class="w" data-s="74609" data-e="74780">woman</span> <span class="w" data-s="74823" data-e="75079">stopped</span> <span class="w target" data-s="75121" data-e="75548" title="打扫；清扫；扫去；清除η.扫；打扫；清扫； 巡行；搜索；扫荡">sweeping</span> <span class="w" data-s="75591" data-e="75676">to</span> <span class="w target" data-s="75719" data-e="76103" title="鼓掌；称赞">applaud.</span></p><p class="zh">一位老太太停下扫帚，为它鼓起掌来。</p></div>
+<div class="pair" data-s0="76968" data-s1="80680"><p class="en"><span class="w" data-s="76968" data-e="77395">Lanterns</span> <span class="w" data-s="77438" data-e="77566">above</span> <span class="w" data-s="77608" data-e="77779">the</span> <span class="w" data-s="77822" data-e="77950">square</span> <span class="w" data-s="77992" data-e="78291">began</span> <span class="w" data-s="78334" data-e="78547">to</span> <span class="w target" data-s="78590" data-e="78803" title="摇摆；摆动 v.(使)摇摆，摇动">sway,</span> <span class="w" data-s="79016" data-e="79187">and</span> <span class="w" data-s="79358" data-e="79656">children</span> <span class="w" data-s="79699" data-e="80040">ran</span> <span class="w" data-s="80083" data-e="80296">to</span> <span class="w" data-s="80339" data-e="80424">the</span> <span class="w target" data-s="80467" data-e="80680" title="摆动；挥动；转动；秋千v.(使)摆动，摇摆， 摇荡">swing.</span></p><p class="zh">广场上方的灯笼开始摇晃，孩子们跑向秋千。</p></div>
+<div class="pair" data-s0="80851" data-s1="84648"><p class="en"><span class="w" data-s="80851" data-e="81704">Above</span> <span class="w" data-s="81747" data-e="81790">the</span> <span class="w" data-s="81832" data-e="82003">ridge</span> <span class="w" data-s="82046" data-e="82387">the</span> <span class="w" data-s="82430" data-e="82558">moon</span> <span class="w" data-s="82600" data-e="82814">rose,</span> <span class="w" data-s="83112" data-e="83368">a</span> <span class="w" data-s="83454" data-e="83795">pale</span> <span class="w target" data-s="83838" data-e="84179" title="球体；范围；领域">sphere</span> <span class="w" data-s="84222" data-e="84435">in</span> <span class="w" data-s="84478" data-e="84520">the</span> <span class="w" data-s="84563" data-e="84648">dark.</span></p><p class="zh">山脊上方，月亮升起来了，是黑夜里一个苍白的球体。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">wicked</span>
+          <span class="ipa">/&#x27;wıkıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有害的；邪恶的；淘气的 n. 恶人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a wicked spirit lives in the tunnel</div>          <div class="mnem"><span class="lbl">记</span>我们的(wi 想成 we)手表(CK 的手表)“坏”了。</div>          <div class="root"><span class="lbl">根</span>联想 witch(巫婆) → 巫婆做的事 → 邪恶的</div>          <div class="zt"><span class="lbl">真题</span>Some people are born wicked. 有的人天 生邪恶。</div>          <div class="fam"><span class="lbl">族</span>wickedly adv. 恶劣地 / wickedness n. 邪恶</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">evil</span>
+          <span class="ipa">/&#x27;i:vl, &#x27;i:vıl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">恶毒的；邪恶的 n. 邪恶；罪恶；恶行</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It is not evil</div>          <div class="mnem"><span class="lbl">记</span>这个单词反过来写就是 live(生 活），我们听过一句话是“一念成仙，一念成魔”， 生活的另一面就是“魔鬼”。</div>          <div class="root"><span class="lbl">根</span>联想 live(生活)倒过来写 → 生活的另一面 → 邪恶</div>          <div class="zt"><span class="lbl">真题</span>I suppose that&#x27;s what these films are all about—good triumphing over evil. 我想那就是 这些电影的主题——正义战胜邪恶。</div>          <div class="fam"><span class="lbl">族</span>evilly adv. 恶毒地 / evil-doer n. 作恶者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">tunnel</span>
+          <span class="ipa">/&#x27;tanl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地下通道;地道；隧道；(动物的)洞穴通道</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the only road out runs through a tunnel</div>          <div class="root"><span class="lbl">根</span>谐音联想：塌喽 → 质量差的隧道才会塌</div>          <div class="zt"><span class="lbl">真题</span>Alexandre turned one of Sao Paulo&#x27;s transport tunnels into an amazing wall painting. 亚历山大将圣保罗的一条运输隧道变 成了一幅令人惊叹的壁画。 东西塌喽？“地道，隧道”修建不合格，才塌 了啊。</div>          <div class="fam"><span class="lbl">族</span>tunnelling n. 挖掘隧道 / funnel n. 漏斗</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">channel</span>
+          <span class="ipa">/&#x27;t∫ænl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">海峡；航道；频道</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in a stone channel beside the road</div>          <div class="root"><span class="lbl">根</span>联想 canal(运河) → 水走的通道 → 海峡；频道</div>          <div class="zt"><span class="lbl">真题</span>The channel needs to interview the boy. 电视台需要采访那个男孩。(2019)</div>          <div class="fam"><span class="lbl">族</span>canal n. 运河 / channel v. 输送</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">steer</span>
+          <span class="ipa">/stir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">驾驶(船、汽车等);操纵；引导</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>must steer it past the wet stones</div>          <div class="mnem"><span class="lbl">记</span>新手开车的时候，在街上(st想 成 street)一定是瞪着两只大眼睛(ee 想成两只 眼睛)，目不转睛、紧张地看着前方。</div>          <div class="root"><span class="lbl">根</span>联想 street(街道)：紧张地盯着前方 → 驾驶</div>          <div class="zt"><span class="lbl">真题</span>Steering through change and facing obstacles brings us face to face with our fears. 驾驭变化和面对障碍会让我们直面恐惧。 (2017)</div>          <div class="fam"><span class="lbl">族</span>steering wheel 方向盘 / steersman n. 舵手</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">applaud</span>
+          <span class="ipa">/ə&#x27;plo:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">鼓掌；称赞</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stopped sweeping to applaud</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆分为：a(一)十pp (拍拍)+laud(大声的)→一双手拍得很响的→ 鼓掌。 【拓展】applause /ə&#x27;plə:z/ n. 掌声，喝彩</div>          <div class="root"><span class="lbl">根</span>ap(去) + plaud(拍手) → 拍手叫好 → 鼓掌</div>          <div class="zt"><span class="lbl">真题</span>The city council vote was met with applause inside the council room. 在议会会议 室，市议会的投票结果赢得了热烈的掌声。</div>          <div class="fam"><span class="lbl">族</span>applause n. 掌声 / applauding adj. 喝彩的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">clap</span>
+          <span class="ipa">/klæp/</span>
+          <span class="pos">v.</span>
+          <span class="cn">鼓掌；轻拍 n. 拍手，鼓掌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>people began to clap</div>          <div class="root"><span class="lbl">根</span>谐音联想：可来拍 → 拍手 → 鼓掌</div>          <div class="fam"><span class="lbl">族</span>clapping n. 掌声 / clapper n. 拍板</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">slap</span>
+          <span class="ipa">/slæp/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用手掌)打，拍，掴</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She did not slap it or shout at it</div>          <div class="mnem"><span class="lbl">记</span>嘶(s)啦(la)一下拍(p)过去→ 打，拍。 (172)</div>          <div class="root"><span class="lbl">根</span>谐音联想：嘶啦拍 → 一掌拍过去 → 掴</div>          <div class="zt"><span class="lbl">真题</span>It would be best for us, too, to slip on a shirt, slop on sunscreen and slap on a hat. 对 我们来说，穿上衬衫、抹上防晒霜、戴上帽子也 是最好的选择。</div>          <div class="fam"><span class="lbl">族</span>slap n. 一巴掌 / a slap in the face 一记耳光</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">slip</span>
+          <span class="ipa">/slip/</span>
+          <span class="pos"></span>
+          <span class="cn">滑跤；滑倒；下降；溜.疏漏，差错</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the bus can slip</div>          <div class="mnem"><span class="lbl">记</span>s美女还没站稳，就立刻（li想 成立刻)扑(p)向了我，为什么？“滑倒”了啊。</div>          <div class="root"><span class="lbl">根</span>联想 slipper(拖鞋) → 穿拖鞋走路容易滑倒</div>          <div class="zt"><span class="lbl">真题</span>But if you have memory slips, you probably needn&#x27;t worry. 但如果你有记忆失误， 你可能不必担心。(2018)</div>          <div class="fam"><span class="lbl">族</span>slippery adj. 滑的 / slipper n. 拖鞋</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">slope</span>
+          <span class="ipa">/sləup/</span>
+          <span class="pos"></span>
+          <span class="cn">斜坡 v.倾斜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>at the foot of a steep slope</div>          <div class="mnem"><span class="lbl">记</span>该单词发音前半部分类似 slow 慢慢地，后部分发音想成中文的“扑”。那连到 一起，就是慢慢地扑过去，因为是“斜坡”，所以 要小心点。</div>          <div class="root"><span class="lbl">根</span>联想 slow(慢) + 坡 → 上坡要慢慢走 → 斜坡</div>          <div class="zt"><span class="lbl">真题</span>They nest on the volcano&#x27;s slopes. 它们 在火山的山坡上筑巢。 例 The path sloped along the river. 这条小路 沿着河边倾斜。</div>          <div class="fam"><span class="lbl">族</span>sloped adj. 倾斜的 / sloping adj. 有坡度的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">steep</span>
+          <span class="ipa">/sti:p/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">险峻的，陡峭的，过高的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>at the foot of a steep slope</div>          <div class="mnem"><span class="lbl">记</span>死提(stee的谐音)着心爬(p) 过去。提着心就是很小心，很小心地爬着过去， 估计山很陡峭吧→陡峭的，险峻的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：死提 → 提着心才敢爬过去 → 陡峭的</div>          <div class="zt"><span class="lbl">真题</span>Even before the steep climb in grain prices in 2008, the number of failing states was expanding. 甚至在 2008 年粮食价格急剧攀 升之前，衰退国家的数量就在不断增加。(2016)</div>          <div class="fam"><span class="lbl">族</span>steeply adv. 陡峭地 / steepen v. 变陡</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">stain</span>
+          <span class="ipa">/stein/</span>
+          <span class="pos">n.</span>
+          <span class="cn">污点，污渍v. 玷污，给……染色</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>left a dark stain on her blue uniform</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“stay”。这个 “污渍”怎么也洗不掉，待在那里。</div>          <div class="root"><span class="lbl">根</span>谐音联想：stay → 污渍待在那儿洗不掉</div>          <div class="zt"><span class="lbl">真题</span>Resume(简历) arrives with stains. 简历 上有污渍。</div>          <div class="fam"><span class="lbl">族</span>stained adj. 沾上污渍的 / stainless adj. 不锈的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">steady</span>
+          <span class="ipa">/&#x27;stedi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">平稳的，持续的，牢固的，冷静的v.使平 稳，稳住 (173) 第七单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she keeps the bus steady</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似 stand 站立，“稳 稳地”站着。</div>          <div class="root"><span class="lbl">根</span>联想 stand(站) → 稳稳地站着 → 平稳的</div>          <div class="zt"><span class="lbl">真题</span>They provide a steady supply of freshwater. 它们提供稳定的淡水供应。(2018)</div>          <div class="fam"><span class="lbl">族</span>steadily adv. 稳定地 / steadiness n. 稳定</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">stable</span>
+          <span class="ipa">/&#x27;sterbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(化学状态或原子状态)稳定的；稳固的；牢 固的η.(养马作特定用途的)养马场；马房</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old engine is stable</div>          <div class="mnem"><span class="lbl">记</span>似（s）桌子（table）一样“稳定 的”。</div>          <div class="root"><span class="lbl">根</span>s(似) + table(桌子) → 像桌子一样稳 → 稳定的</div>          <div class="zt"><span class="lbl">真题</span>Getting regular meals throughout the day is more important to leave blood sugar stable through the day. 每天有规律的饮食对于保持 血糖稳定更重要。(2019)</div>          <div class="fam"><span class="lbl">族</span>stability n. 稳定性 / stabilize v. 使稳定</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">establish</span>
+          <span class="ipa">/ı&#x27;stæblıʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">建立;创立；;设立</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her grandfather helped establish the bus line in 1965</div>          <div class="root"><span class="lbl">根</span>e(出) + stabl(站) + ish(使) → 让它站住 → 建立</div>          <div class="zt"><span class="lbl">真题</span>In the right circumstances, they even like to communicate with humans and establish a relationship through play. 在适当的情况下， 它们甚至喜欢与人类交流，并通过游戏建立关 系。(2019)</div>          <div class="fam"><span class="lbl">族</span>establishment n. 建立；机构 / established adj. 已确立的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">slide</span>
+          <span class="ipa">/slaid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">滑梯，滑倒v.滑行，滑动，下跌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the road turns into a slide of mud</div>          <div class="mnem"><span class="lbl">记</span>蛇(s)来的(lide的谐音)，蛇怎 么来？“滑行”而来啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：蛇来的 → 蛇滑行而来 → 滑行；滑梯</div>          <div class="zt"><span class="lbl">真题</span>The immediate cause for the collapse has been Britain&#x27;s slide toward recession, which has cut into consumer spending. 崩溃的直接原 因是英国滑向衰退，这削减了消费者支出。(2019)</div>          <div class="fam"><span class="lbl">族</span>sliding adj. 滑动的 / slider n. 滑行者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">swing</span>
+          <span class="ipa">/swin/</span>
+          <span class="pos"></span>
+          <span class="cn">摆动；挥动；转动；秋千v.(使)摆动，摇摆， 摇荡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>children ran to the swing</div>          <div class="root"><span class="lbl">根</span>联想 wing(翅膀) → 像翅膀一样左右摆 → 摇摆</div>          <div class="zt"><span class="lbl">真题</span>City officials cooperated with the 4-H members in planting trees, building cooking facilities, picnic tables, swings and public restrooms. 市政府官员在植树、修建烹饪设施、 野餐桌、秋千和公共厕所等方面与4-H成员们 合作。 想象这个美女走路摇摇摆摆的，那如果她有翅 膀，翅膀也会随之左右“摇摆”的。</div>          <div class="fam"><span class="lbl">族</span>swing n. 秋千 / swinging adj. 摇摆的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">wing</span>
+          <span class="ipa">/wi/</span>
+          <span class="pos"></span>
+          <span class="cn">翼，翅膀，翅</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its wing was broken</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似苍蝇扇动“翅 膀”时的声音：嗡嗡。</div>          <div class="root"><span class="lbl">根</span>联想：苍蝇扇动翅膀的嗡嗡声 → 翅膀</div>          <div class="zt"><span class="lbl">真题</span>This bird&#x27;s large wings enable it to fly very fast. 这只鸟的大翅膀使它能飞得非常快。</div>          <div class="fam"><span class="lbl">族</span>winged adj. 有翅膀的 / wingless adj. 无翅的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">sway</span>
+          <span class="ipa">/swei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">摇摆；摆动 v.(使)摇摆，摇动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Lanterns above the square began to sway</div>          <div class="root"><span class="lbl">根</span>联想 way(路) → 走路摇摇摆摆 → 摇摆</div>          <div class="zt"><span class="lbl">真题</span>To sway public opinion of the impact of human activities on Earth.目的是改变公众对 人类活动对地球影响的看法。(2020) 这个美女走路“摇摆”的。</div>          <div class="fam"><span class="lbl">族</span>swaying adj. 摇摆的 / sway n. 影响力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">sweep</span>
+          <span class="ipa">/swi:p/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打扫；清扫；扫去；清除η.扫；打扫；清扫； 巡行；搜索；扫荡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stopped sweeping to applaud</div>          <div class="mnem"><span class="lbl">记</span>weep 拆分为：我(w)瞪着两只 小眼睛(ee想象成两只眼睛)趴在那儿(p想成 趴)哭，所以 weep 是哭泣。sweep 就是一个美 女(s)在那儿哭，为什么啊？因为她被领导狠狠 骂了一顿，让她去“打扫”办公室啊。</div>          <div class="root"><span class="lbl">根</span>联想 weep(哭) → 美女(s)哭着被罚去打扫 → 打扫</div>          <div class="zt"><span class="lbl">真题</span>The reflected sunlight would sweep slowly along the surface of the earth. 反射后的 太阳光会慢慢地扫过地球表面。</div>          <div class="fam"><span class="lbl">族</span>sweeper n. 清扫工 / sweeping adj. 彻底的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">scare</span>
+          <span class="ipa">/skeə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">惊吓，受惊 n. 惊恐,恐慌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it was too scared to move</div>          <div class="mnem"><span class="lbl">记</span>s蛇；care关心。有条蛇在关心 你，你害不害怕，恐不恐慌？</div>          <div class="root"><span class="lbl">根</span>s(蛇) + care(关心) → 有条蛇在关心你，怕不怕 → 惊吓</div>          <div class="zt"><span class="lbl">真题</span>Of course I was scared, yet I had this strong sense of “I have to do this.&quot;当然，我很 害怕，但我有一种强烈的感觉，“我必须这样 做。”(2017)</div>          <div class="fam"><span class="lbl">族</span>scary adj. 吓人的 / scared adj. 害怕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">spill</span>
+          <span class="ipa">/spıl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)洒出，泼出，溢出 . 洒出(量)；泼出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>coffee spilled from her cup</div>          <div class="mnem"><span class="lbl">记</span>s(想成一个身材婀娜的女性) +p(趴在那儿)+ill(生病了)→美女生病了，趴 在那儿呕吐→洒出，溢出。</div>          <div class="root"><span class="lbl">根</span>联想 ill(生病) → 病得趴在那儿吐 → 洒出</div>          <div class="zt"><span class="lbl">真题</span>The road was covered with spilled gas. 道 路上满是溢出的汽油。(2020)</div>          <div class="fam"><span class="lbl">族</span>spillage n. 溢出 / spill n. 洒出量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">spread</span>
+          <span class="ipa">/spred/</span>
+          <span class="pos">v.</span>
+          <span class="cn">展开；打开；散布 n. 传播；散布；广泛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Grain spread across the floor</div>          <div class="mnem"><span class="lbl">记</span>read是“读”，s(ome)十p (eople)+read→一些人都来读→传播；散布。</div>          <div class="root"><span class="lbl">根</span>s(ome) + p(eople) + read → 一些人都来读 → 传播</div>          <div class="zt"><span class="lbl">真题</span>I hurried off to spread the good news. 我 赶紧去发布这个好消息。(2015)</div>          <div class="fam"><span class="lbl">族</span>spread n. 传播 / widespread adj. 广泛的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">spite</span>
+          <span class="ipa">/spait/</span>
+          <span class="pos"></span>
+          <span class="cn">恶意；怨恨. 故意使烦恼；存心使苦恼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in spite of new lights</div>          <div class="mnem"><span class="lbl">记</span>一个s型美女走路(way)，想象</div>          <div class="root"><span class="lbl">根</span>联想 despite(尽管) → 两词同源，都含 spite</div>          <div class="zt"><span class="lbl">真题</span>A dedicated USPS employee was on the job carrying out duties in spite of extreme conditions.一名敬业的美国邮政员工在极端条 件下仍在履行职责。(2019)</div>          <div class="fam"><span class="lbl">族</span>spiteful adj. 怀恨的 / in spite of 尽管</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">pray</span>
+          <span class="ipa">/prei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">祈祷；恳求</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drivers still pray</div>          <div class="mnem"><span class="lbl">记</span>趴(p)在光里(ray)干什么？想 象卖火柴的小女孩，她在“祈祷”奶奶把她带走。</div>          <div class="root"><span class="lbl">根</span>p(趴) + ray(光线) → 趴在光里祈祷</div>          <div class="zt"><span class="lbl">真题</span>The most interesting people aren&#x27;t those who&#x27;ve gone on some Eat, Pray, Love journey to find themselves. 最有趣的人并不是那些在 “吃、祈祷、爱”之旅中寻找自我的人。</div>          <div class="fam"><span class="lbl">族</span>prayer n. 祈祷 / praying adj. 祈祷的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">prey</span>
+          <span class="ipa">/prei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">捕食；掠夺 . 捕获物；受害者；牺牲者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>its prey ran across the road</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：扑(p)十弱（re) →弱者通常是受害者→捕获物；受害者。</div>          <div class="root"><span class="lbl">根</span>p(扑) + re(弱) → 弱者被扑住 → 猎物</div>          <div class="zt"><span class="lbl">真题</span>They know what kind of prey might be (174) easier to hunt. 他们知道什么样的猎物可能更 容易捕猎。(2018)</div>          <div class="fam"><span class="lbl">族</span>prey on 捕食 / predator n. 捕食者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">spray</span>
+          <span class="ipa">/sprei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">喷，喷洒n. 浪花,水花</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>washed its wound with a spray of warm water</div>          <div class="mnem"><span class="lbl">记</span>设想一幅图画：一条蛇（s）趴 (p)在光线里(ray)，在“喷”水的样子。</div>          <div class="root"><span class="lbl">根</span>s(蛇) + p(趴) + ray(光) → 趴着喷水 → 喷洒</div>          <div class="zt"><span class="lbl">真题</span>Farmers could then spot-spray, using 50 to 70 percent less pesticide than they otherwise would.这样农民就可以用比原来少50%到 70%的杀虫剂进行定点喷洒。</div>          <div class="fam"><span class="lbl">族</span>sprayer n. 喷雾器 / spray n. 水花</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">spilt</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>some had already spilt by the door</div>          <div class="root"><span class="lbl">根</span>spill 的过去式和过去分词 → 洒出去了</div>          <div class="fam"><span class="lbl">族</span>spill v. 洒出 / spilled adj. 洒出的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">sphere</span>
+          <span class="ipa">/sfr/</span>
+          <span class="pos">n.</span>
+          <span class="cn">球体；范围；领域</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a pale sphere in the dark</div>          <div class="mnem"><span class="lbl">记</span>一条蛇(s)趴(p)在这里(here)， 那这个地方(范围、领域)就是这条蛇的，其他蛇 就不能来了。</div>          <div class="root"><span class="lbl">根</span>联想：s + p + here(这里) → 蛇占的地盘 → 范围；球体</div>          <div class="fam"><span class="lbl">族</span>spherical adj. 球形的 / hemisphere n. 半球</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">stem</span>
+          <span class="ipa">/stem/</span>
+          <span class="pos">n.</span>
+          <span class="cn">植物的茎，干 v. 起源于，来自</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a rose bush with a thick stem</div>          <div class="mnem"><span class="lbl">记</span>一条蛇（s）一样的树藤缠在他 妹(tem 的谐音)身上。 第七单元</div>          <div class="root"><span class="lbl">根</span>联想：s(蛇) + tem → 像蛇一样的藤缠着 → 茎</div>          <div class="zt"><span class="lbl">真题</span>Wherever it grows, its thick twisting stems are extremely hard to remove. 无论它生 长在哪里，它粗壮而扭曲的茎都很难去除。</div>          <div class="fam"><span class="lbl">族</span>stem from 来自 / stem v. 起源于</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 46</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
