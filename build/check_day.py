@@ -28,15 +28,30 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 ROOT = Path(__file__).resolve().parent.parent
 SUFFIXES = ("ically", "ation", "ingly", "edly", "ness", "ment",
-            "ing", "ies", "ied", "ed", "es", "s", "ly", "y", "e")
+            "ing", "ies", "ied", "ed", "es", "s", "ly", "e")
 
 
 def _strip(w: str) -> str:
+    """
+    剥掉常见后缀得词干。
+
+    ⚠️ 两个容易搞错的地方：
+
+    1. `-y` **不能剥**。英语里 y→i 的变形很常见（apply→applied, reply→replied）。
+       如果把 apply 剥成 app、applied 剥成 appl，两边就永远对不上。
+       保留 y，让 apply→apply、applied→appli 走下面的 y/i 归一。
+    2. `-e` 要剥（revolve→revolv，才能和 revolved→revolv 对上）。
+    """
     w = w.lower()
     for s in SUFFIXES:
         if len(w) > len(s) + 2 and w.endswith(s):
             return w[: -len(s)]
     return w
+
+
+def _fold(s: str) -> str:
+    """把 y/i 归一 —— apply/applied、notify/notified 靠这个对上"""
+    return s.replace("i", "y")
 
 
 def norm(s: str) -> str:
@@ -85,6 +100,14 @@ def check(day: str) -> list[str]:
     # 词数（30 为主；个别天会多 1 个，仍算合格）
     if not (30 <= len(ws) <= 31):
         errs.append(f"words 数量 {len(ws)}，应为 30（或 31）")
+
+    # 注：不再检查「目标词互相包含」。
+    #
+    # 曾经加过这个检查，但它会误伤 normal 情况：书的编排本身就是按词族走的
+    # （special / speciality / specialist 同一天出现很正常），
+    # 加了之后通过率从 43/45 掉到 14/45 —— 全是假警报。
+    # 真正的风险（文章里出现 target 之外的词被误判）已经由 render.py 的
+    # match_target 用「最优匹配」处理掉了，不需要在这里拦。
 
     # 和任务文件对齐
     if tf.exists():

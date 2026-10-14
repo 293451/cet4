@@ -49,7 +49,7 @@ def stem(s: str) -> str:
 
 
 _SUFFIXES = ("ically", "ation", "ingly", "edly", "ness", "ment",
-             "ing", "ies", "ied", "ed", "es", "s", "ly", "y", "e")
+             "ing", "ies", "ied", "ed", "es", "s", "ly", "e")
 
 
 def _strip(word: str) -> str:
