@@ -1,0 +1,696 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 17 · The Small School in the Valley</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 17 · 10/29 · Unit 3 第 481-510 词</div>
+  <h1>The Small School in the Valley<span class="cn">山谷里的小学校</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-17.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4651"><p class="en"><span class="w" data-s="43" data-e="427">Elena</span> <span class="w" data-s="469" data-e="597">taught</span> <span class="w" data-s="640" data-e="853">English</span> <span class="w" data-s="896" data-e="1152">in</span> <span class="w" data-s="1195" data-e="1280">a</span> <span class="w" data-s="1323" data-e="1408">small</span> <span class="w" data-s="1451" data-e="1707">school</span> <span class="w" data-s="1749" data-e="2005">in</span> <span class="w" data-s="2048" data-e="2133">a</span> <span class="w" data-s="2176" data-e="2432">valley,</span> <span class="w" data-s="2603" data-e="2773">and</span> <span class="w" data-s="2859" data-e="3285">she</span> <span class="w" data-s="3328" data-e="3456">was</span> <span class="w target" data-s="3499" data-e="3840" title="流利的，流畅的">fluent</span> <span class="w" data-s="3883" data-e="4011">in</span> <span class="w" data-s="4053" data-e="4181">three</span> <span class="w" data-s="4224" data-e="4651">languages.</span></p><p class="zh">埃琳娜在山谷里一所小学校教英语，她能流利地说三种语言。</p></div>
+<div class="pair" data-s0="4864" data-s1="10581"><p class="en"><span class="w" data-s="4864" data-e="5547">Her</span> <span class="w" data-s="5589" data-e="5803">mother</span> <span class="w" data-s="5845" data-e="6059">had</span> <span class="w" data-s="6101" data-e="6187">been</span> <span class="w" data-s="6229" data-e="6315">a</span> <span class="w" data-s="6357" data-e="6571">teacher</span> <span class="w" data-s="6613" data-e="6741">too,</span> <span class="w" data-s="6955" data-e="7211">and</span> <span class="w" data-s="7381" data-e="7979">Elena</span> <span class="w target" data-s="8021" data-e="8405" title="继承，经遗传获得；接替">inherited</span> <span class="w" data-s="8448" data-e="8576">the</span> <span class="w" data-s="8619" data-e="8789">school,</span> <span class="w" data-s="9003" data-e="9515">part</span> <span class="w" data-s="9557" data-e="9728">of</span> <span class="w" data-s="9771" data-e="9856">the</span> <span class="w" data-s="9899" data-e="10155">village</span> <span class="w target" data-s="10197" data-e="10581" title="遗产(指国家或社会长期形成的历史、传统和 特色)">heritage.</span></p><p class="zh">她母亲也曾是老师，埃琳娜继承了这所学校，它也是村里遗产的一部分。</p></div>
+<div class="pair" data-s0="11230" data-s1="14814"><p class="en"><span class="w" data-s="11230" data-e="11358">By</span> <span class="w" data-s="11401" data-e="11572">local</span> <span class="w target" data-s="11614" data-e="12169" title="">convention,</span> <span class="w" data-s="12382" data-e="12681">every</span> <span class="w" data-s="12852" data-e="13150">family</span> <span class="w" data-s="13193" data-e="13492">sent</span> <span class="w" data-s="13534" data-e="13662">a</span> <span class="w" data-s="13705" data-e="13790">child</span> <span class="w" data-s="13833" data-e="14174">to</span> <span class="w" data-s="14217" data-e="14345">her</span> <span class="w" data-s="14388" data-e="14516">evening</span> <span class="w" data-s="14558" data-e="14814">class.</span></p><p class="zh">按当地习俗，每家都送一个孩子来上她的夜课。</p></div>
+<div class="pair" data-s0="15156" data-s1="20574"><p class="en"><span class="w" data-s="15156" data-e="15966">The</span> <span class="w" data-s="16009" data-e="16436">classroom</span> <span class="w" data-s="16478" data-e="16606">was</span> <span class="w target" data-s="16649" data-e="17033" title="紧凑的，紧密的">compact,</span> <span class="w" data-s="17332" data-e="17545">and</span> <span class="w" data-s="17673" data-e="17886">when</span> <span class="w" data-s="17929" data-e="18100">snow</span> <span class="w" data-s="18142" data-e="18526">slid</span> <span class="w" data-s="18569" data-e="18612">off</span> <span class="w" data-s="18654" data-e="18782">the</span> <span class="w" data-s="18825" data-e="19081">roof,</span> <span class="w" data-s="19166" data-e="19465">the</span> <span class="w target" data-s="19550" data-e="19764" title="碰撞；影响 v. 撞击，冲击；影响">impact</span> <span class="w" data-s="19806" data-e="20318">shook</span> <span class="w" data-s="20361" data-e="20404">the</span> <span class="w" data-s="20446" data-e="20574">wall.</span></p><p class="zh">教室很紧凑，雪从屋顶滑下来时，那一下撞击震得墙壁直响。</p></div>
+<div class="pair" data-s0="20958" data-s1="24628"><p class="en"><span class="w" data-s="20958" data-e="21086">Good</span> <span class="w" data-s="21129" data-e="21556">firewood</span> <span class="w" data-s="21598" data-e="21769">was</span> <span class="w target" data-s="21812" data-e="22110" title="缺乏的;不足的；稀少的">scarce</span> <span class="w" data-s="22153" data-e="22238">that</span> <span class="w" data-s="22281" data-e="22452">winter,</span> <span class="w" data-s="22665" data-e="22836">and</span> <span class="w" data-s="23049" data-e="23305">English</span> <span class="w" data-s="23348" data-e="23561">books</span> <span class="w" data-s="23604" data-e="23817">were</span> <span class="w target" data-s="23860" data-e="24116" title="稀少的;珍贵的;(肉类)三分熟的">rare</span> <span class="w" data-s="24158" data-e="24286">in</span> <span class="w" data-s="24329" data-e="24372">the</span> <span class="w" data-s="24414" data-e="24628">village.</span></p><p class="zh">那年冬天好柴火很缺，村里英语书也很少见。</p></div>
+<div class="pair" data-s0="24798" data-s1="27358"><p class="en"><span class="w" data-s="24798" data-e="25268">Her</span> <span class="w target" data-s="25310" data-e="25737" title="影响；势力 v. 影响">influence</span> <span class="w" data-s="25780" data-e="25908">on</span> <span class="w" data-s="25950" data-e="26078">those</span> <span class="w" data-s="26121" data-e="26292">children</span> <span class="w" data-s="26334" data-e="26676">could</span> <span class="w" data-s="26718" data-e="26846">not</span> <span class="w" data-s="26889" data-e="27060">be</span> <span class="w" data-s="27102" data-e="27358">measured.</span></p><p class="zh">她对那些孩子的影响无法估量。</p></div>
+<div class="pair" data-s0="28087" data-s1="30903"><p class="en"><span class="w" data-s="28087" data-e="28172">In</span> <span class="w" data-s="28215" data-e="28300">the</span> <span class="w" data-s="28343" data-e="28428">winter</span> <span class="w" data-s="28471" data-e="28684">of</span> <span class="w" data-s="28727" data-e="28812">that</span> <span class="w" data-s="28855" data-e="29025">year,</span> <span class="w target" data-s="29281" data-e="30092" title="流行性感冒；流感">influenza</span> <span class="w" data-s="30135" data-e="30348">came</span> <span class="w" data-s="30391" data-e="30519">to</span> <span class="w" data-s="30561" data-e="30604">the</span> <span class="w" data-s="30647" data-e="30903">valley.</span></p><p class="zh">那年冬天，流感来到了山谷。</p></div>
+<div class="pair" data-s0="31073" data-s1="35767"><p class="en"><span class="w" data-s="31073" data-e="31457">A</span> <span class="w" data-s="31500" data-e="31799">doctor</span> <span class="w" data-s="31841" data-e="32097">from</span> <span class="w" data-s="32140" data-e="32225">the</span> <span class="w" data-s="32268" data-e="32396">city</span> <span class="w target" data-s="32439" data-e="32951" title="">exerted</span> <span class="w" data-s="32993" data-e="33164">all</span> <span class="w" data-s="33207" data-e="33377">his</span> <span class="w" data-s="33420" data-e="33633">strength,</span> <span class="w" data-s="33932" data-e="34444">but</span> <span class="w" data-s="34487" data-e="34615">the</span> <span class="w" data-s="34657" data-e="34913">clinic</span> <span class="w" data-s="34956" data-e="35127">had</span> <span class="w" data-s="35169" data-e="35297">few</span> <span class="w" data-s="35340" data-e="35767">supplies.</span></p><p class="zh">城里来的医生用尽全身力气，但诊所的物资少得可怜。</p></div>
+<div class="pair" data-s0="36108" data-s1="39905"><p class="en"><span class="w" data-s="36108" data-e="37047">Elena&#x27;s</span> <span class="w" data-s="37089" data-e="37175">family</span> <span class="w" data-s="37217" data-e="37473">was</span> <span class="w" data-s="37516" data-e="37644">not</span> <span class="w target" data-s="37687" data-e="38156" title="富裕的，富足的">affluent,</span> <span class="w" data-s="38327" data-e="38796">yet</span> <span class="w" data-s="38839" data-e="38967">she</span> <span class="w" data-s="39009" data-e="39180">never</span> <span class="w" data-s="39223" data-e="39436">asked</span> <span class="w" data-s="39479" data-e="39692">for</span> <span class="w" data-s="39735" data-e="39905">money.</span></p><p class="zh">埃琳娜家并不富裕，但她从不向人要钱。</p></div>
+<div class="pair" data-s0="40516" data-s1="42948"><p class="en"><span class="w" data-s="40516" data-e="40602">For</span> <span class="w" data-s="40644" data-e="40730">two</span> <span class="w" data-s="40772" data-e="40986">weeks</span> <span class="w" data-s="41028" data-e="41412">the</span> <span class="w" data-s="41540" data-e="41754">mood</span> <span class="w" data-s="41796" data-e="41882">in</span> <span class="w" data-s="41924" data-e="41967">the</span> <span class="w" data-s="42010" data-e="42351">classroom</span> <span class="w" data-s="42394" data-e="42564">was</span> <span class="w target" data-s="42607" data-e="42948" title="紧张的 v. 紧张,紧绷 n.时态">tense.</span></p><p class="zh">有两个星期，教室里的气氛很紧张。</p></div>
+<div class="pair" data-s0="43076" data-s1="46874"><p class="en"><span class="w" data-s="43076" data-e="43759">She</span> <span class="w" data-s="43802" data-e="43972">kept</span> <span class="w" data-s="44015" data-e="44143">up</span> <span class="w" data-s="44186" data-e="44356">an</span> <span class="w target" data-s="44399" data-e="44655" title="集中的，加强的">intensive</span> <span class="w" data-s="44698" data-e="44996">reading</span> <span class="w" data-s="45039" data-e="45594">programme,</span> <span class="w" data-s="45764" data-e="45935">and</span> <span class="w" data-s="45978" data-e="46148">the</span> <span class="w" data-s="46191" data-e="46276">work</span> <span class="w" data-s="46319" data-e="46532">was</span> <span class="w target" data-s="46575" data-e="46874" title="紧张的;强烈的">intense.</span></p><p class="zh">她坚持高强度的阅读计划，对每个人来说功课都很紧张。</p></div>
+<div class="pair" data-s0="47130" data-s1="50202"><p class="en"><span class="w" data-s="47130" data-e="47514">A</span> <span class="w" data-s="47556" data-e="47940">good</span> <span class="w" data-s="47983" data-e="48282">teacher</span> <span class="w" data-s="48324" data-e="48495">needs</span> <span class="w" data-s="48538" data-e="48666">a</span> <span class="w target" data-s="48708" data-e="48836" title="感觉；见识；理解力 v. 感觉到；觉察到 惯例的，习惯的，常规的">sense</span> <span class="w" data-s="48879" data-e="49050">of</span> <span class="w" data-s="49092" data-e="49263">what</span> <span class="w" data-s="49306" data-e="49348">a</span> <span class="w" data-s="49391" data-e="49519">child</span> <span class="w" data-s="49562" data-e="49860">really</span> <span class="w" data-s="49903" data-e="50202">needs.</span></p><p class="zh">好老师需要对孩子的真实需要有感觉。</p></div>
+<div class="pair" data-s0="51065" data-s1="53583"><p class="en"><span class="w" data-s="51065" data-e="51151">She</span> <span class="w" data-s="51193" data-e="51364">was</span> <span class="w target" data-s="51407" data-e="51748" title="敏感的;脆弱的 11. 常识">sensitive</span> <span class="w" data-s="51791" data-e="51961">to</span> <span class="w" data-s="52004" data-e="52089">every</span> <span class="w" data-s="52132" data-e="52431">small</span> <span class="w" data-s="52473" data-e="52772">change</span> <span class="w" data-s="52815" data-e="53071">in</span> <span class="w" data-s="53113" data-e="53199">their</span> <span class="w" data-s="53241" data-e="53583">faces.</span></p><p class="zh">她对孩子们脸上的每一点细小变化都很敏感。</p></div>
+<div class="pair" data-s0="53839" data-s1="58873"><p class="en"><span class="w" data-s="53839" data-e="54436">Her</span> <span class="w target" data-s="54479" data-e="55033" title="">commonsense</span> <span class="w" data-s="55076" data-e="55375">told</span> <span class="w" data-s="55417" data-e="55588">her</span> <span class="w" data-s="55631" data-e="55716">to</span> <span class="w" data-s="55759" data-e="55844">slow</span> <span class="w" data-s="55887" data-e="56143">down,</span> <span class="w" data-s="56399" data-e="56569">and</span> <span class="w" data-s="56697" data-e="57039">her</span> <span class="w target" data-s="57081" data-e="57380" title="明智的；意识到">sensible</span> <span class="w" data-s="57423" data-e="57636">plan</span> <span class="w" data-s="57679" data-e="57892">was</span> <span class="w" data-s="57935" data-e="58105">ten</span> <span class="w" data-s="58148" data-e="58532">pages</span> <span class="w" data-s="58575" data-e="58745">a</span> <span class="w" data-s="58788" data-e="58873">day.</span></p><p class="zh">她的常识告诉她该放慢节奏，于是她明智的计划变成了一天只读十页。</p></div>
+<div class="pair" data-s0="59479" data-s1="62807"><p class="en"><span class="w" data-s="59479" data-e="59649">Some</span> <span class="w" data-s="59692" data-e="59905">parents</span> <span class="w" data-s="59948" data-e="60204">called</span> <span class="w" data-s="60247" data-e="60417">her</span> <span class="w" data-s="60460" data-e="60588">method</span> <span class="w target" data-s="60631" data-e="61143" title="">nonsense,</span> <span class="w" data-s="61441" data-e="61655">but</span> <span class="w" data-s="61868" data-e="61996">the</span> <span class="w" data-s="62039" data-e="62167">children</span> <span class="w" data-s="62209" data-e="62807">improved.</span></p><p class="zh">有些家长说她这套是胡说八道，但孩子们进步了。</p></div>
+<div class="pair" data-s0="63105" data-s1="67031"><p class="en"><span class="w" data-s="63105" data-e="63319">In</span> <span class="w" data-s="63532" data-e="63745">spring</span> <span class="w" data-s="63788" data-e="64129">the</span> <span class="w" data-s="64172" data-e="64343">snow</span> <span class="w target" data-s="64385" data-e="64812" title="">melted,</span> <span class="w" data-s="64940" data-e="65111">and</span> <span class="w" data-s="65367" data-e="65495">a</span> <span class="w" data-s="65537" data-e="65623">warm</span> <span class="w" data-s="65665" data-e="65921">wind</span> <span class="w" data-s="65964" data-e="66263">came</span> <span class="w" data-s="66305" data-e="66519">over</span> <span class="w" data-s="66561" data-e="66689">the</span> <span class="w" data-s="66732" data-e="67031">fields.</span></p><p class="zh">春天雪化了，一阵暖风从田野上吹来。</p></div>
+<div class="pair" data-s0="67201" data-s1="70529"><p class="en"><span class="w" data-s="67201" data-e="67927">Elena</span> <span class="w" data-s="67969" data-e="68140">even</span> <span class="w target" data-s="68183" data-e="68481" title="驯服，制服 adj.(动物)驯服的，温顺的">tamed</span> <span class="w" data-s="68524" data-e="68652">a</span> <span class="w" data-s="68695" data-e="68823">small</span> <span class="w" data-s="68865" data-e="69121">wild</span> <span class="w" data-s="69164" data-e="69463">bird</span> <span class="w" data-s="69505" data-e="69847">that</span> <span class="w" data-s="69889" data-e="70017">lived</span> <span class="w" data-s="70060" data-e="70231">near</span> <span class="w" data-s="70273" data-e="70359">the</span> <span class="w" data-s="70401" data-e="70529">window.</span></p><p class="zh">埃琳娜甚至驯服了一只住在窗边的小野鸟。</p></div>
+<div class="pair" data-s0="71223" data-s1="74807"><p class="en"><span class="w" data-s="71223" data-e="71309">The</span> <span class="w" data-s="71351" data-e="71437">sun</span> <span class="w" data-s="71479" data-e="71650">is</span> <span class="w" data-s="71693" data-e="71778">the</span> <span class="w target" data-s="71821" data-e="71949" title="来源 v. 从某地获得">source</span> <span class="w" data-s="71991" data-e="72119">of</span> <span class="w" data-s="72162" data-e="72333">light,</span> <span class="w" data-s="72546" data-e="72717">and</span> <span class="w" data-s="73015" data-e="73229">time</span> <span class="w" data-s="73271" data-e="73527">is</span> <span class="w" data-s="73570" data-e="73655">her</span> <span class="w" data-s="73698" data-e="73783">most</span> <span class="w" data-s="73826" data-e="74338">precious</span> <span class="w target" data-s="74381" data-e="74807" title="资源；财力 v. 向……提供资源">resource.</span></p><p class="zh">太阳是光的来源，而时间是她最宝贵的资源。</p></div>
+<div class="pair" data-s0="75021" data-s1="79330"><p class="en"><span class="w" data-s="75021" data-e="75575">She</span> <span class="w" data-s="75618" data-e="75831">often</span> <span class="w" data-s="75874" data-e="76087">spoke</span> <span class="w" data-s="76130" data-e="76429">about</span> <span class="w target" data-s="76471" data-e="76642" title="精神的，智力的；思想的">mental</span> <span class="w" data-s="76685" data-e="76898">health</span> <span class="w" data-s="76941" data-e="77367">and</span> <span class="w" data-s="77709" data-e="77837">about</span> <span class="w" data-s="77879" data-e="78050">the</span> <span class="w target" data-s="78093" data-e="78562" title="基础的，根本的 n. (pl.)基本原则，基本 原理">fundamental</span> <span class="w" data-s="78605" data-e="78733">rule</span> <span class="w" data-s="78775" data-e="78989">of</span> <span class="w" data-s="79031" data-e="79117">her</span> <span class="w" data-s="79159" data-e="79330">school.</span></p><p class="zh">她常谈起心理健康，也常谈起她学校的根本原则。</p></div>
+<div class="pair" data-s0="79629" data-s1="82573"><p class="en"><span class="w" data-s="79629" data-e="80141">A</span> <span class="w" data-s="80183" data-e="80567">mistake</span> <span class="w" data-s="80610" data-e="80781">in</span> <span class="w" data-s="80823" data-e="81122">grammar</span> <span class="w" data-s="81165" data-e="81335">is</span> <span class="w" data-s="81378" data-e="81506">never</span> <span class="w target" data-s="81549" data-e="81975" title="致命的">fatal,</span> <span class="w" data-s="82103" data-e="82274">she</span> <span class="w" data-s="82402" data-e="82573">said.</span></p><p class="zh">她说，语法上的错误从来都不致命。</p></div>
+<div class="pair" data-s0="83224" data-s1="86381"><p class="en"><span class="w" data-s="83224" data-e="83352">In</span> <span class="w target" data-s="83394" data-e="83608" title="总的，全部的；完全的 n. 总数，总计">total,</span> <span class="w" data-s="83864" data-e="84504">forty</span> <span class="w" data-s="84546" data-e="84888">pupils</span> <span class="w" data-s="84930" data-e="85186">passed</span> <span class="w" data-s="85229" data-e="85442">the</span> <span class="w" data-s="85485" data-e="85613">exam</span> <span class="w" data-s="85656" data-e="85997">that</span> <span class="w" data-s="86040" data-e="86381">June.</span></p><p class="zh">那年六月，一共有四十名学生通过了考试。</p></div>
+<div class="pair" data-s0="86594" data-s1="89410"><p class="en"><span class="w" data-s="86594" data-e="86808">Now</span> <span class="w" data-s="87448" data-e="87704">she</span> <span class="w" data-s="87746" data-e="88002">keeps</span> <span class="w" data-s="88045" data-e="88216">every</span> <span class="w" data-s="88258" data-e="88600">record</span> <span class="w" data-s="88642" data-e="88856">in</span> <span class="w target" data-s="88898" data-e="89154" title="数字的,数码的">digital</span> <span class="w" data-s="89197" data-e="89410">form.</span></p><p class="zh">现在她把所有记录都以数字形式保存。</p></div>
+<div class="pair" data-s0="90151" data-s1="92796"><p class="en"><span class="w" data-s="90151" data-e="90279">Her</span> <span class="w" data-s="90321" data-e="90492">greatest</span> <span class="w target" data-s="90535" data-e="91047" title="天资，才能，天才">talent,</span> <span class="w" data-s="91175" data-e="91345">the</span> <span class="w" data-s="91431" data-e="91772">villagers</span> <span class="w" data-s="91815" data-e="91943">said,</span> <span class="w" data-s="92156" data-e="92284">was</span> <span class="w" data-s="92412" data-e="92796">patience.</span></p><p class="zh">村里人说，她最大的才能是耐心。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">compact</span>
+          <span class="ipa">/&#x27;kpmpækt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">紧凑的，紧密的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The classroom was compact</div>          <div class="root"><span class="lbl">根</span>com(共同) + pact(压紧) → 压在一起</div>          <div class="fam"><span class="lbl">族</span>compactly adv. 紧凑地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">impact</span>
+          <span class="ipa">/&#x27;ımpækt, im&#x27;pækt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">碰撞；影响 v. 撞击，冲击；影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the impact shook the wall</div>          <div class="mnem"><span class="lbl">记</span>往里面（im）拍它（pact的谐 音)，想象海水“冲击”海边岩石的声音，有种惊 涛拍岸的感觉。</div>          <div class="root"><span class="lbl">根</span>im(向内) + pact(压紧) → 往里压 → 撞击</div>          <div class="zt"><span class="lbl">真题</span>More studies are needed to find out the impact of emotion on behavior. 需要更多的研 究来发现情绪对行为的影响。(2016)</div>          <div class="fam"><span class="lbl">族</span>impactful adj. 有影响力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">influence</span>
+          <span class="ipa">/&#x27;Influəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">影响；势力 v. 影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her influence on those children</div>          <div class="mnem"><span class="lbl">记</span>in里面，flu 流感，ence 是名词 后缀，连在一起就是：家里的人都得流感了，肯 定会产生一些“影响”啊。</div>          <div class="root"><span class="lbl">根</span>in(里面) + flu(流) + ence → 流进心里</div>          <div class="zt"><span class="lbl">真题</span>Mothers&#x27;influence on children may last longer than fathers&#x27;.母亲对孩子的影响可能比 父亲更持久。(2016) (064)</div>          <div class="fam"><span class="lbl">族</span>influential adj. 有影响的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">influenza</span>
+          <span class="ipa">/ınflu&#x27;enzə/</span>
+          <span class="pos"></span>
+          <span class="cn">流行性感冒；流感</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>influenza came to the valley</div>          <div class="mnem"><span class="lbl">记</span>bird flu禽流感，这个短语我们 很熟悉。</div>          <div class="root"><span class="lbl">根</span>与 influence 同源：古人以为「星流」带来流感</div>          <div class="fam"><span class="lbl">族</span>flu n. 流感</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">exert</span>
+          <span class="ipa">/ig&#x27;z3irt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A doctor from the city exerted all his strength</div>          <div class="root"><span class="lbl">根</span>ex(出) + ert(想成 art 本领) → 拿出本领 → 施加</div>          <div class="zt"><span class="lbl">真题</span>Katharine had exerted an important influence on the world. 凯瑟琳已经对世界产生 了重要的影响。</div>          <div class="fam"><span class="lbl">族</span>exertion n. 努力，用力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">fluent</span>
+          <span class="ipa">/&#x27;flu:ənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">流利的，流畅的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she was fluent in three languages</div>          <div class="root"><span class="lbl">根</span>flu(流) + ent(……的) → 说得像水流一样</div>          <div class="zt"><span class="lbl">真题</span>Some European firms have half or more of their employees fluent in a second language. 一些欧洲公司有一半或一半以上的员工能流利 地使用第二语言。</div>          <div class="fam"><span class="lbl">族</span>fluency n. 流利</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">affluent</span>
+          <span class="ipa">/&#x27;æfluənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">富裕的，富足的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elena&#x27;s family was not affluent</div>          <div class="mnem"><span class="lbl">记</span>af 表示一再地；fluent 流畅的、 流利的。连在一起，那就是一再地流畅，做什么 事都很流畅，一帆风顺，估计是父亲为你铺好了 065 第三单元 所有的路，你就是传说中的富二代了吧→富裕 的，富足的。</div>          <div class="root"><span class="lbl">根</span>af(一再) + flu(流) + ent → 钱一直流进来</div>          <div class="zt"><span class="lbl">真题</span>Research shows that in developed countries, more affluent and educated people tend to consume higher-quality diets—including more fruits and vegetables. 研究表明，在发达 国家，更富裕和受教育程度更高的人倾向于食 用更高质量的饮食——包括更多的水果和蔬 菜。(2022)</div>          <div class="fam"><span class="lbl">族</span>affluence n. 富裕</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">scarce</span>
+          <span class="ipa">/skers/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">缺乏的;不足的；稀少的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Good firewood was scarce that winter</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：s(死）十car (车)+ce(字母谐音类似 see,看)→想象你在农 村，想打个车就是打不到，于是你说：“这死车一 辆都看不到！”→稀少的；缺乏的。</div>          <div class="root"><span class="lbl">根</span>s(死) + car(车) + ce(看) → 死车一辆都看不到</div>          <div class="zt"><span class="lbl">真题</span>In college, time is scarce, and consequently, very precious. 在大学里，时间是稀缺的，因此， 非常宝贵。(2016)</div>          <div class="fam"><span class="lbl">族</span>scarcity n. 缺乏 / scarcely adv. 几乎不</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">rare</span>
+          <span class="ipa">/rer/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">稀少的;珍贵的;(肉类)三分熟的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>English books were rare in the village</div>          <div class="mnem"><span class="lbl">记</span>这种花(r)是(are)很少见到的。 →稀少的。</div>          <div class="root"><span class="lbl">根</span>联想：r(花) + are(是) → 这种花很少见到</div>          <div class="zt"><span class="lbl">真题</span>Physical books will surely become much rarer in the marketplace. 实体书籍在市场上肯 定会变得更加罕见。</div>          <div class="fam"><span class="lbl">族</span>rarely adv. 很少 / rarity n. 稀有</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">inherit</span>
+          <span class="ipa">/ın&#x27;herit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">继承，经遗传获得；接替</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elena inherited the school</div>          <div class="mnem"><span class="lbl">记</span>从内心（in）看她（her）给了它 (it)，也就是说，我的女儿从内心看很像我，我 “遗传”给她的啊，从我这里“继承”的。</div>          <div class="root"><span class="lbl">根</span>in(内) + her(她) + it(它) → 从内心传给她</div>          <div class="zt"><span class="lbl">真题</span>There arè risks inherent in almost every sport. 几乎每种运动本身都带有风险。</div>          <div class="fam"><span class="lbl">族</span>inheritance n. 遗产 / inherent adj. 固有的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">heritage</span>
+          <span class="ipa">/&#x27;heritıd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">遗产(指国家或社会长期形成的历史、传统和 特色)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>part of the village heritage</div>          <div class="mnem"><span class="lbl">记</span>heritage可以拆 分为：从她 (her)到它(it想成婴儿，婴儿是不分男女的，统 称为it)，她把财产给了他(她)，那就是“遗产”。</div>          <div class="root"><span class="lbl">根</span>herit(继承) + age(名词后缀) → 传下来的东西</div>          <div class="zt"><span class="lbl">真题</span>Archaeologists(考古学家） protect cultural heritage from natural disasters and terror groups.考古学家保护文化遗产免受自然灾害 和恐怖组织的侵害。(2018)</div>          <div class="fam"><span class="lbl">族</span>inherit v. 继承</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">convention</span>
+          <span class="ipa">/kən&#x27;ven∫n/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>By local convention</div>          <div class="mnem"><span class="lbl">记</span>所有的(con)都文身(vention发 音类似“文身”)。某个地方的所有居民都文身， 并且图案一样，那文身就是这个地方的“习俗， 传统”了。</div>          <div class="root"><span class="lbl">根</span>con(共同) + vent(来) + ion → 大家都这么来的做法</div>          <div class="zt"><span class="lbl">真题</span>It is important to distinguish between the rules of grammar and the conventions of written language.区分语法规则和书面语言的 惯例很重要。</div>          <div class="fam"><span class="lbl">族</span>conventional adj. 传统的；常规的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">tense</span>
+          <span class="ipa">/tens/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">紧张的 v. 紧张,紧绷 n.时态</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mood in the classroom was tense</div>          <div class="mnem"><span class="lbl">记</span>ten(十)十se(蛇)，十条蛇。放 学的路上，十条蛇围着你，你有什么感觉？→ 紧张。</div>          <div class="root"><span class="lbl">根</span>tens(拉紧) + e → 绷紧的</div>          <div class="zt"><span class="lbl">真题</span>Throughout this long, tense election, everyone has focused on the presidential candidates and how they&#x27;ll change America. 在 这场漫长而紧张的选举中，每个人都把注意力 集中在总统候选人以及他们将如何改变美 国上。</div>          <div class="fam"><span class="lbl">族</span>tension n. 紧张；张力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">intensive</span>
+          <span class="ipa">/ın&#x27;tensiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">集中的，加强的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She kept up an intensive reading programme</div>          <div class="mnem"><span class="lbl">记</span>in表示“里，里面”，tens十，ive 是形容词后缀，表示“……的”→十个都在里面 的→很密集，特别集中→集中的，加强的。</div>          <div class="root"><span class="lbl">根</span>in(向内) + tens(拉紧) + ive → 力气往一处使</div>          <div class="zt"><span class="lbl">真题</span>The program will offer patients several bags of food prescribed for their condition, along with intensive training in how to cook it. 该计划将为患者提供几袋适合其病情的食物， 并提供如何烹饪的强化培训。(2018)</div>          <div class="fam"><span class="lbl">族</span>intensity n. 强度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">intense</span>
+          <span class="ipa">/ın&#x27;tens/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">紧张的;强烈的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the work was intense</div>          <div class="mnem"><span class="lbl">记</span>家里（in里面）有十（ten）条蛇 (se)。回到家，发现十条蛇坐在你家沙发上，这 次可完了→紧张的。</div>          <div class="root"><span class="lbl">根</span>in(向内) + tens(拉紧) + e → 绷得很紧 → 强烈的</div>          <div class="zt"><span class="lbl">真题</span>Melanomas are more common if you have periodic intense exposure to the sun. 如果你定 期强烈暴露在阳光下，黑色素瘤会更常见。(2015)</div>          <div class="fam"><span class="lbl">族</span>intensely adv. 强烈地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">sense</span>
+          <span class="ipa">/sens/</span>
+          <span class="pos">n.</span>
+          <span class="cn">感觉；见识；理解力 v. 感觉到；觉察到 惯例的，习惯的，常规的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a sense of what a child really needs</div>          <div class="mnem"><span class="lbl">记</span>发音类似“神似”。有朋友说你 长得像某个人，也就是神似某人，这只是他们的 “感觉”而已。</div>          <div class="root"><span class="lbl">根</span>sens(感觉) + e → 感觉、判断力</div>          <div class="zt"><span class="lbl">真题</span>She connected with her sense of purpose and dug deep, cultivating a tremendous sense of strength.她与自己的使命感联系在一起，深 入挖掘，培养了一种巨大的力量感。(2017)</div>          <div class="fam"><span class="lbl">族</span>sensation n. 感觉 / sensor n. 传感器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">sensitive</span>
+          <span class="ipa">/&#x27;sensətiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">敏感的;脆弱的 11. 常识</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was sensitive to every small change</div>          <div class="mnem"><span class="lbl">记</span>普通人（common）都有的感觉 (sense)→常识。</div>          <div class="root"><span class="lbl">根</span>sens(感觉) + itive → 容易有感觉的</div>          <div class="zt"><span class="lbl">真题</span>“I&#x27;m extremely sensitive to sounds, smells and visual detail&quot;, explains Nicole Donohue, who has taken part in many of these studies.“我对声音、气味和视觉细节非常敏 感。”参加过许多此类研究的妮可·多诺霍解释 说。(2017)</div>          <div class="fam"><span class="lbl">族</span>sensitivity n. 敏感；敏感性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">commonsense</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her commonsense told her to slow down</div>          <div class="root"><span class="lbl">根</span>common(普通) + sense(感觉) → 人人都有的判断</div>          <div class="fam"><span class="lbl">族</span>common sense 常识</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">nonsense</span>
+          <span class="ipa">/&#x27;na:nsens/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Some parents called her method nonsense</div>          <div class="mnem"><span class="lbl">记</span>没有(non)常识(sense)的，没有 (non)感觉(sense)的→废话，胡说。</div>          <div class="root"><span class="lbl">根</span>non(没有) + sense(道理) → 没道理的话</div>          <div class="zt"><span class="lbl">真题</span>Bureaucrats regularly rewrite curriculums, talk nonsense about theories of education, and require ever more administrators. 官僚经常修 改课程，对教育理论胡言乱语，并要求设置更多 的行政人员。</div>          <div class="fam"><span class="lbl">族</span>nonsensical adj. 荒谬的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">sensible</span>
+          <span class="ipa">/&#x27;sensəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明智的；意识到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her sensible plan was ten pages a day</div>          <div class="root"><span class="lbl">根</span>sens(感觉) + ible(能) → 能感觉到的 → 明理的</div>          <div class="zt"><span class="lbl">真题</span>Less stressed people made more sensible decisions and communicated better.压力较小 的人做决定更为明智，更善于沟通。</div>          <div class="fam"><span class="lbl">族</span>sensibly adv. 明智地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">melt</span>
+          <span class="ipa">/melt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In spring the snow melted, and a warm wind</div>          <div class="mnem"><span class="lbl">记</span>我（me)怎么了(1）他（t)？我 “融化”了他的内心。</div>          <div class="root"><span class="lbl">根</span>联想：我(me)怎么了 → 心都化了</div>          <div class="zt"><span class="lbl">真题</span>The goal was simple, to discover how the species adapted to the kind of heat that can literally melt the bottom of shoes. 目标很简 单，就是探索这个物种是如何适应这种可以融 化鞋底的热度的。</div>          <div class="fam"><span class="lbl">族</span>melting adj. 融化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">tame</span>
+          <span class="ipa">/teim/</span>
+          <span class="pos">v.</span>
+          <span class="cn">驯服，制服 adj.(动物)驯服的，温顺的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elena even tamed a small wild bird</div>          <div class="mnem"><span class="lbl">记</span>我曾经是一个桀骜不驯的人， 后来认识了我的那个她，她(ta)“驯服”了我 (me)，我变成了温顺的小王子→驯服，制服。 第三单元</div>          <div class="root"><span class="lbl">根</span>联想：她(ta)把我(me)驯服了</div>          <div class="zt"><span class="lbl">真题</span>They are quite easy to tame. 它们很容易 驯服。(2019)</div>          <div class="fam"><span class="lbl">族</span>tame adj. 驯服的 / tamer n. 驯兽师</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">source</span>
+          <span class="ipa">/soirs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">来源 v. 从某地获得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The sun is the source of light</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“骚死”。回到家 闻到猫撒的尿有骚味，赶紧找猫把尿撒在哪儿 了啊？就是寻找“来源，源头”。</div>          <div class="root"><span class="lbl">根</span>谐音「骚死」→ 顺着气味找源头</div>          <div class="zt"><span class="lbl">真题</span>To make that happen, you have to help the child find pleasure in learning—to see school as source of joy. 要做到这一点，你必须 帮助孩子在学习中找到乐趣——把学校看作快 乐的源泉。(2015)</div>          <div class="fam"><span class="lbl">族</span>resource n. 资源</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">resource</span>
+          <span class="ipa">/&#x27;ri:səirs; ri&#x27;soirs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">资源；财力 v. 向……提供资源</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>time is her most precious resource</div>          <div class="mnem"><span class="lbl">记</span>re表示重复，一再地寻找源头 (source)是需要“财力；资源”的支持的。</div>          <div class="root"><span class="lbl">根</span>re(一再) + source(源头) → 可反复取用的东西</div>          <div class="zt"><span class="lbl">真题</span>Half of the world&#x27;s water resources have been seriously polluted. 世界上一半的水资源 已经被严重污染。</div>          <div class="fam"><span class="lbl">族</span>resourceful adj. 足智多谋的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">mental</span>
+          <span class="ipa">/&#x27;mentl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">精神的，智力的；思想的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She often spoke about mental health</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为人(men)头(tal 情吗？</div>          <div class="root"><span class="lbl">根</span>ment(想) + al(……的) → 脑子里的</div>          <div class="zt"><span class="lbl">真题</span>What mattered most was the residents&#x27; physical health and mental status. 最重要的是 居民的身体健康和精神状态。(2016)</div>          <div class="fam"><span class="lbl">族</span>mentally adv. 精神上 / mentality n. 心态</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">fundamental</span>
+          <span class="ipa">/ifandə&#x27;mentl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">基础的，根本的 n. (pl.)基本原则，基本 原理</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the fundamental rule of her school</div>          <div class="mnem"><span class="lbl">记</span>fund 资金，现金；mental：men 人，tal发音类似“头”。人头是干什么的？精神 上的，那fundamental就是精神和物质上的，物 质和精神对人的发展都是“基础的，根本的”。 (067)</div>          <div class="root"><span class="lbl">根</span>fund(基础、资金) + a + mental → 打底的东西</div>          <div class="zt"><span class="lbl">真题</span>These are all fundamental commitments that are now occurring later in life. 这些都是在 人生后期做出的基本承诺。(2019)</div>          <div class="fam"><span class="lbl">族</span>fundamentally adv. 根本上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">fatal</span>
+          <span class="ipa">/&#x27;fertl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">致命的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A mistake in grammar is never fatal</div>          <div class="mnem"><span class="lbl">记</span>发音类似“肥头”，婴儿得了肥 头(大头病)是很严重的→严重的，致命的。</div>          <div class="root"><span class="lbl">根</span>fate(命运) + al → 决定命运的</div>          <div class="zt"><span class="lbl">真题</span>The research is starting to show that early setbacks don&#x27;t have to be fatal. 这项研究 开始表明，早期的挫折不一定是致命的。</div>          <div class="fam"><span class="lbl">族</span>fate n. 命运 / fatally adv. 致命地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">total</span>
+          <span class="ipa">/&#x27;təutl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">总的，全部的；完全的 n. 总数，总计</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In total, forty pupils passed the exam</div>          <div class="mnem"><span class="lbl">记</span>发音类似“头头”，一个头一个 头地数，最后得出“总数，总计”是多少。</div>          <div class="root"><span class="lbl">根</span>tot(全部) + al → 全部的</div>          <div class="zt"><span class="lbl">真题</span>All the people we interviewed expressed almost total satisfaction with it. 我们采访的所 有人对此都表示非常满意。</div>          <div class="fam"><span class="lbl">族</span>totally adv. 完全地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">digital</span>
+          <span class="ipa">/&#x27;dıd3ıtl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">数字的,数码的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she keeps every record in digital form</div>          <div class="mnem"><span class="lbl">记</span>发音类似“低个头”；人家听课 都抬着头，你却低个头，干什么呢？看数码产品 啊→数字的，数码的。</div>          <div class="root"><span class="lbl">根</span>digit(手指、数字) + al → 数字的</div>          <div class="zt"><span class="lbl">真题</span>Digital technology also makes it easier for people to coordinate their activities without resorting to hierarchy. 数字技术还使人们更容 易协调他们的活动，而无需诉诸等级制度。 (2017)</div>          <div class="fam"><span class="lbl">族</span>digit n. 数字 / digitalize v. 数字化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">talent</span>
+          <span class="ipa">/&#x27;tælənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">天资，才能，天才</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her greatest talent, the villagers said, was patience</div>          <div class="mnem"><span class="lbl">记</span>借出去(lent)个头(tal)，你挺有 头脑啊，别人有问题总找你出谋划策→才能， 天才。 (068</div>          <div class="root"><span class="lbl">根</span>联想：借出去(lent)个头(tal) → 有头脑 → 才能</div>          <div class="zt"><span class="lbl">真题</span>Teaching is an art and a craft, talent and practice; it is not something that just anyone can be good at. 教学是一门艺术，是一门手艺， 是天赋，是实践；这不是任何人都能擅长的事 情。(2016)</div>          <div class="fam"><span class="lbl">族</span>talented adj. 有才能的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 17</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 35 · The Ferry That Would Not Sink</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 35 · 11/16 · Unit 5~6 第 1021-1050 词</div>
+  <h1>The Ferry That Would Not Sink<span class="cn">不会沉的小渡轮</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-35.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4480"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="427">Bellport</span> <span class="w" data-s="469" data-e="811">ferry</span> <span class="w" data-s="853" data-e="981">was</span> <span class="w" data-s="1024" data-e="1152">a</span> <span class="w" data-s="1195" data-e="1323">small</span> <span class="w target" data-s="1365" data-e="1877" title="公司；企业；(尤指艰巨而重大的)规划，事业">enterprise</span> <span class="w" data-s="1920" data-e="2176">that</span> <span class="w" data-s="2219" data-e="2347">old</span> <span class="w" data-s="2389" data-e="2603">Mrs.</span> <span class="w" data-s="2773" data-e="2944">Feng</span> <span class="w" data-s="2987" data-e="3200">had</span> <span class="w" data-s="3243" data-e="3371">built</span> <span class="w" data-s="3413" data-e="3669">into</span> <span class="w" data-s="3712" data-e="3840">a</span> <span class="w" data-s="3883" data-e="4011">quiet</span> <span class="w target" data-s="4053" data-e="4480" title="帝国，大企业">empire.</span></p><p class="zh">贝尔波特的渡轮是老冯太太一手做起来的小企业，后来成了一个不起眼的小帝国。</p></div>
+<div class="pair" data-s0="4779" data-s1="11008"><p class="en"><span class="w" data-s="4779" data-e="5333">She</span> <span class="w" data-s="5376" data-e="5589">was</span> <span class="w target" data-s="5632" data-e="5845" title="总统，主席；董事长；总经理；(大学)校长， 会长">president</span> <span class="w" data-s="5888" data-e="6187">and</span> <span class="w target" data-s="6229" data-e="6357" title="椅子；主席 v. 主持；使就任要职">chair</span> <span class="w" data-s="6400" data-e="6613">of</span> <span class="w" data-s="6656" data-e="6699">the</span> <span class="w" data-s="6741" data-e="6827">board,</span> <span class="w" data-s="7040" data-e="7253">and</span> <span class="w" data-s="7424" data-e="7680">at</span> <span class="w" data-s="7723" data-e="8149">seventy</span> <span class="w" data-s="8192" data-e="8405">she</span> <span class="w" data-s="8533" data-e="8747">still</span> <span class="w target" data-s="8789" data-e="9131" title="完成(困难的事);能解决(问题);管理">managed</span> <span class="w" data-s="9173" data-e="9301">the</span> <span class="w" data-s="9344" data-e="9685">timetable</span> <span class="w" data-s="9728" data-e="10027">and</span> <span class="w target" data-s="10069" data-e="10624" title="指挥；控制；掌管；操纵 n.(对国家、地区、机构等的)管理权，控制权，支 配权；控制(或操纵)能力">controlled</span> <span class="w" data-s="10667" data-e="10795">every</span> <span class="w" data-s="10837" data-e="11008">cent.</span></p><p class="zh">她是总裁兼董事会主席，七十岁了还在安排班次，控制着每一分钱。</p></div>
+<div class="pair" data-s0="11660" data-s1="18017"><p class="en"><span class="w" data-s="11660" data-e="11788">Her</span> <span class="w" data-s="11830" data-e="12172">grandson</span> <span class="w" data-s="12214" data-e="12513">Lin,</span> <span class="w" data-s="12726" data-e="12897">a</span> <span class="w target" data-s="13153" data-e="13622" title="有能力的，能胜任的">competent</span> <span class="w" data-s="13665" data-e="13878">young</span> <span class="w" data-s="13921" data-e="14305">captain,</span> <span class="w" data-s="14476" data-e="14646">had</span> <span class="w" data-s="14860" data-e="15030">learned</span> <span class="w" data-s="15073" data-e="15244">to</span> <span class="w target" data-s="15286" data-e="15585" title="控制；利用n. 马具，挽具">harness</span> <span class="w" data-s="15628" data-e="15713">the</span> <span class="w" data-s="15756" data-e="15884">river</span> <span class="w" data-s="15926" data-e="16182">and</span> <span class="w" data-s="16225" data-e="16353">to</span> <span class="w" data-s="16396" data-e="16481">read</span> <span class="w" data-s="16524" data-e="16652">the</span> <span class="w" data-s="16694" data-e="16822">brown</span> <span class="w" data-s="16865" data-e="17121">water</span> <span class="w" data-s="17164" data-e="17462">thick</span> <span class="w" data-s="17505" data-e="17718">with</span> <span class="w target" data-s="17761" data-e="18017" title="泥；淤泥；泥浆">mud.</span></p><p class="zh">她的外孙林是个能干的年轻船长，学会了驾驭这条河，也学会了看那浑黄的、掺着泥的水。</p></div>
+<div class="pair" data-s0="18273" data-s1="23649"><p class="en"><span class="w" data-s="18273" data-e="18444">Every</span> <span class="w" data-s="18486" data-e="18700">morning</span> <span class="w" data-s="18742" data-e="18998">his</span> <span class="w" data-s="19041" data-e="19212">sister</span> <span class="w target" data-s="19254" data-e="19852" title="">accompanied</span> <span class="w" data-s="19894" data-e="19980">him</span> <span class="w" data-s="20022" data-e="20193">to</span> <span class="w" data-s="20236" data-e="20321">the</span> <span class="w" data-s="20364" data-e="20492">pier,</span> <span class="w" data-s="20662" data-e="20876">and</span> <span class="w" data-s="21004" data-e="21388">the</span> <span class="w" data-s="21430" data-e="21601">crew</span> <span class="w" data-s="21644" data-e="21729">of</span> <span class="w" data-s="21772" data-e="21900">six</span> <span class="w target" data-s="21942" data-e="22540" title="帮助，援助；促进">assisted</span> <span class="w" data-s="22582" data-e="22668">the</span> <span class="w" data-s="22710" data-e="23094">passengers</span> <span class="w" data-s="23137" data-e="23350">onto</span> <span class="w" data-s="23393" data-e="23521">the</span> <span class="w" data-s="23564" data-e="23649">boat.</span></p><p class="zh">每天早上妹妹陪他到码头，六个人的船员一起扶乘客上船。</p></div>
+<div class="pair" data-s0="23862" data-s1="28001"><p class="en"><span class="w" data-s="23862" data-e="24502">That</span> <span class="w" data-s="24545" data-e="24844">crew</span> <span class="w target" data-s="24886" data-e="25228" title="(~ol)由……组成，由……构成">consisted</span> <span class="w" data-s="25270" data-e="25441">of</span> <span class="w" data-s="25484" data-e="25569">three</span> <span class="w" data-s="25612" data-e="25910">families,</span> <span class="w target" data-s="26209" data-e="26977" title="包括，包含；由……组成">comprising</span> <span class="w" data-s="27020" data-e="27404">twelve</span> <span class="w" data-s="27446" data-e="27574">hands</span> <span class="w" data-s="27617" data-e="27830">in</span> <span class="w" data-s="27873" data-e="28001">all.</span></p><p class="zh">这些船员来自三个家庭，加起来一共十二口人的生计。</p></div>
+<div class="pair" data-s0="28771" data-s1="35683"><p class="en"><span class="w" data-s="28771" data-e="28856">A</span> <span class="w" data-s="28899" data-e="29112">city</span> <span class="w" data-s="29155" data-e="29325">firm</span> <span class="w target" data-s="29368" data-e="29923" title="参加比赛；竞争">competed</span> <span class="w" data-s="29965" data-e="30136">for</span> <span class="w" data-s="30179" data-e="30264">the</span> <span class="w" data-s="30307" data-e="30435">same</span> <span class="w" data-s="30477" data-e="30947">route,</span> <span class="w" data-s="31032" data-e="31459">and</span> <span class="w" data-s="31501" data-e="31672">in</span> <span class="w" data-s="31715" data-e="31800">that</span> <span class="w target" data-s="31843" data-e="32355" title="竞争，竞赛">competition</span> <span class="w" data-s="32397" data-e="32739">the</span> <span class="w" data-s="32824" data-e="32952">old</span> <span class="w" data-s="32995" data-e="33379">ferry,</span> <span class="w target" data-s="33549" data-e="33891" title="(表示两队或双方对阵)对，对抗；与…… 相对">versus</span> <span class="w" data-s="33933" data-e="34189">the</span> <span class="w" data-s="34232" data-e="34360">new</span> <span class="w" data-s="34403" data-e="34573">fast</span> <span class="w" data-s="34616" data-e="34872">boat,</span> <span class="w" data-s="35128" data-e="35384">looked</span> <span class="w" data-s="35427" data-e="35683">slow.</span></p><p class="zh">一家城里公司来争同一条航线，在那场竞争里，老渡轮比起新快船，显得很慢。</p></div>
+<div class="pair" data-s0="36067" data-s1="40163"><p class="en"><span class="w" data-s="36067" data-e="36621">The</span> <span class="w" data-s="36664" data-e="36835">family</span> <span class="w target" data-s="36877" data-e="37475" title="抵抗，反抗；阻挡">resisted</span> <span class="w" data-s="37517" data-e="37603">the</span> <span class="w" data-s="37645" data-e="37773">offer</span> <span class="w" data-s="37816" data-e="38029">to</span> <span class="w" data-s="38072" data-e="38157">sell</span> <span class="w" data-s="38200" data-e="38413">the</span> <span class="w" data-s="38456" data-e="38541">line</span> <span class="w" data-s="38584" data-e="38797">and</span> <span class="w target" data-s="38840" data-e="39437" title="坚持；继续存在">persisted</span> <span class="w" data-s="39480" data-e="39608">with</span> <span class="w" data-s="39651" data-e="39736">its</span> <span class="w" data-s="39779" data-e="39907">own</span> <span class="w" data-s="39949" data-e="40163">plan.</span></p><p class="zh">一家人抵住了卖掉航线的条件，坚持自己的方案。</p></div>
+<div class="pair" data-s0="40899" data-s1="44227"><p class="en"><span class="w" data-s="40899" data-e="41027">One</span> <span class="w" data-s="41069" data-e="41283">spring</span> <span class="w" data-s="41325" data-e="41581">the</span> <span class="w" data-s="41624" data-e="41795">flood</span> <span class="w" data-s="41837" data-e="41965">came,</span> <span class="w" data-s="42179" data-e="42349">and</span> <span class="w" data-s="42648" data-e="42776">the</span> <span class="w" data-s="42819" data-e="42904">lower</span> <span class="w" data-s="42947" data-e="43160">town</span> <span class="w" data-s="43203" data-e="43501">was</span> <span class="w" data-s="43544" data-e="43672">its</span> <span class="w" data-s="43715" data-e="43843">first</span> <span class="w target" data-s="43885" data-e="44227" title="受害者；罹难者；罹病者；牺牲品；受骗者；上 当的人">victim.</span></p><p class="zh">有一年春天洪水来了，地势低的那半个镇子最先遭了殃。</p></div>
+<div class="pair" data-s0="44397" data-s1="48664"><p class="en"><span class="w" data-s="44397" data-e="45037">Mrs.</span> <span class="w" data-s="45208" data-e="45379">Feng</span> <span class="w" data-s="45421" data-e="45635">made</span> <span class="w" data-s="45677" data-e="45763">a</span> <span class="w target" data-s="45805" data-e="46189" title="牺牲；舍弃 v. 牺牲；献出">sacrifice:</span> <span class="w" data-s="46488" data-e="47043">she</span> <span class="w" data-s="47085" data-e="47256">sold</span> <span class="w" data-s="47299" data-e="47427">her</span> <span class="w" data-s="47469" data-e="47597">own</span> <span class="w" data-s="47640" data-e="47768">house</span> <span class="w" data-s="47811" data-e="48024">to</span> <span class="w" data-s="48067" data-e="48280">repair</span> <span class="w" data-s="48323" data-e="48451">the</span> <span class="w" data-s="48493" data-e="48664">pier.</span></p><p class="zh">冯太太作出了牺牲：她卖掉了自己的房子来修码头。</p></div>
+<div class="pair" data-s0="48835" data-s1="52077"><p class="en"><span class="w" data-s="48835" data-e="49432">The</span> <span class="w" data-s="49475" data-e="49859">passengers</span> <span class="w target" data-s="49901" data-e="50200" title="&amp;- n. 表扬，赞美">praised</span> <span class="w" data-s="50243" data-e="50413">her,</span> <span class="w" data-s="50584" data-e="50755">and</span> <span class="w" data-s="50840" data-e="51096">the</span> <span class="w" data-s="51139" data-e="51224">town</span> <span class="w target" data-s="51267" data-e="51651" title="&amp;- n. 表扬，赞美">praised</span> <span class="w" data-s="51693" data-e="51821">the</span> <span class="w" data-s="51864" data-e="52077">crew.</span></p><p class="zh">乘客称赞她，全镇人也称赞这些船员。</p></div>
+<div class="pair" data-s0="52725" data-s1="55754"><p class="en"><span class="w" data-s="52725" data-e="52810">But</span> <span class="w" data-s="52853" data-e="53023">that</span> <span class="w" data-s="53066" data-e="53237">same</span> <span class="w" data-s="53279" data-e="53535">week</span> <span class="w" data-s="53578" data-e="53877">two</span> <span class="w" data-s="54133" data-e="54389">men</span> <span class="w" data-s="54431" data-e="54687">came</span> <span class="w" data-s="54730" data-e="54901">to</span> <span class="w" data-s="54943" data-e="55029">the</span> <span class="w" data-s="55071" data-e="55242">pier</span> <span class="w" data-s="55285" data-e="55455">with</span> <span class="w" data-s="55498" data-e="55626">a</span> <span class="w" data-s="55669" data-e="55754">plan.</span></p><p class="zh">可就在那一周，两个男人带着一个打算来到了码头。</p></div>
+<div class="pair" data-s0="56138" data-s1="59509"><p class="en"><span class="w" data-s="56138" data-e="56351">They</span> <span class="w" data-s="56565" data-e="56693">had</span> <span class="w target" data-s="56735" data-e="57119" title="赌博；打赌；冒险v. 冒风险；碰运气； 以……为赌注">gambled</span> <span class="w" data-s="57162" data-e="57247">away</span> <span class="w" data-s="57290" data-e="57418">their</span> <span class="w" data-s="57461" data-e="57589">money</span> <span class="w" data-s="57631" data-e="57845">and</span> <span class="w" data-s="57887" data-e="58271">made</span> <span class="w" data-s="58314" data-e="58442">a</span> <span class="w target" data-s="58485" data-e="58570" title="打赌；赌注；预计；估计 v. 下赌注(于)； 用……打赌">bet</span> <span class="w" data-s="58613" data-e="58954">with</span> <span class="w" data-s="58997" data-e="59125">a</span> <span class="w" data-s="59167" data-e="59509">smuggler.</span></p><p class="zh">他们赌光了钱，和一个走私犯打了赌。</p></div>
+<div class="pair" data-s0="60019" data-s1="63731"><p class="en"><span class="w" data-s="60019" data-e="60147">They</span> <span class="w" data-s="60189" data-e="60360">hid</span> <span class="w target" data-s="60403" data-e="60787" title="海洛因">heroin</span> <span class="w" data-s="60829" data-e="60957">in</span> <span class="w" data-s="61000" data-e="61043">a</span> <span class="w" data-s="61085" data-e="61341">cargo</span> <span class="w" data-s="61384" data-e="61512">box</span> <span class="w" data-s="61555" data-e="61811">and</span> <span class="w" data-s="61853" data-e="62280">sold</span> <span class="w target" data-s="62323" data-e="62877" title="(尤指旧时的)海盗；盗版者 v.盗印；窃用">pirated</span> <span class="w" data-s="62920" data-e="63261">tickets</span> <span class="w" data-s="63304" data-e="63475">at</span> <span class="w" data-s="63517" data-e="63603">the</span> <span class="w" data-s="63645" data-e="63731">gate.</span></p><p class="zh">他们在一只货箱里藏了海洛因，还在门口卖盗版船票。</p></div>
+<div class="pair" data-s0="63944" data-s1="68765"><p class="en"><span class="w" data-s="63944" data-e="64840">When</span> <span class="w" data-s="64883" data-e="65096">Lin</span> <span class="w" data-s="65139" data-e="65437">refused</span> <span class="w" data-s="65480" data-e="65651">to</span> <span class="w" data-s="65693" data-e="65779">help</span> <span class="w" data-s="65821" data-e="66035">them,</span> <span class="w" data-s="66205" data-e="66333">they</span> <span class="w target" data-s="66589" data-e="67016" title="劫持；绑架">kidnapped</span> <span class="w" data-s="67059" data-e="67187">him</span> <span class="w" data-s="67229" data-e="67400">and</span> <span class="w" data-s="67443" data-e="67869">left</span> <span class="w" data-s="67912" data-e="68040">him</span> <span class="w" data-s="68083" data-e="68125">in</span> <span class="w" data-s="68168" data-e="68211">the</span> <span class="w target" data-s="68253" data-e="68339" title="泥；淤泥；泥浆">mud</span> <span class="w" data-s="68381" data-e="68509">by</span> <span class="w" data-s="68552" data-e="68595">the</span> <span class="w" data-s="68637" data-e="68765">river.</span></p><p class="zh">林不肯帮他们，他们就把林绑走了，扔在河边的泥里。</p></div>
+<div class="pair" data-s0="69418" data-s1="74069"><p class="en"><span class="w" data-s="69418" data-e="69504">He</span> <span class="w" data-s="69546" data-e="69674">was</span> <span class="w" data-s="69717" data-e="69802">found</span> <span class="w" data-s="69845" data-e="70016">at</span> <span class="w" data-s="70058" data-e="70314">dawn,</span> <span class="w" data-s="70528" data-e="70869">cold</span> <span class="w" data-s="70912" data-e="71296">and</span> <span class="w" data-s="71338" data-e="71680">shaking,</span> <span class="w" data-s="71850" data-e="72021">and</span> <span class="w" data-s="72320" data-e="72448">the</span> <span class="w" data-s="72490" data-e="72618">police</span> <span class="w" data-s="72661" data-e="72917">caught</span> <span class="w" data-s="72960" data-e="73173">both</span> <span class="w" data-s="73216" data-e="73429">men</span> <span class="w" data-s="73472" data-e="73813">before</span> <span class="w" data-s="73856" data-e="74069">noon.</span></p><p class="zh">天亮时人们找到了他，冻得直抖；中午前警察把两个人都抓了。</p></div>
+<div class="pair" data-s0="74325" data-s1="79146"><p class="en"><span class="w" data-s="74325" data-e="74837">In</span> <span class="w" data-s="74880" data-e="75050">court</span> <span class="w" data-s="75093" data-e="75349">the</span> <span class="w" data-s="75392" data-e="75605">older</span> <span class="w" data-s="75648" data-e="75861">man</span> <span class="w" data-s="75904" data-e="76117">showed</span> <span class="w" data-s="76160" data-e="76373">no</span> <span class="w target" data-s="76416" data-e="76672" title="内疚；悔恨；犯罪；罪行；有罪；罪责；责任">guilt,</span> <span class="w" data-s="76800" data-e="77098">but</span> <span class="w" data-s="77226" data-e="77397">the</span> <span class="w" data-s="77440" data-e="77653">younger</span> <span class="w" data-s="77696" data-e="77824">one</span> <span class="w" data-s="77866" data-e="78165">chose</span> <span class="w" data-s="78208" data-e="78336">to</span> <span class="w target" data-s="78378" data-e="78592" title="跪下">kneel</span> <span class="w" data-s="78634" data-e="78848">and</span> <span class="w" data-s="78890" data-e="79146">weep.</span></p><p class="zh">法庭上，年长的那人毫无愧疚，年轻的那个却选择跪下痛哭。</p></div>
+<div class="pair" data-s0="79793" data-s1="81713"><p class="en"><span class="w" data-s="79793" data-e="79921">The</span> <span class="w" data-s="79964" data-e="80220">judge</span> <span class="w target" data-s="80262" data-e="80518" title="处罚，惩罚">punished</span> <span class="w" data-s="80561" data-e="80689">them</span> <span class="w" data-s="80732" data-e="80860">with</span> <span class="w" data-s="80902" data-e="81030">five</span> <span class="w" data-s="81073" data-e="81329">years</span> <span class="w" data-s="81372" data-e="81542">in</span> <span class="w target" data-s="81585" data-e="81713" title="监狱；牢狱；看守所；牢笼；樊笼">prison.</span></p><p class="zh">法官判他们五年监禁。</p></div>
+<div class="pair" data-s0="81969" data-s1="84486"><p class="en"><span class="w" data-s="81969" data-e="82780">Mrs.</span> <span class="w" data-s="82950" data-e="83121">Feng</span> <span class="w" data-s="83164" data-e="83377">did</span> <span class="w" data-s="83420" data-e="83590">not</span> <span class="w" data-s="83633" data-e="83804">speak</span> <span class="w" data-s="83846" data-e="83974">to</span> <span class="w" data-s="84017" data-e="84102">the</span> <span class="w" data-s="84145" data-e="84486">reporters.</span></p><p class="zh">冯太太没有对记者说话。</p></div>
+<div class="pair" data-s0="84657" data-s1="87388"><p class="en"><span class="w" data-s="84657" data-e="85126">She</span> <span class="w" data-s="85297" data-e="85510">only</span> <span class="w" data-s="85553" data-e="85766">asked</span> <span class="w" data-s="85809" data-e="86108">whether</span> <span class="w" data-s="86150" data-e="86364">the</span> <span class="w" data-s="86406" data-e="86662">ferry</span> <span class="w" data-s="86705" data-e="86833">could</span> <span class="w" data-s="86876" data-e="87004">leave</span> <span class="w" data-s="87046" data-e="87217">at</span> <span class="w" data-s="87260" data-e="87388">six.</span></p><p class="zh">她只问了一句：渡轮能不能六点开。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">victim</span>
+          <span class="ipa">/&#x27;vıktım/</span>
+          <span class="pos">n.</span>
+          <span class="cn">受害者；罹难者；罹病者；牺牲品；受骗者；上 当的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the lower town was its first victim</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“weak team” →很弱的团队，只能是“牺牲品”。</div>          <div class="root"><span class="lbl">根</span>victim 本义「祭品」→ 被牺牲的 → 受害者</div>          <div class="zt"><span class="lbl">真题</span>One benefit of this change is that students will not fall victim to the “summer slide”.这种变化的一个好处是学生们不会成为 “夏季滑坡”的受害者。(2023)</div>          <div class="fam"><span class="lbl">族</span>victimize v. 使受害</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">sacrifice</span>
+          <span class="ipa">/&#x27;sækrifais/</span>
+          <span class="pos">n.</span>
+          <span class="cn">牺牲；舍弃 v. 牺牲；献出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mrs. Feng made a sacrifice</div>          <div class="mnem"><span class="lbl">记</span>这个单词读起来很悲壮的，试 着读一下？sa—cri—fice—(杀—可就—非死)， 有没有那种“为有牺牲多壮志，敢叫日月换新 天”的感觉？ (132) 像“疯狗”一样努力奔跑！ 第六单元 口</div>          <div class="root"><span class="lbl">根</span>sacri(神圣) + fice(做) → 献给神的东西</div>          <div class="zt"><span class="lbl">真题</span>The pursuit of a fulfilling career involves personal sacrifice. 追求令人满意的事业需要个 人的牺牲。(2020)</div>          <div class="fam"><span class="lbl">族</span>sacrificial adj. 献祭的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">assist</span>
+          <span class="ipa">/ə&#x27;sist/</span>
+          <span class="pos">v.</span>
+          <span class="cn">帮助，援助；促进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the crew of six assisted the passengers</div>          <div class="mnem"><span class="lbl">记</span>词根 sist 特别像 sister(姐姐)， 姐姐不就是当你需要时，站在你身后帮助你的 那个人吗？所以词根 sist 表示“站”。as 表示 “一再地”→一再地站在你旁边，准备帮助你→ 帮助。</div>          <div class="root"><span class="lbl">根</span>as(在旁边) + sist(站) → 站在你旁边 → 帮助</div>          <div class="zt"><span class="lbl">真题</span>He assists Professor Williams with his teaching. 他协助威廉姆斯教授进行教学。</div>          <div class="fam"><span class="lbl">族</span>assistance n. 帮助 / assistant n. 助手</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">resist</span>
+          <span class="ipa">/ri&#x27;zist/</span>
+          <span class="pos">v.</span>
+          <span class="cn">抵抗，反抗；阻挡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The family resisted the offer</div>          <div class="mnem"><span class="lbl">记</span>re表示“重复”，也可以表示“回 去”，你往回站(sist)，不要跟我站在一起→ 抵抗。</div>          <div class="root"><span class="lbl">根</span>re(往回) + sist(站) → 站回去 → 抵抗</div>          <div class="zt"><span class="lbl">真题</span>Yet so far this idea has met little but resistance.然而，到目前为止，这个想法几乎没 有遇到什么阻力。</div>          <div class="fam"><span class="lbl">族</span>resistance n. 抵抗 / resistant adj. 抵抗的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">persist</span>
+          <span class="ipa">/pə&#x27;sist/</span>
+          <span class="pos">v.</span>
+          <span class="cn">坚持；继续存在</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and persisted with its own plan</div>          <div class="mnem"><span class="lbl">记</span>per表示“每一”；sist 表示 “站”。每一天都站着→坚持；固执。</div>          <div class="root"><span class="lbl">根</span>per(一直) + sist(站) → 一直站着不倒 → 坚持</div>          <div class="zt"><span class="lbl">真题</span>If our findings persist, we may be faced with a financial crisis. 如果我们的发现持续下 去，我们可能会面临一场金融危机。</div>          <div class="fam"><span class="lbl">族</span>persistence n. 坚持 / persistent adj. 执着的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">consist</span>
+          <span class="ipa">/kən&#x27;sist/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(~ol)由……组成，由……构成</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>That crew consisted of three families</div>          <div class="mnem"><span class="lbl">记</span>con表示“所有的”；sist 表示 “站”。所有的人都站在这儿→组成，构成。</div>          <div class="root"><span class="lbl">根</span>con(一起) + sist(站) → 站在一起 → 组成</div>          <div class="zt"><span class="lbl">真题</span>The large bowl consisted of two equal parts. 大碗由两个相等的部分组成。</div>          <div class="fam"><span class="lbl">族</span>consistent adj. 一致的 / consistency n. 一致性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">comprise</span>
+          <span class="ipa">/kəm&#x27;praiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">包括，包含；由……组成</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>comprising twelve hands in all</div>          <div class="mnem"><span class="lbl">记</span>com(一起)+ prise(形似 prize 奖赏)→一起奖赏→“包括”所有同学都要奖赏。</div>          <div class="root"><span class="lbl">根</span>com(一起) + prise(抓住) → 一起抓住 → 包括</div>          <div class="zt"><span class="lbl">真题</span>Teenagers comprise about half of the group, many of whom began lion dancing at the age of 14. 青少年约占舞狮群体的一半，其 中许多人14岁就开始舞狮。(2023)</div>          <div class="fam"><span class="lbl">族</span>comprise v. 包括（同义：consist of）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">praise</span>
+          <span class="ipa">/preiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp;- n. 表扬，赞美</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The passengers praised her</div>          <div class="root"><span class="lbl">根</span>靠搭配记：praise sb for sth 因某事表扬某人</div>          <div class="zt"><span class="lbl">真题</span>A lifetime of praise leads smart people to develop too much faith in their intelligence and abilities.一生的赞美会使聪明人对自己的智力 和能力产生过度的信心。(2023)</div>          <div class="fam"><span class="lbl">族</span>praiseworthy adj. 值得称赞的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">enterprise</span>
+          <span class="ipa">/&#x27;entərpraiz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">公司；企业；(尤指艰巨而重大的)规划，事业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was a small enterprise</div>          <div class="mnem"><span class="lbl">记</span>该单词可以分为两部分：enter (进来)+prise(想象成 praise表扬)→“公司”的 老总走进来，表扬你出色的工作。</div>          <div class="root"><span class="lbl">根</span>enter(进入) + prise(抓住) → 敢闯敢干的事 → 企业</div>          <div class="zt"><span class="lbl">真题</span>These platforms create a bridge between traditional enterprises and this emerging economy.这些平台在传统企业和这个新兴经 济体之间架起了一座桥梁。</div>          <div class="fam"><span class="lbl">族</span>enterprising adj. 有进取心的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">empire</span>
+          <span class="ipa">/&#x27;empaiər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">帝国，大企业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had built into a quiet empire</div>          <div class="mnem"><span class="lbl">记</span>发音类似：俺妹怕。怕谁？“帝 国”啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：俺妹怕 → 怕谁？怕帝国</div>          <div class="zt"><span class="lbl">真题</span>The Empire Builder, which was focused on in one ad, enjoyed a 15 percent increase in profits on its Chicago to Seattle route. 一则广 告所关注的“帝国缔造者号”，在芝加哥至西雅 图航线上的利润增长了15%。 (134)</div>          <div class="fam"><span class="lbl">族</span>emperor n. 皇帝 / imperial adj. 帝国的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">accompany</span>
+          <span class="ipa">/ə&#x27;kampəni/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his sister accompanied him to the pier</div>          <div class="mnem"><span class="lbl">记</span>ac 表示“一再地”；company 除 了表示“公司”，还意为“做伴，陪伴”。一再地陪 伴→陪伴，伴随。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + company(陪伴) → 一再地陪着 → 陪伴</div>          <div class="zt"><span class="lbl">真题</span>It accompanies all machinery involving high technology. 它伴随着所有涉及高科技的 机器。(2016)</div>          <div class="fam"><span class="lbl">族</span>company n. 陪伴；公司 / companion n. 同伴</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">manage</span>
+          <span class="ipa">/&#x27;mænıd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">完成(困难的事);能解决(问题);管理</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she still managed the timetable</div>          <div class="root"><span class="lbl">根</span>man(手) + age → 用手操控 → 管理</div>          <div class="zt"><span class="lbl">真题</span>Women are more likely than men to take charge of their stress and manage it. 女性比男 性更有可能掌控自己的压力并加以控制。 (2021)</div>          <div class="fam"><span class="lbl">族</span>management n. 管理 / manager n. 经理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">chair</span>
+          <span class="ipa">/t∫er/</span>
+          <span class="pos">n.</span>
+          <span class="cn">椅子；主席 v. 主持；使就任要职</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was president and chair of the board</div>          <div class="root"><span class="lbl">根</span>本义「椅子」→ 坐主位的人 → 主席</div>          <div class="zt"><span class="lbl">真题</span>&quot;We didn&#x27;t do any global consideration,&#x27; says Patricia Hayes, the board&#x27;s chair. 董事会 主席帕特里夏·海耶斯说：“我们没有做任何全 球性的考虑。”</div>          <div class="fam"><span class="lbl">族</span>chairman n. 主席 / chair v. 主持</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">president</span>
+          <span class="ipa">/&#x27;prezidənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">总统，主席；董事长；总经理；(大学)校长， 会长</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was president and chair</div>          <div class="mnem"><span class="lbl">记</span>前面（pre）从旁边（sid想成 第六单元 side)进来的(ent 想成 enter)的那个人是“总统， 总经理”。</div>          <div class="root"><span class="lbl">根</span>pre(在前) + sid(坐) + ent(人) → 坐在最前面的人</div>          <div class="zt"><span class="lbl">真题</span>It was suggested by the firm&#x27;s vice- president. 这是公司副总裁提出的建议。(2015)</div>          <div class="fam"><span class="lbl">族</span>preside v. 主持 / presidency n. 总统职位</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">harness</span>
+          <span class="ipa">/&#x27;ha:rnis/</span>
+          <span class="pos">v.</span>
+          <span class="cn">控制；利用n. 马具，挽具</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had learned to harness the river</div>          <div class="mnem"><span class="lbl">记</span>在拴马的时候，马受了惊，大叫 起来，差点把你吓“死”→“吓你死”(类似 harness 的发音)。</div>          <div class="root"><span class="lbl">根</span>本义「马具」→ 套上马具 → 驾驭、利用</div>          <div class="zt"><span class="lbl">真题</span>So executives hit on an idea that would harness the new-found popularity of television. 因此，高管们想到了一个想法，可以利用新发现 的电视的普及。(2020)</div>          <div class="fam"><span class="lbl">族</span>harness n. 马具</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">control</span>
+          <span class="ipa">/kən&#x27;trəul/</span>
+          <span class="pos">v.</span>
+          <span class="cn">指挥；控制；掌管；操纵 n.(对国家、地区、机构等的)管理权，控制权，支 配权；控制(或操纵)能力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and controlled every cent</div>          <div class="root"><span class="lbl">根</span>contra(相反) + rol(卷轴) → 拿着对照的账簿 → 掌控</div>          <div class="zt"><span class="lbl">真题</span>Some people find that craftwork helps them control their weight. 有些人发现手工可 以帮助他们控制体重。(2017)</div>          <div class="fam"><span class="lbl">族</span>controller n. 控制者 / uncontrolled adj. 失控的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">compete</span>
+          <span class="ipa">/kəm&#x27;pi:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">参加比赛；竞争</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A city firm competed for the same route</div>          <div class="mnem"><span class="lbl">记</span>com 想象成 company(公司)； pete发音很像 PK，PK 就是竞争、比赛。公司之 间PK，就是“竞争”。</div>          <div class="root"><span class="lbl">根</span>com(一起) + pete(追求) → 一起追同一个目标</div>          <div class="zt"><span class="lbl">真题</span>It is well positioned to compete with the giants. 它处于与巨头竞争的有利位置。</div>          <div class="fam"><span class="lbl">族</span>competition n. 竞争 / competitive adj. 有竞争力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">competition</span>
+          <span class="ipa">/ikpmpə&#x27;tı∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">竞争，竞赛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and in that competition the old ferry</div>          <div class="root"><span class="lbl">根</span>com(一起) + pet(追求) + ition → 一起争夺</div>          <div class="zt"><span class="lbl">真题</span>There will be more competition in the job market.就业市场上的竞争将更加激烈。</div>          <div class="fam"><span class="lbl">族</span>compete v. 竞争 / competitor n. 竞争者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">competent</span>
+          <span class="ipa">/&#x27;kpmpitənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有能力的，能胜任的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a competent young captain</div>          <div class="mnem"><span class="lbl">记</span>我的竞争对手（competitor）是 一个有能力的(competent)人。</div>          <div class="root"><span class="lbl">根</span>compet(胜任) + ent → 能担得起的</div>          <div class="zt"><span class="lbl">真题</span>But what makes you a competent lion dancer is that there&#x27;s a sense of imagination involved. 但想象力可以让你成为一个称职的舞 狮者。(2023)</div>          <div class="fam"><span class="lbl">族</span>competence n. 能力 / incompetent adj. 无能的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">versus</span>
+          <span class="ipa">/&#x27;v3irsəs/</span>
+          <span class="pos">prep.</span>
+          <span class="cn">(表示两队或双方对阵)对，对抗；与…… 相对</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>versus the new fast boat</div>          <div class="mnem"><span class="lbl">记</span>我们很熟悉这个单词的缩写形 式“vs.”，表示对抗。</div>          <div class="root"><span class="lbl">根</span>vers(转) + us → 转向对面 → 对、对抗</div>          <div class="zt"><span class="lbl">真题</span>I developed a broader theory of what separates the two general classes of learners— helpless versus mastery-oriented. 我提出了一 个更广泛的理论来区分两类学习者——无助型 和精通型。</div>          <div class="fam"><span class="lbl">族</span>缩写 vs. 对阵</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">heroin</span>
+          <span class="ipa">/&#x27;herəuin/</span>
+          <span class="pos">n.</span>
+          <span class="cn">海洛因</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They hid heroin in a cargo box</div>          <div class="root"><span class="lbl">根</span>音译词：heroin 读作“海洛因”</div>          <div class="zt"><span class="lbl">真题</span>It is as harmful as morphine and heroin. 它与吗啡和海洛因一样有害。</div>          <div class="fam"><span class="lbl">族</span>hero n. 英雄（拼写相近，勿混）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">gamble</span>
+          <span class="ipa">/&#x27;gæmbl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">赌博；打赌；冒险v. 冒风险；碰运气； 以……为赌注</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They had gambled away their money</div>          <div class="root"><span class="lbl">根</span>game(游戏) + ble → 拿钱玩游戏 → 赌博</div>          <div class="fam"><span class="lbl">族</span>gambler n. 赌徒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">bet</span>
+          <span class="ipa">/bet/</span>
+          <span class="pos">n.</span>
+          <span class="cn">打赌；赌注；预计；估计 v. 下赌注(于)； 用……打赌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and made a bet with a smuggler</div>          <div class="root"><span class="lbl">根</span>靠搭配记：make a bet 打个赌 / bet on 押注在……</div>          <div class="zt"><span class="lbl">真题</span>I bet you get a lot of requests for it. 我敢 打赌你会为此收到很多请求。(2013)</div>          <div class="fam"><span class="lbl">族</span>betting n. 赌博</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">pirate</span>
+          <span class="ipa">/&#x27;pairət/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(尤指旧时的)海盗；盗版者 v.盗印；窃用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and sold pirated tickets at the gate</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为：pi速度(rate)，也 就是把速度加快或减慢，估计你听的是“盗版” 光盘。</div>          <div class="root"><span class="lbl">根</span>pir(尝试) + ate → 冒险抢夺的人 → 海盗；盗版者</div>          <div class="fam"><span class="lbl">族</span>piracy n. 盗版；海盗行为</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">kidnap</span>
+          <span class="ipa">/&#x27;kıdnæp/</span>
+          <span class="pos">v.</span>
+          <span class="cn">劫持；绑架</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they kidnapped him</div>          <div class="mnem"><span class="lbl">记</span>孩子(kid)被“绑架”了，奶奶(na 想成nai奶奶)扑(p)向绑架者。</div>          <div class="root"><span class="lbl">根</span>kid(小孩) + nap(抓) → 抓走小孩 → 绑架</div>          <div class="fam"><span class="lbl">族</span>kidnapper n. 绑匪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">prison</span>
+          <span class="ipa">/&#x27;prizn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">监狱；牢狱；看守所；牢笼；樊笼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>five years in prison</div>          <div class="root"><span class="lbl">根</span>pris(抓住) + on → 被抓住关起来的地方</div>          <div class="zt"><span class="lbl">真题</span>Schools and prisons with craft programs report that they have a calming effect and enhance social skills. 有手工课程的学校和监狱 报告说，它们有镇静作用，还能提高社交技能。 (2017)</div>          <div class="fam"><span class="lbl">族</span>prisoner n. 囚犯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">punish</span>
+          <span class="ipa">/&#x27;panıʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">处罚，惩罚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The judge punished them</div>          <div class="mnem"><span class="lbl">记</span>其读音类似“怕你失（迷失自 己)”，所以妈妈要严格管教你，惩罚你→惩罚。</div>          <div class="root"><span class="lbl">根</span>pun(惩罚) + ish → 给予惩罚</div>          <div class="zt"><span class="lbl">真题</span>Their parents often punish them for minor faults. 他们的父母经常因为小错误而惩 罚他们。</div>          <div class="fam"><span class="lbl">族</span>punishment n. 惩罚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">guilt</span>
+          <span class="ipa">/gilt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">内疚；悔恨；犯罪；罪行；有罪；罪责；责任</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the older man showed no guilt</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似跪(gui)了（1） 他(t)。为什么跪他？→内疚；悔恨；有罪。</div>          <div class="root"><span class="lbl">根</span>与 guilty(有罪的) 同源 → 罪责、内疚</div>          <div class="zt"><span class="lbl">真题</span>More than half of the interviewees felt no sense of guilt over cheating. 超过一半的受访者 对作弊没有负罪感。(2022) (136)</div>          <div class="fam"><span class="lbl">族</span>guilty adj. 有罪的；内疚的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">kneel</span>
+          <span class="ipa">/ni:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">跪下</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the younger one chose to kneel and weep</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“你啊”。你 啊，真是太不听话了，还是“跪下”吧。</div>          <div class="root"><span class="lbl">根</span>knee(膝盖) + l → 用膝盖着地 → 跪下</div>          <div class="fam"><span class="lbl">族</span>knee n. 膝盖 / knelt v. 跪下（过去式）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">mud</span>
+          <span class="ipa">/m^d/</span>
+          <span class="pos">n.</span>
+          <span class="cn">泥；淤泥；泥浆</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>thick with mud</div>          <div class="mnem"><span class="lbl">记</span>mud谐音“抹地”，抹完地板后， 抹布上沾了很多“泥”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：抹地 → 抹布上沾的全是泥</div>          <div class="zt"><span class="lbl">真题</span>The busy streets in Paris were uneven and caked in thick mud. 巴黎繁忙的街道坑坑 洼洼，到处都是厚厚的泥土。(2018)</div>          <div class="fam"><span class="lbl">族</span>muddy adj. 泥泞的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5~6 · Day 35</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

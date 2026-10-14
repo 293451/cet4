@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 18 · The House of Wet Clay</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 18 · 10/30 · Unit 3 第 511-540 词</div>
+  <h1>The House of Wet Clay<span class="cn">湿黏土屋</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-18.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2773"><p class="en"><span class="w" data-s="43" data-e="256">Umi</span> <span class="w" data-s="299" data-e="427">lived</span> <span class="w" data-s="469" data-e="683">in</span> <span class="w" data-s="725" data-e="768">a</span> <span class="w" data-s="811" data-e="939">small</span> <span class="w target" data-s="981" data-e="1493" title="小屋，村舍">cottage</span> <span class="w" data-s="1536" data-e="1664">at</span> <span class="w" data-s="1707" data-e="1792">the</span> <span class="w" data-s="1835" data-e="1920">edge</span> <span class="w" data-s="1963" data-e="2133">of</span> <span class="w" data-s="2176" data-e="2219">the</span> <span class="w" data-s="2261" data-e="2347">rain</span> <span class="w" data-s="2389" data-e="2773">forest.</span></p><p class="zh">乌米住在雨林边上的一间小屋。</p></div>
+<div class="pair" data-s0="2944" data-s1="7211"><p class="en"><span class="w" data-s="2944" data-e="3541">The</span> <span class="w" data-s="3584" data-e="3712">air</span> <span class="w" data-s="3755" data-e="3968">there</span> <span class="w" data-s="4011" data-e="4181">was</span> <span class="w" data-s="4224" data-e="4395">always</span> <span class="w target" data-s="4437" data-e="4907" title="湿热的">humid,</span> <span class="w" data-s="5077" data-e="5205">and</span> <span class="w" data-s="5547" data-e="5717">in</span> <span class="w" data-s="5760" data-e="5803">the</span> <span class="w target" data-s="5845" data-e="6144" title="热带，热带地区">tropics</span> <span class="w" data-s="6187" data-e="6571">the</span> <span class="w" data-s="6656" data-e="6784">heat</span> <span class="w" data-s="6827" data-e="6997">was</span> <span class="w" data-s="7040" data-e="7211">heavy.</span></p><p class="zh">那里的空气总是潮湿，在热带，热气沉沉的。</p></div>
+<div class="pair" data-s0="7552" data-s1="12416"><p class="en"><span class="w" data-s="7552" data-e="7723">After</span> <span class="w" data-s="7765" data-e="7979">the</span> <span class="w" data-s="8021" data-e="8149">rain</span> <span class="w" data-s="8192" data-e="8491">the</span> <span class="w" data-s="8533" data-e="8619">ground</span> <span class="w" data-s="8661" data-e="9131">stayed</span> <span class="w target" data-s="9173" data-e="9429" title="潮湿的；湿润的；微湿的">moist</span> <span class="w" data-s="9472" data-e="9685">for</span> <span class="w" data-s="9728" data-e="9899">days,</span> <span class="w" data-s="10197" data-e="10496">and</span> <span class="w" data-s="10624" data-e="10837">the</span> <span class="w" data-s="10880" data-e="11093">sheets</span> <span class="w" data-s="11136" data-e="11221">in</span> <span class="w" data-s="11264" data-e="11307">her</span> <span class="w" data-s="11349" data-e="11477">room</span> <span class="w" data-s="11520" data-e="11776">were</span> <span class="w target" data-s="11819" data-e="12117" title="潮湿的 n. 潮湿;挫败；沼气 v. (使)潮湿">damp</span> <span class="w" data-s="12160" data-e="12245">and</span> <span class="w" data-s="12288" data-e="12416">heavy.</span></p><p class="zh">雨后地面会一连几天都是湿的，她房里的被单又潮又重。</p></div>
+<div class="pair" data-s0="12672" data-s1="15019"><p class="en"><span class="w" data-s="12672" data-e="13611">Only</span> <span class="w" data-s="13653" data-e="13781">the</span> <span class="w" data-s="13824" data-e="13952">early</span> <span class="w" data-s="13995" data-e="14251">morning</span> <span class="w" data-s="14293" data-e="14592">brought</span> <span class="w" data-s="14635" data-e="14805">a</span> <span class="w target" data-s="14848" data-e="15019" title="冷的，令人紧张的 n. 寒冷，害怕，冷漠">chill.</span></p><p class="zh">只有清晨才有一点凉意。</p></div>
+<div class="pair" data-s0="15886" data-s1="20536"><p class="en"><span class="w" data-s="15886" data-e="15971">In</span> <span class="w" data-s="16014" data-e="16142">that</span> <span class="w" data-s="16184" data-e="16398">house,</span> <span class="w" data-s="16696" data-e="17208">water</span> <span class="w" data-s="17251" data-e="17507">and</span> <span class="w target" data-s="17550" data-e="17848" title="肉体；黏土，陶土">clay</span> <span class="w" data-s="17891" data-e="18104">were</span> <span class="w target" data-s="18147" data-e="18446" title="至关重要的;必不可少的">vital;</span> <span class="w" data-s="18702" data-e="19384">without</span> <span class="w" data-s="19427" data-e="19640">them</span> <span class="w" data-s="19683" data-e="19939">she</span> <span class="w" data-s="19982" data-e="20152">could</span> <span class="w" data-s="20195" data-e="20323">not</span> <span class="w" data-s="20366" data-e="20536">work.</span></p><p class="zh">在那间屋子里，水和黏土至关重要；没有它们她就没法干活。</p></div>
+<div class="pair" data-s0="20792" data-s1="27235"><p class="en"><span class="w" data-s="20792" data-e="21603">She</span> <span class="w" data-s="21646" data-e="21816">worked</span> <span class="w" data-s="21859" data-e="22072">hard</span> <span class="w" data-s="22115" data-e="22414">to</span> <span class="w target" data-s="22456" data-e="22670" title="达到;获得">attain</span> <span class="w" data-s="22712" data-e="22926">one</span> <span class="w" data-s="22968" data-e="23267">small</span> <span class="w" data-s="23310" data-e="23694">skill</span> <span class="w" data-s="23736" data-e="23992">each</span> <span class="w" data-s="24035" data-e="24291">week,</span> <span class="w" data-s="24504" data-e="24760">and</span> <span class="w" data-s="24803" data-e="25187">she</span> <span class="w" data-s="25230" data-e="25358">was</span> <span class="w" data-s="25400" data-e="25528">happy</span> <span class="w" data-s="25571" data-e="25827">to</span> <span class="w target" data-s="25870" data-e="26168" title="获得,得到">obtain</span> <span class="w" data-s="26211" data-e="26339">a</span> <span class="w" data-s="26382" data-e="26467">bag</span> <span class="w" data-s="26510" data-e="26766">of</span> <span class="w" data-s="26808" data-e="26894">good</span> <span class="w target" data-s="26936" data-e="27235" title="肉体；黏土，陶土">clay.</span></p><p class="zh">她每周努力学到一个小本领，能买到一袋好黏土她就很高兴。</p></div>
+<div class="pair" data-s0="27886" data-s1="32750"><p class="en"><span class="w" data-s="27886" data-e="28185">Water</span> <span class="w" data-s="28227" data-e="28398">will</span> <span class="w" data-s="28441" data-e="28569">not</span> <span class="w target" data-s="28611" data-e="28953" title="保持，保留；雇；记住">retain</span> <span class="w" data-s="28995" data-e="29209">its</span> <span class="w" data-s="29251" data-e="29422">shape,</span> <span class="w" data-s="29721" data-e="29849">so</span> <span class="w" data-s="30318" data-e="30531">she</span> <span class="w" data-s="30574" data-e="30702">had</span> <span class="w" data-s="30745" data-e="30873">to</span> <span class="w target" data-s="30915" data-e="31001" title="维持；维修；坚持认为">maintain</span> <span class="w" data-s="31043" data-e="31342">the</span> <span class="w" data-s="31385" data-e="31513">fire</span> <span class="w" data-s="31555" data-e="31854">under</span> <span class="w" data-s="31897" data-e="32067">the</span> <span class="w" data-s="32110" data-e="32153">pot</span> <span class="w" data-s="32195" data-e="32494">all</span> <span class="w" data-s="32537" data-e="32750">day.</span></p><p class="zh">水保不住形状，所以她得整天让锅下的火不灭。</p></div>
+<div class="pair" data-s0="33343" data-s1="38932"><p class="en"><span class="w" data-s="33343" data-e="33428">A</span> <span class="w" data-s="33471" data-e="33641">bowl</span> <span class="w" data-s="33684" data-e="33769">of</span> <span class="w" data-s="33812" data-e="34025">rice</span> <span class="w" data-s="34068" data-e="34367">was</span> <span class="w" data-s="34409" data-e="34580">enough</span> <span class="w" data-s="34623" data-e="34793">to</span> <span class="w target" data-s="34836" data-e="35135" title="">sustain</span> <span class="w" data-s="35177" data-e="35391">her,</span> <span class="w" data-s="35519" data-e="35647">and</span> <span class="w" data-s="35732" data-e="36031">the</span> <span class="w" data-s="36073" data-e="36329">forest</span> <span class="w" data-s="36372" data-e="36628">seemed</span> <span class="w" data-s="36671" data-e="36884">to</span> <span class="w target" data-s="36927" data-e="37140" title="生物，动物">pertain</span> <span class="w" data-s="37183" data-e="37396">to</span> <span class="w" data-s="37439" data-e="37567">a</span> <span class="w" data-s="37609" data-e="37695">world</span> <span class="w" data-s="37737" data-e="38121">she</span> <span class="w" data-s="38377" data-e="38505">would</span> <span class="w" data-s="38548" data-e="38719">never</span> <span class="w" data-s="38761" data-e="38932">know.</span></p><p class="zh">一碗米饭就够她维持生活了，而那片森林仿佛属于一个她永远不会了解的世界。</p></div>
+<div class="pair" data-s0="39188" data-s1="42644"><p class="en"><span class="w" data-s="39188" data-e="39871">In</span> <span class="w" data-s="39913" data-e="40041">the</span> <span class="w" data-s="40084" data-e="40212">evening</span> <span class="w" data-s="40255" data-e="40553">she</span> <span class="w" data-s="40596" data-e="40767">would</span> <span class="w target" data-s="40809" data-e="41108" title="(尤指在自己家中)招待，款待；使快乐；娱乐">entertain</span> <span class="w" data-s="41151" data-e="41577">visitors</span> <span class="w" data-s="41620" data-e="41791">with</span> <span class="w" data-s="41833" data-e="42089">tea</span> <span class="w" data-s="42132" data-e="42388">and</span> <span class="w" data-s="42431" data-e="42644">stories.</span></p><p class="zh">傍晚她会给来客端上茶，讲讲故事，招待他们。</p></div>
+<div class="pair" data-s0="43509" data-s1="46282"><p class="en"><span class="w" data-s="43509" data-e="43722">Once,</span> <span class="w" data-s="43935" data-e="44149">heavy</span> <span class="w" data-s="44447" data-e="44703">rain</span> <span class="w target" data-s="44746" data-e="45215" title="拘留；留住；耽搁">detained</span> <span class="w" data-s="45258" data-e="45301">her</span> <span class="w" data-s="45343" data-e="45429">at</span> <span class="w" data-s="45471" data-e="45514">the</span> <span class="w" data-s="45557" data-e="45685">market</span> <span class="w" data-s="45727" data-e="45983">until</span> <span class="w" data-s="46026" data-e="46282">dark.</span></p><p class="zh">有一次大雨把她在集市上耽搁到天黑。</p></div>
+<div class="pair" data-s0="46538" data-s1="49354"><p class="en"><span class="w" data-s="46538" data-e="47263">Another</span> <span class="w" data-s="47306" data-e="47434">time,</span> <span class="w" data-s="47690" data-e="47818">a</span> <span class="w" data-s="47989" data-e="48202">thief</span> <span class="w" data-s="48245" data-e="48415">was</span> <span class="w target" data-s="48458" data-e="48842" title="逮捕 n. 逮捕,拘留">arrested</span> <span class="w" data-s="48885" data-e="49013">near</span> <span class="w" data-s="49055" data-e="49183">her</span> <span class="w" data-s="49226" data-e="49354">door.</span></p><p class="zh">还有一次，一个贼在她门附近被逮捕了。</p></div>
+<div class="pair" data-s0="49610" data-s1="52938"><p class="en"><span class="w" data-s="49610" data-e="50165">She</span> <span class="w" data-s="50207" data-e="50421">made</span> <span class="w" data-s="50463" data-e="50591">little</span> <span class="w" data-s="50634" data-e="51018">figures</span> <span class="w" data-s="51061" data-e="51231">of</span> <span class="w" data-s="51274" data-e="51445">every</span> <span class="w target" data-s="51487" data-e="51914" title="物种，种类">species</span> <span class="w" data-s="51957" data-e="52170">she</span> <span class="w" data-s="52213" data-e="52298">saw</span> <span class="w" data-s="52341" data-e="52554">in</span> <span class="w" data-s="52597" data-e="52639">the</span> <span class="w" data-s="52682" data-e="52938">forest.</span></p><p class="zh">她给在森林里见到的每一个物种都做了小塑像。</p></div>
+<div class="pair" data-s0="53581" data-s1="57507"><p class="en"><span class="w" data-s="53581" data-e="53752">Each</span> <span class="w target" data-s="53795" data-e="54051" title="">creature</span> <span class="w" data-s="54093" data-e="54221">had</span> <span class="w" data-s="54264" data-e="54349">its</span> <span class="w" data-s="54392" data-e="54477">own</span> <span class="w" data-s="54520" data-e="54733">shape,</span> <span class="w" data-s="54989" data-e="55117">and</span> <span class="w" data-s="55459" data-e="55629">she</span> <span class="w" data-s="55672" data-e="55757">was</span> <span class="w" data-s="55800" data-e="55885">a</span> <span class="w target" data-s="55928" data-e="56227" title="创造(性)的；创作的；有创造力的.富 于创造力的人；搞创作的人；创意；创作素材">creative</span> <span class="w" data-s="56269" data-e="56568">artist</span> <span class="w" data-s="56611" data-e="56696">in</span> <span class="w" data-s="56739" data-e="56781">her</span> <span class="w" data-s="56824" data-e="56952">own</span> <span class="w" data-s="56995" data-e="57165">quiet</span> <span class="w" data-s="57208" data-e="57507">way.</span></p><p class="zh">每只生物都有自己的形状，而她自己就是一个安静的、有创造力的艺术家。</p></div>
+<div class="pair" data-s0="57763" data-s1="60621"><p class="en"><span class="w" data-s="57763" data-e="58232">Her</span> <span class="w" data-s="58403" data-e="58616">hands</span> <span class="w" data-s="58659" data-e="58829">could</span> <span class="w" data-s="58872" data-e="59000">give</span> <span class="w" data-s="59043" data-e="59128">a</span> <span class="w target" data-s="59171" data-e="59597" title="混凝土 adj. 具体的，实在的">concrete</span> <span class="w" data-s="59640" data-e="59811">shape</span> <span class="w" data-s="59853" data-e="60024">to</span> <span class="w" data-s="60067" data-e="60237">soft</span> <span class="w target" data-s="60280" data-e="60621" title="肉体；黏土，陶土">clay.</span></p><p class="zh">她的双手能给柔软的黏土一个具体的形状。</p></div>
+<div class="pair" data-s0="61243" data-s1="65936"><p class="en"><span class="w" data-s="61243" data-e="61371">She</span> <span class="w" data-s="61413" data-e="61712">believed</span> <span class="w" data-s="61755" data-e="61968">every</span> <span class="w target" data-s="62011" data-e="62309" title="人 adj.人的">human</span> <span class="w" data-s="62352" data-e="62565">being</span> <span class="w" data-s="62608" data-e="63120">carried</span> <span class="w" data-s="63163" data-e="63248">a</span> <span class="w" data-s="63291" data-e="63419">story,</span> <span class="w" data-s="63675" data-e="63888">and</span> <span class="w" data-s="64187" data-e="64315">that</span> <span class="w target" data-s="64357" data-e="64784" title="人类">humankind</span> <span class="w" data-s="64827" data-e="65168">had</span> <span class="w" data-s="65211" data-e="65381">always</span> <span class="w" data-s="65424" data-e="65595">done</span> <span class="w" data-s="65637" data-e="65765">the</span> <span class="w" data-s="65808" data-e="65936">same.</span></p><p class="zh">她相信每个人都带着一个故事，而人类一直和她做着同样的事。</p></div>
+<div class="pair" data-s0="66192" data-s1="70629"><p class="en"><span class="w" data-s="66192" data-e="66704">She</span> <span class="w" data-s="66747" data-e="66917">was</span> <span class="w target" data-s="66960" data-e="67259" title="谦逊的；虚心的 v. 贬低；使感到卑微 η. 诙谐；幽默，幽默感">humble</span> <span class="w" data-s="67301" data-e="67472">about</span> <span class="w" data-s="67515" data-e="67685">her</span> <span class="w" data-s="67728" data-e="67856">own</span> <span class="w" data-s="67899" data-e="68069">work,</span> <span class="w" data-s="68283" data-e="68539">and</span> <span class="w" data-s="68581" data-e="68923">she</span> <span class="w" data-s="68965" data-e="69093">never</span> <span class="w" data-s="69136" data-e="69349">lost</span> <span class="w" data-s="69392" data-e="69563">her</span> <span class="w target" data-s="69605" data-e="69904" title="">humour</span> <span class="w" data-s="69947" data-e="70075">when</span> <span class="w" data-s="70117" data-e="70203">a</span> <span class="w" data-s="70245" data-e="70331">figure</span> <span class="w" data-s="70373" data-e="70629">broke.</span></p><p class="zh">她对自己的作品很谦逊，塑像碎了也从不忘幽默一下。</p></div>
+<div class="pair" data-s0="71362" data-s1="74903"><p class="en"><span class="w" data-s="71362" data-e="71575">Each</span> <span class="w target" data-s="71618" data-e="72087" title="单独的；个别的 n. 个人">individual</span> <span class="w" data-s="72130" data-e="72343">piece</span> <span class="w" data-s="72386" data-e="72685">was</span> <span class="w" data-s="72727" data-e="72941">different,</span> <span class="w" data-s="73239" data-e="73495">and</span> <span class="w" data-s="73751" data-e="73922">no</span> <span class="w" data-s="73965" data-e="74135">two</span> <span class="w" data-s="74178" data-e="74391">were</span> <span class="w" data-s="74434" data-e="74562">ever</span> <span class="w" data-s="74605" data-e="74733">the</span> <span class="w" data-s="74775" data-e="74903">same.</span></p><p class="zh">每一件单独的作品都不一样，从来没有两件是相同的。</p></div>
+<div class="pair" data-s0="75202" data-s1="80194"><p class="en"><span class="w" data-s="75202" data-e="75671">She</span> <span class="w" data-s="75714" data-e="76013">would</span> <span class="w target" data-s="76055" data-e="76226" title="(使)分开，分散；分配；分享；分担n. 不同， 差异，分歧；分水岭">divide</span> <span class="w" data-s="76269" data-e="76439">the</span> <span class="w target" data-s="76482" data-e="76653" title="肉体；黏土，陶土">clay</span> <span class="w" data-s="76695" data-e="76909">into</span> <span class="w" data-s="76951" data-e="77165">small</span> <span class="w" data-s="77207" data-e="77591">balls,</span> <span class="w" data-s="77847" data-e="78274">then</span> <span class="w target" data-s="78317" data-e="78829" title="(被)再分割，再分">subdivide</span> <span class="w" data-s="78871" data-e="79085">one</span> <span class="w" data-s="79127" data-e="79341">ball</span> <span class="w" data-s="79383" data-e="79682">into</span> <span class="w" data-s="79725" data-e="79938">four</span> <span class="w" data-s="79981" data-e="80194">parts.</span></p><p class="zh">她会把黏土分成小球，再把一个球细分成四份。</p></div>
+<div class="pair" data-s0="80578" data-s1="85058"><p class="en"><span class="w" data-s="80578" data-e="80663">The</span> <span class="w" data-s="80706" data-e="80877">wet</span> <span class="w" data-s="80919" data-e="81090">weather</span> <span class="w" data-s="81133" data-e="81303">could</span> <span class="w target" data-s="81346" data-e="81559" title="损害，毁坏 n. 损害">damage</span> <span class="w" data-s="81602" data-e="81858">a</span> <span class="w" data-s="81901" data-e="82029">finished</span> <span class="w" data-s="82071" data-e="82370">figure,</span> <span class="w" data-s="82626" data-e="82754">and</span> <span class="w" data-s="83095" data-e="83309">long</span> <span class="w" data-s="83351" data-e="83607">rain</span> <span class="w" data-s="83650" data-e="83906">would</span> <span class="w target" data-s="83949" data-e="84247" title="使成为；使变得；给予；提供">render</span> <span class="w" data-s="84290" data-e="84375">the</span> <span class="w" data-s="84418" data-e="84674">garden</span> <span class="w" data-s="84717" data-e="85058">useless.</span></p><p class="zh">潮湿的天气会损害做好的塑像，长时间的雨会让园子变得一无用处。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">vital</span>
+          <span class="ipa">/&#x27;vaitl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">至关重要的;必不可少的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>water and clay were vital</div>          <div class="mnem"><span class="lbl">记</span>六个头的(vi是罗马数字六)， 说明这个人很有头脑，他的地位一定是“至关重 要的”。</div>          <div class="root"><span class="lbl">根</span>vit(生命) + al(……的) → 关乎生命的</div>          <div class="zt"><span class="lbl">真题</span>We will lose a vital part of what has made humanity as a whole so successful as a species. 我们将失去使人类作为一个整体取得 如此成功的一个重要部分。(2017)</div>          <div class="fam"><span class="lbl">族</span>vitality n. 活力 / vitamin n. 维生素</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">attain</span>
+          <span class="ipa">/ə&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">达到;获得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She worked hard to attain one small skill</div>          <div class="mnem"><span class="lbl">记</span>tain 词根，意思同 take(拿)，at 表示“一再地”。一再地拿着(当你特别喜欢一 个东西，最终得到的时候，一定日日拿着)→获 得，达到。</div>          <div class="root"><span class="lbl">根</span>at(一再) + tain(拿) → 一直拿着 → 达到</div>          <div class="zt"><span class="lbl">真题</span>We expect our pupils to do their best, and we give them every encouragement to attain this goal. 我们期望我们的学生尽他们最 大的努力，我们也会鼓励他们来实现这一目标。</div>          <div class="fam"><span class="lbl">族</span>attainment n. 成就</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">retain</span>
+          <span class="ipa">/ri&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保持，保留；雇；记住</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Water will not retain its shape</div>          <div class="mnem"><span class="lbl">记</span>re(重复)十tain(拿)，重复地拿 着，那“拿”这个动作是“保持”的→保持。</div>          <div class="root"><span class="lbl">根</span>re(再) + tain(拿) → 拿着不放</div>          <div class="zt"><span class="lbl">真题</span>Their babies retain the ability to produce their own chlorophyll. 它们的幼崽保留了自己 产生叶绿素的能力。(2019)</div>          <div class="fam"><span class="lbl">族</span>retention n. 保留</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">maintain</span>
+          <span class="ipa">/mein&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">维持；维修；坚持认为</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she had to maintain the fire under the pot</div>          <div class="mnem"><span class="lbl">记</span>main主要的，那“主要的全拿 (tain)着”是什么意思？你们的钱，主要的谁全 拿着？当然就是在家中主管钱的人一家之 主，他在“维持”一家人的生活。</div>          <div class="root"><span class="lbl">根</span>main(主要) + tain(拿) → 一直把住 → 维持</div>          <div class="zt"><span class="lbl">真题</span>The best way to maintain good blood circulation is through using the brain. 保持良 好血液循环的最佳方法是使用大脑。</div>          <div class="fam"><span class="lbl">族</span>maintenance n. 维护</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">entertain</span>
+          <span class="ipa">/ientər&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(尤指在自己家中)招待，款待；使快乐；娱乐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she would entertain visitors with tea and stories</div>          <div class="mnem"><span class="lbl">记</span>enter(进来)，tain(拿)，进来就 拿着。和同学去唱歌，有一个同学进去就拿着 麦克风唱，哪管别人的感受，只顾“娱乐”自己→ 娱乐。</div>          <div class="root"><span class="lbl">根</span>enter(进来) + tain(拿) → 请进来好好招待</div>          <div class="zt"><span class="lbl">真题</span>Visiting a bookshop as curiosity leads us can be a good way to entertain ourselves. 好奇 心引导我们去书店是一种很好的娱乐方式。 (2017)</div>          <div class="fam"><span class="lbl">族</span>entertainment n. 娱乐</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">sustain</span>
+          <span class="ipa">/sə&#x27;stein/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A bowl of rice was enough to sustain her</div>          <div class="mnem"><span class="lbl">记</span>sus下，tain拿，从下面拿着。 女娲拿着补天石，她是怎样拿着补天石的？从 下面拿着→维持；承担，支撑。</div>          <div class="root"><span class="lbl">根</span>sus(在下面) + tain(拿) → 从下面托住</div>          <div class="zt"><span class="lbl">真题</span>Some of those small mammals help to sustain such big birds as golden eagles. 有些小 型哺乳动物有助于饲养像金雕这样的大鸟类。 (2019)</div>          <div class="fam"><span class="lbl">族</span>sustainable adj. 可持续的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">pertain</span>
+          <span class="ipa">/pə&#x27;tein/</span>
+          <span class="pos">n.</span>
+          <span class="cn">生物，动物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the forest seemed to pertain to a world</div>          <div class="mnem"><span class="lbl">记</span>per每一个，tain 拿，每一个都 拿着，说明这个东西属于你→属于；适合。</div>          <div class="root"><span class="lbl">根</span>per(每一) + tain(拿) → 都归它管 → 属于</div>          <div class="fam"><span class="lbl">族</span>pertinent adj. 相关的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">obtain</span>
+          <span class="ipa">/əb&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">获得,得到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>happy to obtain a bag of good clay</div>          <div class="mnem"><span class="lbl">记</span>ob表示方向，tain拿，朝着某个 方向拿着→获得，得到。</div>          <div class="root"><span class="lbl">根</span>ob(朝着) + tain(拿) → 朝它拿 → 得到</div>          <div class="zt"><span class="lbl">真题</span>Help it to obtain financial support from industry. 帮助其获得行业的资金支持。(2010) (069) 第三单元</div>          <div class="fam"><span class="lbl">族</span>obtainable adj. 可获得的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">detain</span>
+          <span class="ipa">/dı&#x27;tein/</span>
+          <span class="pos">v.</span>
+          <span class="cn">拘留；留住；耽搁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>heavy rain detained her at the market</div>          <div class="mnem"><span class="lbl">记</span>de往下，tain拿，往下拿→拘 留；耽搁。</div>          <div class="root"><span class="lbl">根</span>de(向下) + tain(拿) → 按住了不让走</div>          <div class="fam"><span class="lbl">族</span>detention n. 拘留；留堂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">arrest</span>
+          <span class="ipa">/ə&#x27;rest/</span>
+          <span class="pos">v.</span>
+          <span class="cn">逮捕 n. 逮捕,拘留</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a thief was arrested near her door</div>          <div class="mnem"><span class="lbl">记</span>ar啊，rest休息，罪犯被“逮捕” 之后感叹说：“啊，终于可以休息一下了”。</div>          <div class="root"><span class="lbl">根</span>ar(啊) + rest(休息) → 被捕后终于「休息」了</div>          <div class="zt"><span class="lbl">真题</span>Alaska State Troopers released a statement saying they&#x27;ve arrested Arnold Demoski, 26. 阿拉斯加州骑警发表声明称，他们已经逮捕了 26岁的阿诺德·德莫斯基。(2017)</div>          <div class="fam"><span class="lbl">族</span>arresting adj. 引人注目的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">species</span>
+          <span class="ipa">/&#x27;spi:∫i:z/</span>
+          <span class="pos">n.</span>
+          <span class="cn">物种，种类</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>little figures of every species</div>          <div class="mnem"><span class="lbl">记</span>这个单词很像 special，世界上 每个“物种(species)”都很特别(special)。</div>          <div class="root"><span class="lbl">根</span>与 special 同源：每一「种」都很特别</div>          <div class="zt"><span class="lbl">真题</span>Its title was The Origin of Species, written by Charles Darwin. 这本书叫《物种起 源》，作者是查尔斯·达尔文。</div>          <div class="fam"><span class="lbl">族</span>specific adj. 具体的；特定的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">creature</span>
+          <span class="ipa">/&#x27;kri:t∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Each creature had its own shape</div>          <div class="mnem"><span class="lbl">记</span>create意思是“创造，产生”，在 大多数西方人眼中，所有生物都是上帝创造的， 所以上帝创造的东西就是“生物，动物”。</div>          <div class="root"><span class="lbl">根</span>create(创造) + ure(东西) → 被创造出来的东西</div>          <div class="zt"><span class="lbl">真题</span>As one of the most brutal predators(食肉 动物), killer whales may not fit the image of a cultured creature. 作为最残忍的掠食者之一， 虎鲸可能不符合养殖生物的形象。(2019)</div>          <div class="fam"><span class="lbl">族</span>create v. 创造 / creation n. 创造</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">creative</span>
+          <span class="ipa">/kri&#x27;eitiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">创造(性)的；创作的；有创造力的.富 于创造力的人；搞创作的人；创意；创作素材</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she was a creative artist</div>          <div class="root"><span class="lbl">根</span>create(创造) + ive(……的) → 有创造力的</div>          <div class="zt"><span class="lbl">真题</span>Teachers should aim to build a supportive, creative environment for students to do this work.教师应该致力于为学生创造一个支持性 的、创造性的环境来完成这项工作。</div>          <div class="fam"><span class="lbl">族</span>creativity n. 创造力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">concrete</span>
+          <span class="ipa">/&#x27;ka:nkri:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">混凝土 adj. 具体的，实在的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>give a concrete shape to soft clay</div>          <div class="mnem"><span class="lbl">记</span>con 所有的；crete 很像 create (创造)。传说中，女娲创造出来的都是“具体 的，实在的”人啊。</div>          <div class="root"><span class="lbl">根</span>con(一起) + crete(生长) → 长在一起变硬 → 具体的</div>          <div class="zt"><span class="lbl">真题</span>The doer of a good deed can feel spiritually rewarded even when they gain no concrete benefits. 做好事的人即使没有得到具 体的好处，也能感到精神上的奖赏。(2016)</div>          <div class="fam"><span class="lbl">族</span>concretely adv. 具体地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">clay</span>
+          <span class="ipa">/klei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">肉体；黏土，陶土</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>water and clay were vital</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：可（河南话的意 思是“很”)累。什么累？“肉体”啊。一整天都 在用“黏土，陶土”制陶，可累了。</div>          <div class="root"><span class="lbl">根</span>谐音「可累」→ 一整天捏黏土可累了</div>          <div class="fam"><span class="lbl">族</span>clayey adj. 黏土的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">human</span>
+          <span class="ipa">/&#x27;hju:mən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">人 adj.人的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every human being carried a story</div>          <div class="root"><span class="lbl">根</span>hum(土、人) + an → 土做的人</div>          <div class="zt"><span class="lbl">真题</span>Some robots are already programmed with basic human values. 一些机器人已经具备 了基本的人类价值观。(2016) 【拓展】humanity /hju:&#x27;mænəti/n.人的总称； 人性；人文学科</div>          <div class="fam"><span class="lbl">族</span>humanity n. 人性；人类</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">humankind</span>
+          <span class="ipa">/ihju:mən&#x27;kaınd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">人类</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>humankind had always done the same</div>          <div class="root"><span class="lbl">根</span>human(人) + kind(类) → 人类</div>          <div class="zt"><span class="lbl">真题</span>Fire was one of the earliest major technological advances for humankind. 火是人 类最早的主要技术进步之一。</div>          <div class="fam"><span class="lbl">族</span>mankind n. 人类</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">humble</span>
+          <span class="ipa">/&#x27;hambl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">谦逊的；虚心的 v. 贬低；使感到卑微 η. 诙谐；幽默，幽默感</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was humble about her own work</div>          <div class="mnem"><span class="lbl">记</span>音译。或者串记：说谣言 (rumour)是从我们的(our)房间(room)传出 (run)的，这也太“幽默(humour)”了吧。</div>          <div class="root"><span class="lbl">根</span>hum(土) + ble → 低到土里 → 谦逊的</div>          <div class="zt"><span class="lbl">真题</span>Researchers have come to realize that being humble generally indicates the presence of deeply admirable personal qualities. 研究人 员已经意识到，谦虚通常被认为是非常令人钦 佩的个人品质。(2021)</div>          <div class="fam"><span class="lbl">族</span>humility n. 谦逊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">humour</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she never lost her humour</div>          <div class="root"><span class="lbl">根</span>与 humid 同源：体液 → 性情 → 幽默</div>          <div class="fam"><span class="lbl">族</span>humorous adj. 幽默的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">humid</span>
+          <span class="ipa">/&#x27;hju:mıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">湿热的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The air there was always humid</div>          <div class="mnem"><span class="lbl">记</span>把“hu”想成“湖”，把“mid”想成 “middle(中间的)”。湖中间水汽充足，肯定也 是“潮湿的”。</div>          <div class="root"><span class="lbl">根</span>hum(湿) + id → 湿热的</div>          <div class="zt"><span class="lbl">真题</span>The hot, humid air over the ocean causes severe tropical thunderstorms. 海洋上空炎热 潮湿的空气造成了严重的热带雷暴。</div>          <div class="fam"><span class="lbl">族</span>humidity n. 湿度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">tropic</span>
+          <span class="ipa">/&#x27;tra:pık/</span>
+          <span class="pos"></span>
+          <span class="cn">热带，热带地区</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in the tropics the heat was heavy</div>          <div class="mnem"><span class="lbl">记</span>单词topic(主题、话题)我们很 熟悉，这个单词比 topic多了一个 r,那就是热带 拿花(字母r联想成一朵花)做主题。“热带地 区”有很多植物和花草的。</div>          <div class="root"><span class="lbl">根</span>trop(转) + ic → 太阳回转之地 → 热带</div>          <div class="zt"><span class="lbl">真题</span>Most of the world&#x27;s fridges are to be found, not in the tropics where they might (070) prove useful, but in the wealthy countries. 世 界上大多数冰箱都不是在可能被证明有用的热 带地区，而是在富裕国家里。</div>          <div class="fam"><span class="lbl">族</span>tropical adj. 热带的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">chill</span>
+          <span class="ipa">/t∫1l/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">冷的，令人紧张的 n. 寒冷，害怕，冷漠</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Only the early morning brought a chill</div>          <div class="mnem"><span class="lbl">记</span>chi想成汉字“吃”；l1 想成两支 冰棍，数九寒天，你吃了两支冰棍，是不是心底 都是“冷的”？</div>          <div class="root"><span class="lbl">根</span>谐音「吃」+ ll(两根冰棍) → 心里发冷</div>          <div class="fam"><span class="lbl">族</span>chilly adj. 寒冷的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">moist</span>
+          <span class="ipa">/məist/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">潮湿的；湿润的；微湿的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ground stayed moist for days</div>          <div class="mnem"><span class="lbl">记</span>mo想成汉字“毛”，ist 结尾表 示人，比如 scientist 科学家，那这个单词就是毛 人，浑身都长了毛，为什么？天气太“潮湿”了， 身上都长了毛。</div>          <div class="root"><span class="lbl">根</span>联想：mo(毛) + ist(人) → 潮得浑身长毛</div>          <div class="zt"><span class="lbl">真题</span>Our skins let us know whether the air is moist or dry. 我们的皮肤可以让我们知道空气 是潮湿还是干燥。</div>          <div class="fam"><span class="lbl">族</span>moisture n. 水分</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">render</span>
+          <span class="ipa">/&#x27;rendər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使成为；使变得；给予；提供</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>long rain would render the garden useless</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“润的”。皮 第三单元 肤润润的，是重庆的潮湿天气使得你皮肤润润 的啊→使变得。</div>          <div class="root"><span class="lbl">根</span>联想：re(再) + nder(想成 under) → 使变成某种状态</div>          <div class="zt"><span class="lbl">真题</span>Many professors require that their students use only the latest versions in the classroom, essentially rendering older texts unusable.许多教授要求他们的学生在课堂上 只使用最新的版本，这实际上使旧的文本无法 使用。(2013)</div>          <div class="fam"><span class="lbl">族</span>rendering n. 演绎；渲染</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">damp</span>
+          <span class="ipa">/dæmp/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">潮湿的 n. 潮湿;挫败；沼气 v. (使)潮湿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sheets in her room were damp</div>          <div class="mnem"><span class="lbl">记</span>p趴，dam大坝，趴（p)在大坝 上(dam)，身上就“潮湿”了。</div>          <div class="root"><span class="lbl">根</span>联想：趴(p)在大坝(dam)上 → 身上就潮了</div>          <div class="zt"><span class="lbl">真题</span>The sheets are damp with sweat. 床单被 汗水浸湿了。</div>          <div class="fam"><span class="lbl">族</span>dampen v. 弄湿 / dampness n. 潮湿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">damage</span>
+          <span class="ipa">/&#x27;dæmıd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">损害，毁坏 n. 损害</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The wet weather could damage a finished figure</div>          <div class="mnem"><span class="lbl">记</span>dam 的发音似“damn(该死，见 鬼)”，那就是骂人的那个年代(age)会“损害”你 的形象啊。</div>          <div class="root"><span class="lbl">根</span>dam(大坝) + age → 大坝坏了 → 损害</div>          <div class="zt"><span class="lbl">真题</span>They claimed damages for their heavy losses. 他们要求赔偿他们的重大损失。(2021)</div>          <div class="fam"><span class="lbl">族</span>damaging adj. 有破坏性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">cottage</span>
+          <span class="ipa">/&#x27;ka:tıd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">小屋，村舍</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Umi lived in a small cottage</div>          <div class="mnem"><span class="lbl">记</span>cott 想成 cotton(棉花);age 年 代；那就是纺棉花的那个年代，发生在哪儿？ “村舍，小屋”啊。</div>          <div class="root"><span class="lbl">根</span>cott(想成 cotton 棉花) + age → 纺棉花年代住的小屋</div>          <div class="zt"><span class="lbl">真题</span>We gave out a cheer when the red roof of the cottage came into view. 当小屋的红色屋顶 映入眼帘时，我们发出了一声欢呼。</div>          <div class="fam"><span class="lbl">族</span>cottage industry 家庭手工业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">individual</span>
+          <span class="ipa">/ındı&#x27;vıd3uəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">单独的；个别的 n. 个人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Each individual piece was different</div>          <div class="mnem"><span class="lbl">记</span>in 否定前缀，divide分开，那这 个单词就是“不可分开的”。“个人”是“单独的” 个体，内心与外表不可分割。</div>          <div class="root"><span class="lbl">根</span>in(不) + divid(分) + ual → 不可再分的 → 个人</div>          <div class="zt"><span class="lbl">真题</span>Real friendship is when two individuals share the same soul. 真正的友谊是两个人拥有 同一个灵魂。(2016)</div>          <div class="fam"><span class="lbl">族</span>individually adv. 单独地 / individuality n. 个性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">divide</span>
+          <span class="ipa">/dı&#x27;vaıd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)分开，分散；分配；分享；分担n. 不同， 差异，分歧；分水岭</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She would divide the clay into small balls</div>          <div class="root"><span class="lbl">根</span>di(分开) + vide(分) → 分开</div>          <div class="zt"><span class="lbl">真题</span>When you look at attitudes toward driverless cars, there doesn&#x27;t seem to be a clear (071) generational divide. 当你观察人们对无人驾驶 汽车的态度时，似乎没有明显的代沟。(2016)</div>          <div class="fam"><span class="lbl">族</span>division n. 分开；部门</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">subdivide</span>
+          <span class="ipa">/&#x27;sabdıvaid, sabdı&#x27;vaid/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(被)再分割，再分</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then subdivide one ball into four parts</div>          <div class="mnem"><span class="lbl">记</span>sub 表示“下面”；divide 是“分 离，分开”，该单词就是在下面分开。一个盗窃 团伙盗窃成功后已经分赃了一次，然后私下在 下面又分了一次，那就是“再分”。</div>          <div class="root"><span class="lbl">根</span>sub(再往下) + divide(分) → 再分一次</div>          <div class="zt"><span class="lbl">真题</span>They are subdivided into half a dozen sections. 他们被细分为六个部分。</div>          <div class="fam"><span class="lbl">族</span>subdivision n. 细分</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 18</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

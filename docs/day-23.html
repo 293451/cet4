@@ -1,0 +1,693 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 23 · The Ship in the Grey Ice</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 23 · 11/4 · Unit 4 第 661-690 词</div>
+  <h1>The Ship in the Grey Ice<span class="cn">灰冰上的那艘船</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-23.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2731"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="341">research</span> <span class="w" data-s="384" data-e="640">ship</span> <span class="w" data-s="683" data-e="896">lay</span> <span class="w" data-s="939" data-e="1152">still,</span> <span class="w target" data-s="1408" data-e="2133" title="周围；环绕；包围v. 包围；环绕">surrounded</span> <span class="w" data-s="2176" data-e="2261">by</span> <span class="w" data-s="2304" data-e="2603">grey</span> <span class="w" data-s="2645" data-e="2731">ice.</span></p><p class="zh">那艘科考船一动不动地停着，四周全是灰白色的冰。</p></div>
+<div class="pair" data-s0="2987" data-s1="8363"><p class="en"><span class="w" data-s="2987" data-e="3712">The</span> <span class="w target" data-s="3755" data-e="4096" title="气候；氛围；形势">climate</span> <span class="w" data-s="4139" data-e="4267">there</span> <span class="w" data-s="4309" data-e="4480">changed</span> <span class="w" data-s="4523" data-e="5205">faster</span> <span class="w" data-s="5248" data-e="5376">than</span> <span class="w" data-s="5419" data-e="5547">anywhere</span> <span class="w" data-s="5589" data-e="5888">on</span> <span class="w" data-s="5931" data-e="6101">earth,</span> <span class="w" data-s="6272" data-e="6485">and</span> <span class="w" data-s="6613" data-e="6997">the</span> <span class="w target" data-s="7040" data-e="7168" title="情绪；心情；气氛，氛围；(动词的)语气">mood</span> <span class="w" data-s="7211" data-e="7296">on</span> <span class="w" data-s="7339" data-e="7467">board</span> <span class="w" data-s="7509" data-e="7851">changed</span> <span class="w" data-s="7893" data-e="8149">with</span> <span class="w" data-s="8192" data-e="8363">it.</span></p><p class="zh">那里的气候变化比地球上任何地方都快，船上的气氛也跟着变。</p></div>
+<div class="pair" data-s0="8931" data-s1="12430"><p class="en"><span class="w" data-s="8931" data-e="9145">Under</span> <span class="w" data-s="9187" data-e="9315">such</span> <span class="w target" data-s="9358" data-e="9998" title="">circumstances,</span> <span class="w" data-s="10297" data-e="10553">the</span> <span class="w target" data-s="10638" data-e="10979" title="首领 v. 担任……的队长；船长；机长">captain</span> <span class="w" data-s="11022" data-e="11150">kept</span> <span class="w" data-s="11193" data-e="11321">a</span> <span class="w" data-s="11363" data-e="11577">strict</span> <span class="w target" data-s="11619" data-e="11833" title="圆；圆形；圆圈；圈子，阶层 v. 盘旋，环绕； 画圈，圈出">circle</span> <span class="w" data-s="11875" data-e="12046">of</span> <span class="w" data-s="12089" data-e="12430">habits.</span></p><p class="zh">在这种情形下，船长守着一整套固定的习惯。</p></div>
+<div class="pair" data-s0="12601" data-s1="17550"><p class="en"><span class="w" data-s="12601" data-e="13241">Every</span> <span class="w" data-s="13283" data-e="13539">morning</span> <span class="w" data-s="13582" data-e="13838">the</span> <span class="w" data-s="13881" data-e="14094">crew</span> <span class="w" data-s="14137" data-e="14222">ran</span> <span class="w" data-s="14265" data-e="14478">one</span> <span class="w target" data-s="14521" data-e="14947" title="环行；环行路线；电路；赛车道">circuit</span> <span class="w" data-s="14990" data-e="15033">of</span> <span class="w" data-s="15075" data-e="15118">the</span> <span class="w" data-s="15161" data-e="15374">deck,</span> <span class="w" data-s="15545" data-e="15673">and</span> <span class="w" data-s="15843" data-e="16057">warm</span> <span class="w" data-s="16099" data-e="16313">air</span> <span class="w target" data-s="16355" data-e="16825" title="(液体或气体)环流，循环，传播">circulated</span> <span class="w" data-s="16867" data-e="17081">through</span> <span class="w" data-s="17123" data-e="17251">the</span> <span class="w" data-s="17294" data-e="17550">cabins.</span></p><p class="zh">每天早上，船员们都要绕甲板跑一圈，暖空气在船舱里循环流动。</p></div>
+<div class="pair" data-s0="17806" data-s1="21219"><p class="en"><span class="w" data-s="17806" data-e="17891">When</span> <span class="w" data-s="17934" data-e="18019">the</span> <span class="w" data-s="18062" data-e="18147">ice</span> <span class="w" data-s="18190" data-e="18617">cracked,</span> <span class="w" data-s="18702" data-e="18830">the</span> <span class="w" data-s="19086" data-e="19214">whole</span> <span class="w" data-s="19257" data-e="19513">ship</span> <span class="w" data-s="19555" data-e="19854">would</span> <span class="w target" data-s="19897" data-e="20153" title="跳跃；剧增">leap</span> <span class="w" data-s="20195" data-e="20366">like</span> <span class="w" data-s="20409" data-e="20537">a</span> <span class="w" data-s="20579" data-e="20835">nervous</span> <span class="w" data-s="20878" data-e="21219">animal.</span></p><p class="zh">冰一裂开，整条船就像受惊的动物一样猛地跳起来。</p></div>
+<div class="pair" data-s0="21347" data-s1="24590"><p class="en"><span class="w" data-s="21347" data-e="21859">The</span> <span class="w target" data-s="21902" data-e="22201" title="首领 v. 担任……的队长；船长；机长">captain</span> <span class="w target" data-s="22243" data-e="22627" title="行为，操行v. 执行；引导；传(热，电)">conducted</span> <span class="w" data-s="22670" data-e="22798">the</span> <span class="w" data-s="22841" data-e="22926">journey</span> <span class="w" data-s="22969" data-e="23225">from</span> <span class="w" data-s="23267" data-e="23395">a</span> <span class="w" data-s="23438" data-e="23523">small</span> <span class="w" data-s="23566" data-e="23822">room</span> <span class="w" data-s="23865" data-e="24121">behind</span> <span class="w" data-s="24163" data-e="24334">the</span> <span class="w" data-s="24377" data-e="24590">bridge.</span></p><p class="zh">船长在驾驶台后面的小舱里指挥整段航程。</p></div>
+<div class="pair" data-s0="25387" data-s1="28971"><p class="en"><span class="w" data-s="25387" data-e="25472">He</span> <span class="w" data-s="25515" data-e="25643">could</span> <span class="w target" data-s="25685" data-e="25813" title="直接的 v. 管理，指导，指挥；把……对准">direct</span> <span class="w" data-s="25856" data-e="26027">the</span> <span class="w" data-s="26069" data-e="26197">ship</span> <span class="w" data-s="26240" data-e="26368">with</span> <span class="w" data-s="26411" data-e="26539">one</span> <span class="w" data-s="26581" data-e="26795">hand:</span> <span class="w" data-s="27179" data-e="27435">a</span> <span class="w" data-s="27477" data-e="27605">short</span> <span class="w target" data-s="27648" data-e="27904" title="指挥；命令；控制；掌管n. 指挥；命令；指示">command,</span> <span class="w" data-s="28160" data-e="28416">a</span> <span class="w" data-s="28544" data-e="28715">clear</span> <span class="w target" data-s="28757" data-e="28971" title="方向，方位；指示">direction.</span></p><p class="zh">他一只手就能指挥这条船：一句简短的命令，一个明确的方向。</p></div>
+<div class="pair" data-s0="29312" data-s1="33067"><p class="en"><span class="w" data-s="29312" data-e="29611">He</span> <span class="w target" data-s="29781" data-e="30379" title="命令，指示；告知；吩咐；教授，传授">instructed</span> <span class="w" data-s="30421" data-e="30549">the</span> <span class="w" data-s="30592" data-e="30677">young</span> <span class="w" data-s="30720" data-e="31104">sailors</span> <span class="w" data-s="31147" data-e="31317">in</span> <span class="w" data-s="31360" data-e="31403">a</span> <span class="w" data-s="31445" data-e="31488">low</span> <span class="w" data-s="31531" data-e="31744">voice,</span> <span class="w" data-s="32000" data-e="32213">and</span> <span class="w" data-s="32384" data-e="32512">no</span> <span class="w" data-s="32555" data-e="32683">one</span> <span class="w" data-s="32725" data-e="33067">argued.</span></p><p class="zh">他低声指导年轻的水手，没有人顶嘴。</p></div>
+<div class="pair" data-s0="33195" data-s1="35243"><p class="en"><span class="w" data-s="33195" data-e="33493">He</span> <span class="w" data-s="33579" data-e="33877">had</span> <span class="w" data-s="33920" data-e="34005">been</span> <span class="w" data-s="34048" data-e="34133">in</span> <span class="w" data-s="34176" data-e="34219">the</span> <span class="w target" data-s="34261" data-e="34389" title="军方 adj. 军事的">military</span> <span class="w target" data-s="34432" data-e="34773" title="在头部的 adv.在头部n. 前面">for</span> <span class="w" data-s="34816" data-e="34944">twenty</span> <span class="w" data-s="34987" data-e="35243">years.</span></p><p class="zh">他在军队里待了二十年。</p></div>
+<div class="pair" data-s0="35936" data-s1="38240"><p class="en"><span class="w" data-s="35936" data-e="36149">Each</span> <span class="w" data-s="36192" data-e="36362">evening</span> <span class="w" data-s="36405" data-e="36618">the</span> <span class="w" data-s="36661" data-e="36960">radio</span> <span class="w" data-s="37002" data-e="37301">officer</span> <span class="w" data-s="37344" data-e="37472">would</span> <span class="w target" data-s="37514" data-e="37856" title="播送(电视或无线电节目)；广播；散布，传播 (信息等) n. 广播节目；电视节目">broadcast</span> <span class="w" data-s="37898" data-e="38069">the</span> <span class="w" data-s="38112" data-e="38240">weather.</span></p><p class="zh">每天晚上，报务员都会播报天气。</p></div>
+<div class="pair" data-s0="38453" data-s1="40245"><p class="en"><span class="w" data-s="38453" data-e="38666">His</span> <span class="w target" data-s="39093" data-e="39520" title="&amp;. n. 预测；预报">forecast</span> <span class="w" data-s="39562" data-e="39776">was</span> <span class="w" data-s="39818" data-e="39989">never</span> <span class="w" data-s="40032" data-e="40245">perfect.</span></p><p class="zh">他的预报从来都不完美。</p></div>
+<div class="pair" data-s0="40544" data-s1="44000"><p class="en"><span class="w" data-s="40544" data-e="40842">We</span> <span class="w" data-s="41184" data-e="41397">cannot</span> <span class="w target" data-s="41440" data-e="41824" title="预见，预知">foresee</span> <span class="w" data-s="41866" data-e="41952">the</span> <span class="w" data-s="41994" data-e="42165">ice,</span> <span class="w" data-s="42378" data-e="42592">he</span> <span class="w" data-s="42634" data-e="42762">said;</span> <span class="w" data-s="43061" data-e="43488">we</span> <span class="w" data-s="43530" data-e="43616">can</span> <span class="w" data-s="43658" data-e="43786">only</span> <span class="w" data-s="43829" data-e="44000">guess.</span></p><p class="zh">“我们没法预见冰情，”他说，“只能猜。”</p></div>
+<div class="pair" data-s0="44341" data-s1="49034"><p class="en"><span class="w" data-s="44341" data-e="44469">From</span> <span class="w" data-s="44512" data-e="44554">the</span> <span class="w target" data-s="44597" data-e="44682" title="在头部的 adv.在头部n. 前面">fore</span> <span class="w" data-s="44725" data-e="44938">part</span> <span class="w" data-s="44981" data-e="45109">of</span> <span class="w" data-s="45152" data-e="45237">the</span> <span class="w" data-s="45280" data-e="45322">ship</span> <span class="w" data-s="45365" data-e="45578">the</span> <span class="w" data-s="45621" data-e="45920">lookout</span> <span class="w" data-s="45962" data-e="46176">watched</span> <span class="w" data-s="46218" data-e="46474">the</span> <span class="w" data-s="46517" data-e="46645">white</span> <span class="w" data-s="46688" data-e="46944">distance,</span> <span class="w" data-s="47242" data-e="47626">and</span> <span class="w" data-s="47669" data-e="47840">land</span> <span class="w" data-s="47882" data-e="48224">came</span> <span class="w" data-s="48266" data-e="48480">into</span> <span class="w target" data-s="48522" data-e="48608" title="视力；看见；视野；景象 v. 看见；发现">sight</span> <span class="w" data-s="48650" data-e="48864">at</span> <span class="w" data-s="48906" data-e="49034">last.</span></p><p class="zh">在船的前部，瞭望员盯着白茫茫的远方，终于看见了陆地。</p></div>
+<div class="pair" data-s0="49333" data-s1="51125"><p class="en"><span class="w" data-s="49333" data-e="49930">There</span> <span class="w" data-s="49973" data-e="50058">was</span> <span class="w" data-s="50101" data-e="50186">no</span> <span class="w" data-s="50229" data-e="50400">time</span> <span class="w target" data-s="50442" data-e="50698" title="在头部的 adv.在头部n. 前面">for</span> <span class="w target" data-s="50741" data-e="51125" title="观光；游览">sightseeing.</span></p><p class="zh">没有时间观光。</p></div>
+<div class="pair" data-s0="51955" data-s1="56093"><p class="en"><span class="w" data-s="51955" data-e="52040">The</span> <span class="w target" data-s="52083" data-e="52381" title="首领 v. 担任……的队长；船长；机长">captain</span> <span class="w" data-s="52424" data-e="52509">had</span> <span class="w" data-s="52552" data-e="52637">to</span> <span class="w target" data-s="52680" data-e="52979" title="监督；监视">oversee</span> <span class="w" data-s="53021" data-e="53149">the</span> <span class="w" data-s="53192" data-e="53277">whole</span> <span class="w" data-s="53320" data-e="53576">deck,</span> <span class="w" data-s="53789" data-e="53960">and</span> <span class="w" data-s="54173" data-e="54387">his</span> <span class="w" data-s="54429" data-e="54557">one</span> <span class="w target" data-s="54600" data-e="54984" title="疏忽；忽略；失察，负责">oversight</span> <span class="w" data-s="55027" data-e="55240">was</span> <span class="w" data-s="55283" data-e="55411">a</span> <span class="w" data-s="55453" data-e="55667">forgotten</span> <span class="w" data-s="55709" data-e="56093">rope.</span></p><p class="zh">船长必须监督整个甲板，而他唯一的一次疏忽，是一根被遗忘的绳子。</p></div>
+<div class="pair" data-s0="56264" data-s1="60019"><p class="en"><span class="w" data-s="56264" data-e="56776">His</span> <span class="w target" data-s="56819" data-e="57160" title="洞察力；领悟；洞悉；了解">insight</span> <span class="w" data-s="57203" data-e="57331">was</span> <span class="w" data-s="57373" data-e="57544">simple:</span> <span class="w" data-s="57843" data-e="58440">the</span> <span class="w" data-s="58483" data-e="58611">ice</span> <span class="w" data-s="58653" data-e="59208">always</span> <span class="w" data-s="59251" data-e="59592">tells</span> <span class="w" data-s="59635" data-e="59848">the</span> <span class="w" data-s="59891" data-e="60019">truth.</span></p><p class="zh">他的洞察很简单：冰从不说谎。</p></div>
+<div class="pair" data-s0="60275" data-s1="64157"><p class="en"><span class="w" data-s="60275" data-e="60957">He</span> <span class="w" data-s="61000" data-e="61256">pushed</span> <span class="w target" data-s="61299" data-e="61512" title="向前 adj. 向前的 v. 发送,促进">forward,</span> <span class="w" data-s="61768" data-e="61981">and</span> <span class="w" data-s="62109" data-e="62451">the</span> <span class="w" data-s="62493" data-e="62579">ship</span> <span class="w" data-s="62621" data-e="62877">moved</span> <span class="w target" data-s="62920" data-e="63091" title="向前">forth</span> <span class="w" data-s="63133" data-e="63560">into</span> <span class="w" data-s="63603" data-e="63859">open</span> <span class="w" data-s="63901" data-e="64157">water.</span></p><p class="zh">他向前推进，船驶进了开阔的水域。</p></div>
+<div class="pair" data-s0="64802" data-s1="67704"><p class="en"><span class="w" data-s="64802" data-e="64888">A</span> <span class="w" data-s="64930" data-e="65144">small</span> <span class="w" data-s="65186" data-e="65528">camera</span> <span class="w" data-s="65570" data-e="65912">was</span> <span class="w" data-s="65954" data-e="66082">on</span> <span class="w" data-s="66125" data-e="66296">board</span> <span class="w" data-s="66338" data-e="66637">to</span> <span class="w target" data-s="66680" data-e="66936" title="捕获 n. (被)捕获">capture</span> <span class="w" data-s="66978" data-e="67149">pictures</span> <span class="w" data-s="67192" data-e="67405">of</span> <span class="w" data-s="67448" data-e="67576">the</span> <span class="w" data-s="67618" data-e="67704">ice.</span></p><p class="zh">船上有一台小相机，用来拍下冰的样子。</p></div>
+<div class="pair" data-s0="67960" data-s1="71330"><p class="en"><span class="w" data-s="67960" data-e="68216">The</span> <span class="w target" data-s="68557" data-e="68898" title="首领 v. 担任……的队长；船长；机长">captain</span> <span class="w" data-s="68941" data-e="69069">was</span> <span class="w target" data-s="69112" data-e="69453" title="有能力；有才能的；能胜任的">capable</span> <span class="w" data-s="69496" data-e="69666">of</span> <span class="w" data-s="69709" data-e="69837">reading</span> <span class="w" data-s="69880" data-e="70093">them</span> <span class="w" data-s="70136" data-e="70306">better</span> <span class="w" data-s="70349" data-e="70520">than</span> <span class="w" data-s="70562" data-e="70690">any</span> <span class="w" data-s="70733" data-e="71330">scientist.</span></p><p class="zh">船长解读这些照片的能力，比任何科学家都强。</p></div>
+<div class="pair" data-s0="71672" data-s1="78541"><p class="en"><span class="w" data-s="71672" data-e="71757">The</span> <span class="w" data-s="71800" data-e="71928">hold</span> <span class="w" data-s="71970" data-e="72397">had</span> <span class="w" data-s="72568" data-e="72696">the</span> <span class="w target" data-s="72738" data-e="73165" title="容量；容纳能力；领悟(或理解、办事)能力；职 位；生产能力">capacity</span> <span class="w" data-s="73208" data-e="73378">to</span> <span class="w" data-s="73421" data-e="73506">carry</span> <span class="w" data-s="73549" data-e="73805">two</span> <span class="w" data-s="73848" data-e="74104">hundred</span> <span class="w" data-s="74146" data-e="74658">boxes</span> <span class="w" data-s="74701" data-e="74786">of</span> <span class="w" data-s="74829" data-e="75170">samples,</span> <span class="w" data-s="75341" data-e="75554">and</span> <span class="w target" data-s="75768" data-e="75938" title="在头部的 adv.在头部n. 前面">for</span> <span class="w" data-s="75981" data-e="76109">this</span> <span class="w" data-s="76152" data-e="76322">small</span> <span class="w" data-s="76365" data-e="76749">crew</span> <span class="w" data-s="76792" data-e="77048">the</span> <span class="w" data-s="77304" data-e="77432">ship</span> <span class="w" data-s="77474" data-e="77730">itself</span> <span class="w" data-s="77773" data-e="78114">was</span> <span class="w" data-s="78157" data-e="78328">their</span> <span class="w target" data-s="78370" data-e="78541" title="首都；资本;资金；大写字母">capital.</span></p><p class="zh">货舱能装两百箱样本，而对这几个船员来说，这条船本身就是他们的资本。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">leap</span>
+          <span class="ipa">/li:p/</span>
+          <span class="pos">n.</span>
+          <span class="cn">跳跃；剧增</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the whole ship would leap like a nervous animal</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：立扑。设想一 个小孩子“跳跃”时不稳，立刻扑向了妈妈，否则 就摔倒了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a leap forward 向前一跃 → 跳跃、剧增</div>          <div class="zt"><span class="lbl">真题</span>Politicians， policymakers， commissioners and school leaders must be brave enough to make the leap towards reimagining schools. 政 治家、政策制定者、委员和学校领导必须有足够 的勇气向着重新构想学校跨出一大步。(2020)</div>          <div class="fam"><span class="lbl">族</span>leaping adj. 跳跃的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">surround</span>
+          <span class="ipa">/sə&#x27;raund/</span>
+          <span class="pos">n.</span>
+          <span class="cn">周围；环绕；包围v. 包围；环绕</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>surrounded by grey ice</div>          <div class="mnem"><span class="lbl">记</span>sur 上面，round 周围，环绕。 那环绕在你上面的东西，不就是“环绕，包 围”吗？</div>          <div class="root"><span class="lbl">根</span>sur(上面) + round(周围) → 四面围上 → 包围</div>          <div class="zt"><span class="lbl">真题</span>I am making my way through Columbia University，surrounded by students. 我正走在 哥伦比亚大学的路上，周围都是学生。(2017)</div>          <div class="fam"><span class="lbl">族</span>surroundings n. 环境</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">climate</span>
+          <span class="ipa">/&#x27;klaimət/</span>
+          <span class="pos">n.</span>
+          <span class="cn">气候；氛围；形势</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The climate there changed faster than anywhere on earth</div>          <div class="mnem"><span class="lbl">记</span>把c想成半圆，li看作“立 (站)”；mate伙伴，朋友。联想：围着你站的朋 友、伙伴(包括小猫、小狗、树、小草)不就是你生 存的环境“氛围”吗？</div>          <div class="root"><span class="lbl">根</span>clim(倾斜，希腊 klima) + ate → 太阳倾斜不同 → 气候</div>          <div class="zt"><span class="lbl">真题</span>The terms “ global warming” and &quot;climate change&quot; are used by many, seemingly interchangeably.“全球变暖”和“气候变化”这 两个术语被很多人使用，似乎是可以互换的。</div>          <div class="fam"><span class="lbl">族</span>climatic adj. 气候的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">mood</span>
+          <span class="ipa">/mu:d/</span>
+          <span class="pos"></span>
+          <span class="cn">情绪；心情；气氛，氛围；(动词的)语气</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mood on board changed with it</div>          <div class="mnem"><span class="lbl">记</span>mood 很像月亮(moon)，一个 人坐着看月亮，“情绪；心情”有点儿低落。</div>          <div class="root"><span class="lbl">根</span>古英语 mod(心绪) → 心情、氛围</div>          <div class="zt"><span class="lbl">真题</span>And exercise releases hormones that can improve mood and relieve stress, which can also help learning. 运动释放可以改善情绪、缓 解压力的激素，这也有助于学习。(2016)</div>          <div class="fam"><span class="lbl">族</span>moody adj. 情绪化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">circumstance</span>
+          <span class="ipa">/&#x27;s3:kəmstəns/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Under such circumstances, the captain kept a strict circle of habits.</div>          <div class="mnem"><span class="lbl">记</span>circum 类似 circle(环)；stan (=stand,站);ce名词后缀→围着你站的所有 东西，也是你生存的“环境；状况”。</div>          <div class="root"><span class="lbl">根</span>circum(环绕) + stan(站) + ce → 围着你站的 → 环境、状况</div>          <div class="zt"><span class="lbl">真题</span>One strength of the human condition is our tendency to give and receive support from one another under stressful circumstances. 人 类环境的一个优点是我们倾向于在压力重的环 境下给予和接受彼此的支持。</div>          <div class="fam"><span class="lbl">族</span>circumstantial adj. 依情况而定的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">circle</span>
+          <span class="ipa">/&#x27;s3:rkl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">圆；圆形；圆圈；圈子，阶层 v. 盘旋，环绕； 画圈，圈出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>kept a strict circle of habits</div>          <div class="root"><span class="lbl">根</span>circ(环) + le → 一个环 → 圆圈、圈子</div>          <div class="zt"><span class="lbl">真题</span>Start a public discussion on how to raise women&#x27;s status in academic circles. 就如何提 高女性在学术界的地位展开公开的讨论。 (2017)</div>          <div class="fam"><span class="lbl">族</span>circular adj. 圆形的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">circuit</span>
+          <span class="ipa">/&#x27;s3:rkıt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">环行；环行路线；电路；赛车道</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the crew ran one circuit of the deck</div>          <div class="mnem"><span class="lbl">记</span>circui 来源于 circle(环绕，圆）， 那这个单词就是“环行”。</div>          <div class="root"><span class="lbl">根</span>circu(环绕) + it(走) → 绕着走一圈 → 环行、电路</div>          <div class="zt"><span class="lbl">真题</span>We&#x27;ve learned from neuroscience that certain brain circuits are activated, rapidly and unconsciously.我们从神经科学中了解到，特定 的大脑回路会在无意识状态下快速激活。</div>          <div class="fam"><span class="lbl">族</span>circuitous adj. 迂回的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">circulate</span>
+          <span class="ipa">/&#x27;sə:rkjəlert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(液体或气体)环流，循环，传播</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>warm air circulated through the cabins</div>          <div class="mnem"><span class="lbl">记</span>circul 源于 circle(环绕);ate 动 词后缀→那让一个东西环绕起来，就是“循环， 环流”。</div>          <div class="root"><span class="lbl">根</span>circul(环) + ate(动词后缀) → 绕圈流动 → 循环、传播</div>          <div class="zt"><span class="lbl">真题</span>They don&#x27;t want their photos to be circulated on the Internet. 他们不希望自己的 照片在网上流传。(2018)</div>          <div class="fam"><span class="lbl">族</span>circulation n. 循环 / circular adj. 圆形的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">conduct</span>
+          <span class="ipa">/&#x27;kpndakt,kən&#x27;d^kt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">行为，操行v. 执行；引导；传(热，电)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The captain conducted the journey from a small room behind the bridge.</div>          <div class="mnem"><span class="lbl">记</span>都(con)来打他(duct的谐音)， 这种“行为”可不对。</div>          <div class="root"><span class="lbl">根</span>con(一起) + duct(引导) → 带着大家一起走 → 引导；行为</div>          <div class="zt"><span class="lbl">真题</span>The author conducted an experiment to find out about the influence of students&#x27;mind- sets on math learning. 作者通过实验来弄清楚 学生的思维方式对数学学习的影响。(2016) 例 The sport has a strict code of conduct. 这 种体育运动有严格的行为规范。 例 The guide conducted us around the ruins of the ancient city. 导游引导我们游览了古城遗迹。</div>          <div class="fam"><span class="lbl">族</span>conductor n. 指挥；导体 / conduction n. 传导</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">direct</span>
+          <span class="ipa">/də&#x27;rekt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">直接的 v. 管理，指导，指挥；把……对准</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could direct the ship with one hand</div>          <div class="mnem"><span class="lbl">记</span>发音类似“得绕开它”→前面有 一个障碍物，不能直接通过，得绕开它→引领着 走→指导，指挥。</div>          <div class="root"><span class="lbl">根</span>di(分开) + rect(直) → 直接对准 → 指导、指挥</div>          <div class="zt"><span class="lbl">真题</span>The food industry has, in general, been firmly opposed to such direct government action.总的来说，食品行业一直坚决反对政府 采取这种直接行动。(2016) 例 He was in direct contact with the girl. 他与 那个女孩有直接的联络。 例 She now directs a large choir. 她目 前担任 (088) 一个大合唱团的指挥。 例 Most of his anger was directed against himself， 他主要是生自己的气。</div>          <div class="fam"><span class="lbl">族</span>direction n. 方向 / director n. 主管</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">direction</span>
+          <span class="ipa">/də&#x27;rek∫n; dai&#x27;rek∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">方向，方位；指示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a clear direction</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“敌人可神”。 敌人可神了，竟然知道我们埋伏的“方向，方 位”。</div>          <div class="root"><span class="lbl">根</span>direct(指导) + ion(名词后缀) → 指的方向 → 方向</div>          <div class="zt"><span class="lbl">真题</span>This research provides a useful direction for organizations.本研究为组织提供有益的 指示。</div>          <div class="fam"><span class="lbl">族</span>direct v. 指导 / directive n. 指令</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">instruct</span>
+          <span class="ipa">/ın&#x27;strakt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">命令，指示；告知；吩咐；教授，传授</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He instructed the young sailors in a low voice</div>          <div class="mnem"><span class="lbl">记</span>in想成（语）言，st 想成街道 (street),ru 想成侮辱，t想成他，那就是在街上 用语言侮辱他。想象一个人在街上对其他人颐 指气使的样子→命令，指示；教授，传授(技能 等)。</div>          <div class="root"><span class="lbl">根</span>in(往里) + struct(建造) → 把知识建进脑子里 → 教授、指示</div>          <div class="zt"><span class="lbl">真题</span>They engage college undergraduates to teach computer science to high school students, who in turn instruct middle school students on the topic. 他们让大学本科生教高 中生计算机科学，而高中生转而就该主题指导 中学生。</div>          <div class="fam"><span class="lbl">族</span>instruction n. 指示 / instructor n. 教练</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">command</span>
+          <span class="ipa">/kə&#x27;mænd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">指挥；命令；控制；掌管n. 指挥；命令；指示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a short command</div>          <div class="mnem"><span class="lbl">记</span>所有的(com)人(man)都(d)要 听“命令，指挥”。服从是军人的天职。</div>          <div class="root"><span class="lbl">根</span>com(完全) + mand(命令，拉丁 mandare) → 下令</div>          <div class="zt"><span class="lbl">真题</span>But it is still somewhat restricted, particularly when the language moves away from stiffer commands into more human interactions.但它仍然受到一定的限制，特别是 当语言从较生硬的命令转向更多的人类互动 时。(2023)</div>          <div class="fam"><span class="lbl">族</span>commander n. 指挥官</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">military</span>
+          <span class="ipa">/&#x27;mıləteri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">军方 adj. 军事的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had been in the military for twenty years.</div>          <div class="mnem"><span class="lbl">记</span>发音类似：没了tree。敌人“军 方”经过的地方，连树都得烧死或砍掉。</div>          <div class="root"><span class="lbl">根</span>milit(士兵，拉丁 miles) + ary(……的) → 军事的</div>          <div class="zt"><span class="lbl">真题</span>Governor&#x27;s Island is a national historic landmark district long used for military purposes.总督岛是一个长期用于军事目的的 国家历史地标区。(2019)</div>          <div class="fam"><span class="lbl">族</span>militant adj. 好战的 / militia n. 民兵</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">fore</span>
+          <span class="ipa">/fə:r/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">在头部的 adv.在头部n. 前面</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From the fore part of the ship</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为 fo(发音类似 four， 四)十re(阿姨，字母谐音)，四个阿姨去抢购，一 定冲在最“前面”啊。</div>          <div class="root"><span class="lbl">根</span>与 for / before 同源，表「前面」 → 在头部的、前面</div>          <div class="fam"><span class="lbl">族</span>foremost adj. 最前面的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">forth</span>
+          <span class="ipa">/fə:rθ/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">向前</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ship moved forth into open water</div>          <div class="mnem"><span class="lbl">记</span>发音类似：赴死。英勇“向前” 杀敌赴死。</div>          <div class="root"><span class="lbl">根</span>for(向前) + th(副词词尾) → 向前</div>          <div class="zt"><span class="lbl">真题</span>Closing post offices is one of several proposals the Postal Service has put forth recently to cut costs. 关闭邮局是邮政服务最近 为了降低成本提出的几个建议之一。(2016) (089)</div>          <div class="fam"><span class="lbl">族</span>forward adv. 向前</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">forward</span>
+          <span class="ipa">/&#x27;fə:rwərd/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">向前 adj. 向前的 v. 发送,促进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He pushed forward</div>          <div class="mnem"><span class="lbl">记</span>for就记成 forth(往前)，ward 表示“向，朝”、那这个单词就是“朝前的”。后缀 ward表示形容词和副词，“向……，朝……”。 例如： out 外面的十ward 向……，朝……→向外(的) back 后边十ward 向……，朝……→向后(的) down 向下十ward 向……，朝……→向下(的) up 向上十ward 向……，朝……→向上(的) in 在里面的十ward 向……，朝……→向内(的)</div>          <div class="root"><span class="lbl">根</span>fore(前面) + ward(朝……方向) → 朝前的</div>          <div class="zt"><span class="lbl">真题</span>I look forward to each day and experiencing something new. 我期待着每一天， 期待着体验一些新的东西。(2017)</div>          <div class="fam"><span class="lbl">族</span>forwardness n. 早熟；唐突</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">foresee</span>
+          <span class="ipa">/fo:&#x27;si:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">预见，预知</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>We cannot foresee the ice</div>          <div class="mnem"><span class="lbl">记</span>fore 前面，see 看见。foresee 就是 提前都能看到→预见。</div>          <div class="root"><span class="lbl">根</span>fore(提前) + see(看) → 提前看到 → 预见</div>          <div class="fam"><span class="lbl">族</span>foreseeable adj. 可预见的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">oversee</span>
+          <span class="ipa">/əuvər&#x27;si:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">监督；监视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The captain had to oversee the whole deck</div>          <div class="mnem"><span class="lbl">记</span>over上面，see看见。从上面 看，是不是“监督”？</div>          <div class="root"><span class="lbl">根</span>over(在上面) + see(看) → 从上面看 → 监督</div>          <div class="zt"><span class="lbl">真题</span>The former head of the UNESCO World Heritage Centre, which oversees heritage sites，is Francesco Bandarin. 负责监督遗址的 联合国教科文组织世界遗产中心的前任负责人 是弗朗西斯科·班达林。(2018)</div>          <div class="fam"><span class="lbl">族</span>overseer n. 监工</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">sight</span>
+          <span class="ipa">/sait/</span>
+          <span class="pos"></span>
+          <span class="cn">视力；看见；视野；景象 v. 看见；发现</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>land came into sight at last</div>          <div class="root"><span class="lbl">根</span>与 see 同源，古英语 sihth(看) → 视力、景象</div>          <div class="zt"><span class="lbl">真题</span>What caused Edwards to regain his sight 生。(2015) according to one of the doctors?据其中一名医 生说，是什么让爱德华兹恢复了视力？</div>          <div class="fam"><span class="lbl">族</span>sightless adj. 失明的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">sightseeing</span>
+          <span class="ipa">/&#x27;saitsi:in/</span>
+          <span class="pos"></span>
+          <span class="cn">观光；游览</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was no time for sightseeing.</div>          <div class="root"><span class="lbl">根</span>sight(景物) + seeing(看) → 到处看景物 → 观光</div>          <div class="zt"><span class="lbl">真题</span>But while I&#x27;m there I&#x27;d also like to do some sightseeing.但是当我在那里的时候，我 也想去观光。</div>          <div class="fam"><span class="lbl">族</span>sightseer n. 观光客</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">insight</span>
+          <span class="ipa">/&#x27;ınsait/</span>
+          <span class="pos">n.</span>
+          <span class="cn">洞察力；领悟；洞悉；了解</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His insight was simple</div>          <div class="mnem"><span class="lbl">记</span>in表示“里面”，sight 是 see (看)的名词形式，看到里面去了，不就是很有 “洞察力”和理解力吗？</div>          <div class="root"><span class="lbl">根</span>in(往里) + sight(看) → 看到里面去 → 洞察力</div>          <div class="zt"><span class="lbl">真题</span>The realizations I had in that process helped me gain insights and ultimately got me ready to integrate self-care into my daily life. 我在那个过程中的领悟帮助我获得了洞察力， 并最终让我准备好将自我护理融入我的日常生 活。(2021)</div>          <div class="fam"><span class="lbl">族</span>insightful adj. 富有洞察力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">oversight</span>
+          <span class="ipa">/&#x27;əuvərsait/</span>
+          <span class="pos">n.</span>
+          <span class="cn">疏忽；忽略；失察，负责</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his one oversight was a forgotten rope</div>          <div class="mnem"><span class="lbl">记</span>sight“景物，景象”，从景物的一 边跨过去(over)，直接看另一边，是不是“忽略” 了这个景物？</div>          <div class="root"><span class="lbl">根</span>over(越过) + sight(看) → 看漏了 → 疏忽；监督</div>          <div class="fam"><span class="lbl">族</span>oversee v. 监督</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">forecast</span>
+          <span class="ipa">/&#x27;fə:rkæst/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp;. n. 预测；预报</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His forecast was never perfect.</div>          <div class="mnem"><span class="lbl">记</span>词根 cast 投，掷。forecast：提 前(fore前)投(cast)。事情还没发生，就提前投 出来，就是“预测”。</div>          <div class="root"><span class="lbl">根</span>fore(提前) + cast(投掷) → 提前投出来 → 预测</div>          <div class="zt"><span class="lbl">真题</span>The trouble is that the forecast assumes continued improvements in yields, which may not actually happen. 问题在于，这一预测假设 收益率会持续提高，而这可能实际上并不会发 (090)</div>          <div class="fam"><span class="lbl">族</span>forecaster n. 预报员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">broadcast</span>
+          <span class="ipa">/&#x27;brə:dkæst/</span>
+          <span class="pos">v.</span>
+          <span class="cn">播送(电视或无线电节目)；广播；散布，传播 (信息等) n. 广播节目；电视节目</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the radio officer would broadcast the weather</div>          <div class="mnem"><span class="lbl">记</span>宽阔地（broad）投掷（cast），就 是“广播；散布”。</div>          <div class="root"><span class="lbl">根</span>broad(宽广地) + cast(投掷) → 撒得很广 → 广播</div>          <div class="zt"><span class="lbl">真题</span>Chase Carey used to serve as a top advisor for a major broadcasting·company. 蔡 斯·凯里曾是一家大型广播公司的高级顾问。 (2023)</div>          <div class="fam"><span class="lbl">族</span>broadcaster n. 播音员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">capital</span>
+          <span class="ipa">/&#x27;kæpitl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">首都；资本;资金；大写字母</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ship itself was their capital</div>          <div class="mnem"><span class="lbl">记</span>capital 是“首都”，首都里面有 钱，有“资本”，有了钱和权以后，就得是“大写字 母”(炫耀呗)。</div>          <div class="root"><span class="lbl">根</span>capit(头，拉丁 caput) + al → 头等重要的 → 首都；资本</div>          <div class="zt"><span class="lbl">真题</span>Receiving education in a private university in the nation&#x27;s capital may change the author&#x27;s future life and that of her family&#x27;s. 在首都的私立大学接受教育可能会改变作者及 其家人的未来生活。(2022)</div>          <div class="fam"><span class="lbl">族</span>capitalism n. 资本主义 / capitalize v. 资本化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">captain</span>
+          <span class="ipa">/&#x27;kæptın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">首领 v. 担任……的队长；船长；机长</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the captain kept a strict circle of habits</div>          <div class="mnem"><span class="lbl">记</span>cap指“帽子，制服的帽子”。小 时候这种帽子被我们称为“大官帽”，就是大官 (指警察、军官等)才能戴的帽子。captain 担任 这个职位需要戴帽子，意指“队长，机长”。</div>          <div class="root"><span class="lbl">根</span>capt(抓、头) + ain(人) → 领头抓的人 → 船长、队长</div>          <div class="fam"><span class="lbl">族</span>captaincy n. 队长职位</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">capable</span>
+          <span class="ipa">/&#x27;keipəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有能力；有才能的；能胜任的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The captain was capable of reading them better than any scientist.</div>          <div class="root"><span class="lbl">根</span>cap(抓住) + able(能) → 抓得住事的 → 有能力的</div>          <div class="zt"><span class="lbl">真题</span>It is time we realized that deviance may be capable of doing both good and harm to individuals and society.我们是时候认识到，离经 叛道可能对个人和社会既有益又有害。(2022) (091) 第四单元</div>          <div class="fam"><span class="lbl">族</span>capability n. 能力 / capacity n. 容量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">capacity</span>
+          <span class="ipa">/kə&#x27;pæsəti/</span>
+          <span class="pos"></span>
+          <span class="cn">容量；容纳能力；领悟(或理解、办事)能力；职 位；生产能力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The hold had the capacity to carry two hundred boxes of samples</div>          <div class="root"><span class="lbl">根</span>cap(容纳) + acity(名词后缀) → 能装多少 → 容量、能力</div>          <div class="zt"><span class="lbl">真题</span>I should put first a sense of proportion: the capacity to take account of all the important factors.我首先应该提出一种分寸感：考虑到所 有重要因素的能力。</div>          <div class="fam"><span class="lbl">族</span>capable adj. 有能力的 / capacious adj. 宽敞的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">capture</span>
+          <span class="ipa">/&#x27;kæpt∫ər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">捕获 n. (被)捕获</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to capture pictures of the ice</div>          <div class="mnem"><span class="lbl">记</span>capt 词根的含义为“抓”，ure后 缀表“行为”，所以capture就是抓的行为，也就 是“捕获”。</div>          <div class="root"><span class="lbl">根</span>capt(抓) + ure(行为) → 抓的行为 → 捕获</div>          <div class="zt"><span class="lbl">真题</span>A wandering cow was captured by the police.一头流浪的牛被警察抓住了。</div>          <div class="fam"><span class="lbl">族</span>captive n. 俘虏 / captivity n. 囚禁</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4 · Day 23</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

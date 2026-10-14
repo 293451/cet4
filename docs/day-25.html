@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 25 · The Night the Network Was Hacked</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 25 · 11/6 · Unit 4 第 721-750 词</div>
+  <h1>The Night the Network Was Hacked<span class="cn">网络被黑的那一夜</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-25.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2347"><p class="en"><span class="w" data-s="43" data-e="384">Mira</span> <span class="w target" data-s="427" data-e="555" title="(国家或行业等的)劳动力，劳动大军，劳动 人口">worked</span> <span class="w" data-s="597" data-e="768">in</span> <span class="w" data-s="811" data-e="896">a</span> <span class="w" data-s="939" data-e="1024">small</span> <span class="w target" data-s="1067" data-e="1493" title="车间；工场；作坊；研讨会；讲习班">workshop</span> <span class="w" data-s="1536" data-e="1792">on</span> <span class="w" data-s="1835" data-e="1920">the</span> <span class="w" data-s="1963" data-e="2048">fourth</span> <span class="w" data-s="2091" data-e="2347">floor.</span></p><p class="zh">米拉在四楼的一间小工作室里上班。</p></div>
+<div class="pair" data-s0="2603" data-s1="6059"><p class="en"><span class="w" data-s="2603" data-e="3499">Everyone</span> <span class="w" data-s="3541" data-e="3669">there</span> <span class="w" data-s="3712" data-e="3883">had</span> <span class="w" data-s="3925" data-e="4011">a</span> <span class="w" data-s="4053" data-e="4139">vote;</span> <span class="w" data-s="4437" data-e="5035">the</span> <span class="w" data-s="5077" data-e="5291">company</span> <span class="w" data-s="5333" data-e="5589">was</span> <span class="w target" data-s="5632" data-e="6059" title="民主的;有民主精神的">democratic.</span></p><p class="zh">那里每个人都有投票权，公司很民主。</p></div>
+<div class="pair" data-s0="6315" data-s1="10624"><p class="en"><span class="w" data-s="6315" data-e="6869">Her</span> <span class="w" data-s="6912" data-e="7125">company</span> <span class="w" data-s="7168" data-e="7381">was</span> <span class="w" data-s="7424" data-e="7509">an</span> <span class="w target" data-s="7552" data-e="7723" title="同盟国；盟友，伙伴v.(使)联盟，(使)联合">ally</span> <span class="w" data-s="7765" data-e="8064">of</span> <span class="w" data-s="8107" data-e="8149">a</span> <span class="w" data-s="8192" data-e="8448">larger</span> <span class="w" data-s="8491" data-e="8661">firm,</span> <span class="w" data-s="8960" data-e="9173">and</span> <span class="w" data-s="9259" data-e="9557">both</span> <span class="w" data-s="9600" data-e="10027">shared</span> <span class="w" data-s="10069" data-e="10197">one</span> <span class="w target" data-s="10240" data-e="10624" title="网络；关系网；人际网；(互联)网络；广播网； 电视网v.将……连接成网络；建立工作关系 第四单元">network.</span></p><p class="zh">她的公司是一家大公司的盟友，两家共用同一个网络。</p></div>
+<div class="pair" data-s0="11230" data-s1="14174"><p class="en"><span class="w" data-s="11230" data-e="11316">One</span> <span class="w" data-s="11358" data-e="11572">night</span> <span class="w" data-s="11614" data-e="11870">someone</span> <span class="w target" data-s="12126" data-e="12553" title="(计算机系统的)侵入；非法侵入(他人计算机 系统）">hacked</span> <span class="w" data-s="12596" data-e="12681">the</span> <span class="w target" data-s="12724" data-e="12980" title="网络；关系网；人际网；(互联)网络；广播网； 电视网v.将……连接成网络；建立工作关系 第四单元">network</span> <span class="w" data-s="13022" data-e="13193">and</span> <span class="w" data-s="13236" data-e="13748">stole</span> <span class="w" data-s="13790" data-e="14174">everything.</span></p><p class="zh">一天夜里，有人侵入网络，把所有东西都偷走了。</p></div>
+<div class="pair" data-s0="14388" data-s1="17801"><p class="en"><span class="w" data-s="14388" data-e="14686">The</span> <span class="w" data-s="15241" data-e="15454">attack</span> <span class="w" data-s="15497" data-e="15710">did</span> <span class="w" data-s="15753" data-e="15838">not</span> <span class="w target" data-s="15881" data-e="16265" title="产生；生产；引起">generate</span> <span class="w" data-s="16308" data-e="16478">money,</span> <span class="w" data-s="16692" data-e="16905">but</span> <span class="w" data-s="17033" data-e="17161">it</span> <span class="w target" data-s="17204" data-e="17545" title="产生；生产；引起">generated</span> <span class="w" data-s="17588" data-e="17801">fear.</span></p><p class="zh">这次攻击没有产生钱，却产生了恐惧。</p></div>
+<div class="pair" data-s0="18100" data-s1="21940"><p class="en"><span class="w" data-s="18100" data-e="18441">A</span> <span class="w" data-s="18484" data-e="19081">whole</span> <span class="w target" data-s="19124" data-e="19550" title="一代，一代人；产生">generation</span> <span class="w" data-s="19593" data-e="19806">of</span> <span class="w" data-s="19849" data-e="19934">young</span> <span class="w" data-s="19977" data-e="20276">workers</span> <span class="w" data-s="20318" data-e="20660">had</span> <span class="w" data-s="20788" data-e="20958">never</span> <span class="w" data-s="21001" data-e="21172">seen</span> <span class="w" data-s="21214" data-e="21385">anything</span> <span class="w" data-s="21428" data-e="21726">like</span> <span class="w" data-s="21769" data-e="21940">it.</span></p><p class="zh">整整一代年轻员工从没见过这样的事。</p></div>
+<div class="pair" data-s0="22196" data-s1="24585"><p class="en"><span class="w" data-s="22196" data-e="22366">In</span> <span class="w target" data-s="22409" data-e="22580" title="一般的;普通的 n. 将军">general,</span> <span class="w" data-s="22836" data-e="23049">they</span> <span class="w" data-s="23262" data-e="23390">had</span> <span class="w" data-s="23433" data-e="23732">trusted</span> <span class="w" data-s="23774" data-e="24116">machines</span> <span class="w" data-s="24158" data-e="24372">too</span> <span class="w" data-s="24414" data-e="24585">much.</span></p><p class="zh">总的来说，他们太相信机器了。</p></div>
+<div class="pair" data-s0="24798" data-s1="26292"><p class="en"><span class="w" data-s="24798" data-e="25524">Mira</span> <span class="w" data-s="25566" data-e="25737">made</span> <span class="w" data-s="25780" data-e="25908">a</span> <span class="w target" data-s="25950" data-e="26292" title="策略；计策；行动计划；战略；战略部署">strategy.</span></p><p class="zh">米拉想出了一个策略。</p></div>
+<div class="pair" data-s0="27115" data-s1="34667"><p class="en"><span class="w" data-s="27115" data-e="27243">She</span> <span class="w" data-s="27285" data-e="27456">began</span> <span class="w" data-s="27499" data-e="27755">from</span> <span class="w target" data-s="27797" data-e="28139" title="挠，搔(痒处)；划伤，抓伤(皮肤) η.(皮肤 或物体表面上的)划痕，划伤；挠痒">scratch:</span> <span class="w" data-s="28608" data-e="28949">she</span> <span class="w target" data-s="28992" data-e="29376" title="刮；刮擦；擦伤；艰难获得n. 刮擦(声)；擦 伤;困境 n. 目录v. 将……编入目录 n. 对话；对白 (096)">scraped</span> <span class="w" data-s="29419" data-e="29461">the</span> <span class="w" data-s="29504" data-e="29589">old</span> <span class="w" data-s="29632" data-e="29931">files</span> <span class="w" data-s="29973" data-e="30229">clean,</span> <span class="w" data-s="30443" data-e="30869">made</span> <span class="w" data-s="31040" data-e="31211">a</span> <span class="w target" data-s="31253" data-e="31637" title="">catalog</span> <span class="w" data-s="31680" data-e="31851">of</span> <span class="w" data-s="31893" data-e="32021">every</span> <span class="w" data-s="32064" data-e="32320">document,</span> <span class="w" data-s="32619" data-e="32875">and</span> <span class="w" data-s="32960" data-e="33344">opened</span> <span class="w" data-s="33387" data-e="33557">a</span> <span class="w target" data-s="33600" data-e="34027" title="">dialogue</span> <span class="w" data-s="34069" data-e="34240">with</span> <span class="w" data-s="34283" data-e="34368">the</span> <span class="w" data-s="34411" data-e="34496">other</span> <span class="w" data-s="34539" data-e="34667">team.</span></p><p class="zh">她从头开始：把旧文件刮干净，给每份文件编了一份目录，还和另一队人开始了对话。</p></div>
+<div class="pair" data-s0="35353" data-s1="38852"><p class="en"><span class="w" data-s="35353" data-e="35439">When</span> <span class="w" data-s="35481" data-e="35567">the</span> <span class="w" data-s="35609" data-e="35695">news</span> <span class="w target" data-s="35737" data-e="36121" title="撒播，散开">scattered</span> <span class="w" data-s="36164" data-e="36292">across</span> <span class="w" data-s="36335" data-e="36548">the</span> <span class="w" data-s="36591" data-e="36719">city,</span> <span class="w" data-s="36932" data-e="37316">she</span> <span class="w target" data-s="37359" data-e="37615" title="捏，拧，掐；使经济拮据">pinched</span> <span class="w" data-s="37657" data-e="37871">herself</span> <span class="w" data-s="37913" data-e="38297">and</span> <span class="w" data-s="38425" data-e="38681">stayed</span> <span class="w" data-s="38724" data-e="38852">calm.</span></p><p class="zh">消息传遍全城时，她掐了自己一把，保持了冷静。</p></div>
+<div class="pair" data-s0="39236" data-s1="45209"><p class="en"><span class="w" data-s="39236" data-e="40132">Lawyers</span> <span class="w" data-s="40175" data-e="40303">said</span> <span class="w" data-s="40345" data-e="40473">the</span> <span class="w" data-s="40516" data-e="40601">two</span> <span class="w" data-s="40644" data-e="40900">firms</span> <span class="w" data-s="40943" data-e="41156">together</span> <span class="w target" data-s="41199" data-e="41796" title="组成，构成；设立">constitute</span> <span class="w" data-s="41839" data-e="42009">one</span> <span class="w" data-s="42052" data-e="42308">company,</span> <span class="w" data-s="42607" data-e="42820">and</span> <span class="w" data-s="42991" data-e="43289">the</span> <span class="w" data-s="43332" data-e="43417">written</span> <span class="w target" data-s="43460" data-e="44015" title="宪法，章程">constitution</span> <span class="w" data-s="44057" data-e="44228">of</span> <span class="w" data-s="44271" data-e="44313">their</span> <span class="w" data-s="44356" data-e="44484">club</span> <span class="w" data-s="44527" data-e="44825">was</span> <span class="w" data-s="44868" data-e="45209">unclear.</span></p><p class="zh">律师说，这两家公司合起来构成一家公司，而他们那个俱乐部的章程却写得不清楚。</p></div>
+<div class="pair" data-s0="45902" data-s1="50596"><p class="en"><span class="w" data-s="45902" data-e="46030">They</span> <span class="w" data-s="46073" data-e="46158">had</span> <span class="w" data-s="46201" data-e="46329">to</span> <span class="w target" data-s="46372" data-e="46798" title="替代品 v.(以……)代替，取代">substitute</span> <span class="w" data-s="46841" data-e="47054">new</span> <span class="w" data-s="47097" data-e="47268">rules</span> <span class="w" data-s="47310" data-e="47609">for</span> <span class="w" data-s="47652" data-e="47780">old</span> <span class="w" data-s="47822" data-e="47993">ones</span> <span class="w" data-s="48036" data-e="48420">and</span> <span class="w" data-s="48633" data-e="48804">turn</span> <span class="w" data-s="48846" data-e="49017">the</span> <span class="w" data-s="49060" data-e="49145">small</span> <span class="w target" data-s="49188" data-e="49700" title="学院，学会，协会v.制定，创立">institute</span> <span class="w" data-s="49742" data-e="49998">into</span> <span class="w" data-s="50041" data-e="50169">a</span> <span class="w" data-s="50212" data-e="50340">real</span> <span class="w" data-s="50382" data-e="50596">office.</span></p><p class="zh">他们只能拿新规矩代替旧的，把这间小小的学会变成真正的办公室。</p></div>
+<div class="pair" data-s0="50894" data-s1="54094"><p class="en"><span class="w" data-s="50894" data-e="51492">Some</span> <span class="w" data-s="51534" data-e="51833">older</span> <span class="w" data-s="51876" data-e="52260">workers</span> <span class="w" data-s="52302" data-e="52729">blamed</span> <span class="w target" data-s="52772" data-e="53284" title="迷信">superstition,</span> <span class="w" data-s="53497" data-e="53710">not</span> <span class="w" data-s="53796" data-e="54094">code.</span></p><p class="zh">一些老员工怪的是迷信，不是代码。</p></div>
+<div class="pair" data-s0="54393" data-s1="55716"><p class="en"><span class="w" data-s="54393" data-e="54990">Others</span> <span class="w" data-s="55033" data-e="55374">blamed</span> <span class="w target" data-s="55417" data-e="55716" title="宗教，宗教信仰">religion.</span></p><p class="zh">另一些人则怪宗教。</p></div>
+<div class="pair" data-s0="56239" data-s1="62681"><p class="en"><span class="w" data-s="56239" data-e="56324">One</span> <span class="w" data-s="56367" data-e="56793">engineer</span> <span class="w" data-s="56836" data-e="57049">had</span> <span class="w" data-s="57092" data-e="57177">been</span> <span class="w" data-s="57220" data-e="57305">sent</span> <span class="w" data-s="57348" data-e="57604">into</span> <span class="w target" data-s="57647" data-e="58031" title="&amp; n. 流放">exile</span> <span class="w" data-s="58073" data-e="58329">years</span> <span class="w" data-s="58372" data-e="58671">before,</span> <span class="w" data-s="59012" data-e="59268">and</span> <span class="w" data-s="59439" data-e="59652">after</span> <span class="w" data-s="59695" data-e="59993">living</span> <span class="w" data-s="60036" data-e="60420">abroad</span> <span class="w" data-s="60463" data-e="60804">even</span> <span class="w" data-s="60847" data-e="61060">his</span> <span class="w" data-s="61103" data-e="61273">own</span> <span class="w" data-s="61316" data-e="61487">street</span> <span class="w" data-s="61529" data-e="61913">looked</span> <span class="w target" data-s="62127" data-e="62681" title="异国情调的;奇异的；来自异国的">exotic.</span></p><p class="zh">有位工程师多年前被流放，在国外生活之后，连他自己那条街都显得充满异国情调。</p></div>
+<div class="pair" data-s0="62809" data-s1="67972"><p class="en"><span class="w" data-s="62809" data-e="63492">The</span> <span class="w" data-s="63535" data-e="63876">manager</span> <span class="w" data-s="63919" data-e="64132">wanted</span> <span class="w" data-s="64175" data-e="64345">to</span> <span class="w target" data-s="64388" data-e="64687" title="把……开除(或除名)；驱逐出境；排出">expel</span> <span class="w" data-s="64729" data-e="64900">the</span> <span class="w" data-s="64943" data-e="65241">careless</span> <span class="w" data-s="65284" data-e="65668">worker,</span> <span class="w" data-s="65753" data-e="65967">and</span> <span class="w" data-s="66095" data-e="66393">the</span> <span class="w" data-s="66436" data-e="66521">rules</span> <span class="w" data-s="66564" data-e="66863">seemed</span> <span class="w" data-s="66905" data-e="67076">to</span> <span class="w target" data-s="67119" data-e="67332" title="强迫，迫使；使必须">compel</span> <span class="w" data-s="67375" data-e="67545">her</span> <span class="w" data-s="67588" data-e="67716">to</span> <span class="w" data-s="67759" data-e="67801">do</span> <span class="w" data-s="67844" data-e="67972">it.</span></p><p class="zh">经理想把那个粗心的员工开除，规则似乎也在逼她这么做。</p></div>
+<div class="pair" data-s0="68541" data-s1="73533"><p class="en"><span class="w" data-s="68541" data-e="68839">Mira</span> <span class="w" data-s="68882" data-e="69053">used</span> <span class="w target" data-s="69095" data-e="69309" title="同盟国；盟友，伙伴v.(使)联盟，(使)联合">all</span> <span class="w" data-s="69351" data-e="69565">her</span> <span class="w target" data-s="69607" data-e="69778" title="力量，暴力；武装部队；有影响力的人 v. 强迫">force</span> <span class="w" data-s="69821" data-e="70077">to</span> <span class="w" data-s="70119" data-e="70247">protect</span> <span class="w" data-s="70290" data-e="70589">him,</span> <span class="w" data-s="70759" data-e="70887">and</span> <span class="w" data-s="71186" data-e="71314">in</span> <span class="w" data-s="71357" data-e="71399">the</span> <span class="w" data-s="71442" data-e="71570">end</span> <span class="w" data-s="71613" data-e="72039">nobody</span> <span class="w" data-s="72082" data-e="72338">in</span> <span class="w" data-s="72381" data-e="72466">the</span> <span class="w target" data-s="72509" data-e="72807" title="(国家或行业等的)劳动力，劳动大军，劳动 人口">workforce</span> <span class="w" data-s="72850" data-e="73149">lost</span> <span class="w" data-s="73191" data-e="73405">a</span> <span class="w" data-s="73447" data-e="73533">job.</span></p><p class="zh">米拉使出全部力量保护他，最后整个劳动力中没有一个人丢掉工作。</p></div>
+<div class="pair" data-s0="73831" data-s1="76007"><p class="en"><span class="w" data-s="73831" data-e="74215">At</span> <span class="w" data-s="74386" data-e="74514">the</span> <span class="w target" data-s="74557" data-e="74855" title="工作场所">workplace</span> <span class="w" data-s="74898" data-e="75325">everyone</span> <span class="w" data-s="75367" data-e="75709">felt</span> <span class="w" data-s="75751" data-e="76007">tired.</span></p><p class="zh">在工作场所，每个人都觉得疲惫。</p></div>
+<div class="pair" data-s0="76391" data-s1="82749"><p class="en"><span class="w" data-s="76391" data-e="76519">They</span> <span class="w" data-s="76562" data-e="76733">held</span> <span class="w" data-s="76775" data-e="76903">a</span> <span class="w target" data-s="76946" data-e="77202" title="车间；工场；作坊；研讨会；讲习班">workshop</span> <span class="w" data-s="77245" data-e="77501">and</span> <span class="w" data-s="77543" data-e="77799">voted</span> <span class="w" data-s="77842" data-e="77927">to</span> <span class="w target" data-s="77970" data-e="78183" title="强迫，执行(法律)">enforce</span> <span class="w" data-s="78226" data-e="78482">one</span> <span class="w" data-s="78525" data-e="78823">simple</span> <span class="w" data-s="78866" data-e="79165">rule:</span> <span class="w target" data-s="79506" data-e="80786" title="加强，加固；给……加强力量，增援">reinforce</span> <span class="w" data-s="80829" data-e="81170">every</span> <span class="w" data-s="81213" data-e="81554">lock</span> <span class="w" data-s="81597" data-e="81981">with</span> <span class="w" data-s="82023" data-e="82279">a</span> <span class="w" data-s="82322" data-e="82450">second</span> <span class="w" data-s="82493" data-e="82749">key.</span></p><p class="zh">他们办了一场研讨会，投票通过一条简单的规矩：每把锁都再加一道保险，加固一遍。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">ally</span>
+          <span class="ipa">/&#x27;ælaı, ə&#x27;lai/</span>
+          <span class="pos">n.</span>
+          <span class="cn">同盟国；盟友，伙伴v.(使)联盟，(使)联合</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her company was an ally of a larger firm</div>          <div class="mnem"><span class="lbl">记</span>所有人（al 想成 all）连在一起 (lian)死(ce/s/)，那就是所有人同呼吸，共命 运，让我们想到了电影中，共产党人的光辉伟大 形象→结盟团体。</div>          <div class="root"><span class="lbl">根</span>al(一起) + ly(绑) → 绑在一起 → 盟友、结盟</div>          <div class="fam"><span class="lbl">族</span>alliance n. 联盟 / allied adj. 同盟的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">network</span>
+          <span class="ipa">/&#x27;netw3irk/</span>
+          <span class="pos"></span>
+          <span class="cn">网络；关系网；人际网；(互联)网络；广播网； 电视网v.将……连接成网络；建立工作关系 第四单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>both shared one network</div>          <div class="mnem"><span class="lbl">记</span>Internet 是因特网，net 是网， network 就是各种网啊。</div>          <div class="root"><span class="lbl">根</span>net(网) + work(工作) → 一起织成的网 → 网络</div>          <div class="zt"><span class="lbl">真题</span>But having a large network and some promotional skills may be more crucial. 但拥有 一个庞大的网络和一些促销技巧可能更为重 要。(2019)</div>          <div class="fam"><span class="lbl">族</span>networking n. 建立人脉</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">hack</span>
+          <span class="ipa">/hæk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(计算机系统的)侵入；非法侵入(他人计算机 系统）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>someone hacked the network</div>          <div class="mnem"><span class="lbl">记</span>由计算机中的 hacker(黑客)联 想成 hack(侵入)。</div>          <div class="root"><span class="lbl">根</span>由 hacker(黑客) 联想 → 侵入、非法闯入</div>          <div class="fam"><span class="lbl">族</span>hacker n. 黑客</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">democratic</span>
+          <span class="ipa">/ıdemə&#x27;krætık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">民主的;有民主精神的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the company was democratic</div>          <div class="mnem"><span class="lbl">记</span>demo发音类似“戴帽”，rat为 老鼠，ic可联想成IC卡，连在一起就可以联想 成：戴了帽子的老鼠就可以上公交车刷IC卡。 这是个多么“民主的”社会啊！</div>          <div class="root"><span class="lbl">根</span>demo(人民) + crat(统治) + ic(……的) → 人民统治的</div>          <div class="zt"><span class="lbl">真题</span>He is the member of the Democratic Party. 他是民主党的成员。</div>          <div class="fam"><span class="lbl">族</span>democracy n. 民主 / democrat n. 民主人士</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">generate</span>
+          <span class="ipa">/&#x27;dzenəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">产生；生产；引起</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>did not generate money</div>          <div class="mnem"><span class="lbl">记</span>gene 基因；rat 老鼠；老鼠有什 么基因？繁殖能力那么强→生产。</div>          <div class="root"><span class="lbl">根</span>gen(生) + erate(动词后缀) → 生出来 → 产生</div>          <div class="zt"><span class="lbl">真题</span>It generates a great deal of electronic garbage.它产生了大量的电子垃圾。(2021)</div>          <div class="fam"><span class="lbl">族</span>generation n. 一代 / generator n. 发电机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">generation</span>
+          <span class="ipa">/dzenə&#x27;rei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一代，一代人；产生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A whole generation of young workers</div>          <div class="mnem"><span class="lbl">记</span>一代人或东西，都是从上一代 “产生，生产”(generate)的东西。</div>          <div class="root"><span class="lbl">根</span>generate(产生) + ion(名词后缀) → 生出来的那一批 → 一代</div>          <div class="zt"><span class="lbl">真题</span>A new batch of young women—members of the so-called millennial(千禧的)generation—has been · entering the workforce for the past decade.在过去的十年里，一批新的年轻女 性——所谓的千禧一代——进入了劳动力市 场。(2018)</div>          <div class="fam"><span class="lbl">族</span>generate v. 产生 / generational adj. 代际的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">general</span>
+          <span class="ipa">/&#x27;dzenrəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">一般的;普通的 n. 将军</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In general, they had trusted machines too much.</div>          <div class="mnem"><span class="lbl">记</span>gene 基因；r 想成“人”；al 想成 all。那就是所有人都有的基因，说明这种基因 是很“普通的”，很“一般的”。</div>          <div class="root"><span class="lbl">根</span>gen(生、族) + eral → 属于整个族群的 → 一般的</div>          <div class="zt"><span class="lbl">真题</span>That means students are asked to use . their individual experience to come up with answers to general questions. 那意味着学生们 被要求利用他们的个人经验来回答普遍的问 题。(2019)</div>          <div class="fam"><span class="lbl">族</span>generally adv. 通常 / generalize v. 概括</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">strategy</span>
+          <span class="ipa">/&#x27;strætədzi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">策略；计策；行动计划；战略；战略部署</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mira made a strategy.</div>          <div class="mnem"><span class="lbl">记</span>st 想成 street 街道，rat 老鼠， 连到一起就是：对付街上的老鼠是需要“策略” 的，不能只是死追啊。</div>          <div class="root"><span class="lbl">根</span>strat(军队，希腊 stratos) + egy(引导) → 带兵之法 → 策略</div>          <div class="zt"><span class="lbl">真题</span>One strategy is called market modification. 一种策略被称为市场调整。</div>          <div class="fam"><span class="lbl">族</span>strategic adj. 战略的 / strategist n. 战略家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">scratch</span>
+          <span class="ipa">/skræt∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">挠，搔(痒处)；划伤，抓伤(皮肤) η.(皮肤 或物体表面上的)划痕，划伤；挠痒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She began from scratch</div>          <div class="mnem"><span class="lbl">记</span>sc 发音类似“四个”；rat 老鼠； ch发音类似“吃”。连在一起就是：四个老鼠吃。 老鼠怎么吃东西？边挠边吃啊，所以这个单词 的意思是“抓，挠”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：from scratch 从零开始 → 抓、划</div>          <div class="zt"><span class="lbl">真题</span>Songdo, a city built from scratch in South Korea, is one of Kasarda&#x27;s prime examples. 松岛 是在韩国境内从零开始建造的一座城市，是卡萨 尔达的主要例子之一。(2019)</div>          <div class="fam"><span class="lbl">族</span>scratchy adj. 刺痒的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">pinch</span>
+          <span class="ipa">/pint∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">捏，拧，掐；使经济拮据</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she pinched herself and stayed calm</div>          <div class="mnem"><span class="lbl">记</span>单词发音和拼写都类似peach 桃子。去超市买桃子时，售货员经常说：“桃子 不能捏啊！”</div>          <div class="root"><span class="lbl">根</span>靠搭配记：pinch the cheek 捏脸 → 捏、掐</div>          <div class="fam"><span class="lbl">族</span>pinched adj. 消瘦的；拮据的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">scrape</span>
+          <span class="ipa">/skreip/</span>
+          <span class="pos">v.</span>
+          <span class="cn">刮；刮擦；擦伤；艰难获得n. 刮擦(声)；擦 伤;困境 n. 目录v. 将……编入目录 n. 对话；对白 (096)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she scraped the old files clean</div>          <div class="mnem"><span class="lbl">记</span>给老哥（logue谐音）打电话 (dial)→对话。</div>          <div class="root"><span class="lbl">根</span>scrap(碎片) + e → 刮下碎片 → 刮擦</div>          <div class="zt"><span class="lbl">真题</span>Over the centuries, they have simulated (模拟) dialogues in a number of ways. 几个世 纪以来，它们用多种方式模拟了对话。(2019)</div>          <div class="fam"><span class="lbl">族</span>scraper n. 刮刀</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">catalog</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>made a catalog of every document</div>          <div class="root"><span class="lbl">根</span>cata(向下) + log(说、列举) → 一条条列下来 → 目录</div>          <div class="fam"><span class="lbl">族</span>catalogue n. 目录(英式拼写)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">dialogue</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>opened a dialogue with the other team</div>          <div class="root"><span class="lbl">根</span>dia(之间) + logue(说) → 两人之间说 → 对话</div>          <div class="fam"><span class="lbl">族</span>dialog n. 对话(美式拼写) / monologue n. 独白</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">scatter</span>
+          <span class="ipa">/&#x27;skætər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">撒播，散开</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the news scattered across the city</div>          <div class="root"><span class="lbl">根</span>与 shatter(打碎) 同源 → 打散了 → 撒播、散开</div>          <div class="zt"><span class="lbl">真题</span>The space station will break into hundreds of pieces that will be scattered across a track 100 miles wide and 4,000 miles long. 空间站将分裂成数百块碎片，散落在一条100 英里宽、4000英里长的轨道上。</div>          <div class="fam"><span class="lbl">族</span>scattered adj. 分散的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">constitute</span>
+          <span class="ipa">/&#x27;kpnstitju:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">组成，构成；设立</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the two firms together constitute one company</div>          <div class="mnem"><span class="lbl">记</span>词根 stitute 是“站”的意思，con 前缀表示“一起”。单词的字面意思就是“站到 了一起”→组成，构成。</div>          <div class="root"><span class="lbl">根</span>con(一起) + stitute(站) → 站到一起 → 组成</div>          <div class="zt"><span class="lbl">真题</span>It may constitute a challenge to computer programmers. 它可能对计算机程序员构成挑 战。(2016)</div>          <div class="fam"><span class="lbl">族</span>constitution n. 宪法 / constituent n. 成分</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">constitution</span>
+          <span class="ipa">/ikpnsti&#x27;tju:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">宪法，章程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the written constitution of their club was unclear</div>          <div class="mnem"><span class="lbl">记</span>构成(constitute)一个国家最根 本法律的就是“宪法”，它被称为根本大法。</div>          <div class="root"><span class="lbl">根</span>constitute(组成) + ion(名词后缀) → 组成国家的根本法 → 宪法</div>          <div class="zt"><span class="lbl">真题</span>The British constitution is to a large extent a product of the historical events described above. 英国宪法在很大程度上是上述 历史事件的产物。</div>          <div class="fam"><span class="lbl">族</span>constitutional adj. 宪法的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">substitute</span>
+          <span class="ipa">/&#x27;sabstitju:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">替代品 v.(以……)代替，取代</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They had to substitute new rules for old ones</div>          <div class="mnem"><span class="lbl">记</span>sub(在下面)十stitute(站)，那 站在下边(比喻不重要或待命)的自然是等待登 场的“替补”了。 (097) 第四单元</div>          <div class="root"><span class="lbl">根</span>sub(下面) + stitute(站) → 站在下面待命 → 替补、代替</div>          <div class="zt"><span class="lbl">真题</span>It substitutes old information with new data.它用新数据代替旧信息。(2020)</div>          <div class="fam"><span class="lbl">族</span>substitution n. 替代</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">institute</span>
+          <span class="ipa">/&#x27;Institju:t/</span>
+          <span class="pos"></span>
+          <span class="cn">学院，学会，协会v.制定，创立</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>turn the small institute into a real office</div>          <div class="mnem"><span class="lbl">记</span>在一个大学里面，站(stitute)在 里面(in)的东西就是各种“学院，学会”。美国著 名的麻省理工学院（MIT）就是Massachusetts Institute of Technology.</div>          <div class="root"><span class="lbl">根</span>in(里面) + stitute(站) → 立在里面的机构 → 学院、学会</div>          <div class="zt"><span class="lbl">真题</span>The budget of the National Institutes of Health doubled between 1998 and 2003. 1998 年至2003年间，国家卫生研究院的预算翻了 一番。</div>          <div class="fam"><span class="lbl">族</span>institution n. 机构 / institutional adj. 机构的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">superstition</span>
+          <span class="ipa">/isu:pə&#x27;sti∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">迷信</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>blamed superstition, not code</div>          <div class="mnem"><span class="lbl">记</span>高处(super)坐着(sti 想成 sit) 的人→神→迷信。</div>          <div class="root"><span class="lbl">根</span>super(在上) + stit(站) + ion → 站在上面的东西 → 迷信</div>          <div class="fam"><span class="lbl">族</span>superstitious adj. 迷信的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">religion</span>
+          <span class="ipa">/r&#x27;lıdzən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">宗教，宗教信仰</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Others blamed religion.</div>          <div class="root"><span class="lbl">根</span>re(再) + lig(绑) + ion → 把人再绑在一起的信仰 → 宗教</div>          <div class="zt"><span class="lbl">真题</span>It is mainly based on a society&#x27;s religion. 它主要基于一个社会的宗教。(2022)</div>          <div class="fam"><span class="lbl">族</span>religious adj. 宗教的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">exile</span>
+          <span class="ipa">/&#x27;eksaıl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp; n. 流放</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had been sent into exile years before</div>          <div class="mnem"><span class="lbl">记</span>ex(往外)十i(我)+le(了)→我 被弄出去了→流放。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + ile → 被赶到外面 → 流放</div>          <div class="zt"><span class="lbl">真题</span>His years in exile resulted in a 31 percent innovation discount.他的流亡岁月导致了创新 力下降了31%。(2015)</div>          <div class="fam"><span class="lbl">族</span>exiled adj. 流亡的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">exotic</span>
+          <span class="ipa">/ıg&#x27;zptık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">异国情调的;奇异的；来自异国的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>even his own street looked exotic</div>          <div class="mnem"><span class="lbl">记</span>外面的（ex)东西，是不是很有 “异国情调的，奇异的”？</div>          <div class="root"><span class="lbl">根</span>exo(外面，希腊 exo) + tic(……的) → 外面来的 → 异国的</div>          <div class="zt"><span class="lbl">真题</span>Exotic pet enthusiasts often attempt to keep Meller&#x27;s chameleons as pets. 异国的宠物 爱好者们总是想将梅勒的蜥蜴带回去作为宠物 饲养。</div>          <div class="fam"><span class="lbl">族</span>exoticism n. 异国情调</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">expel</span>
+          <span class="ipa">/ık&#x27;spel/</span>
+          <span class="pos">v.</span>
+          <span class="cn">把……开除(或除名)；驱逐出境；排出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wanted to expel the careless worker</div>          <div class="mnem"><span class="lbl">记</span>往外(ex)排(pel 的谐音)，把你 排出去也就是“开除，驱逐”你。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + pel(推) → 推出去 → 开除、驱逐</div>          <div class="fam"><span class="lbl">族</span>expulsion n. 开除</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">compel</span>
+          <span class="ipa">/kəm&#x27;pel/</span>
+          <span class="pos">v.</span>
+          <span class="cn">强迫，迫使；使必须</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the rules seemed to compel her to do it</div>          <div class="mnem"><span class="lbl">记</span>所有人（com）都逼迫、迫使（pe 发音类似“迫”)一个人(1想成一个长的高高的 人)→强迫，迫使。</div>          <div class="root"><span class="lbl">根</span>com(一起) + pel(推) → 一起推你 → 强迫</div>          <div class="zt"><span class="lbl">真题</span>The agents’questions compel student tutors to think and explain the materials in different ways. 代理的问题迫使学生家教以不 同的方式思考和解释这些材料。(2018)</div>          <div class="fam"><span class="lbl">族</span>compulsion n. 强迫 / compelling adj. 引人入胜的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">force</span>
+          <span class="ipa">/fə:rs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">力量，暴力；武装部队；有影响力的人 v. 强迫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mira used all her force to protect him</div>          <div class="mnem"><span class="lbl">记</span>为了(for)走(ce发音类似撤，就 是走)，为了继续赶路，我们需要食物来增加“力 量”。</div>          <div class="root"><span class="lbl">根</span>拉丁 fortis(强壮) → 力量 → 强迫</div>          <div class="zt"><span class="lbl">真题</span>It forces the customer to compensate the waiter.它迫使顾客赔偿服务员。(2016)</div>          <div class="fam"><span class="lbl">族</span>forceful adj. 强有力的 / forced adj. 被迫的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">workforce</span>
+          <span class="ipa">/&#x27;w3:rkfəirs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(国家或行业等的)劳动力，劳动大军，劳动 人口</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>nobody in the workforce lost a job</div>          <div class="mnem"><span class="lbl">记</span>work(工作)十force(力量)，在 一个单位工作的力量，就是“劳动力”啊。</div>          <div class="root"><span class="lbl">根</span>work(工作) + force(力量) → 干活的力量 → 劳动力</div>          <div class="zt"><span class="lbl">真题</span>More than 15% of the workforce are jobless or underemployed. 超过 15%的劳动力 处于失业或未充分就业状态。</div>          <div class="fam"><span class="lbl">族</span>worker n. 工人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">workplace</span>
+          <span class="ipa">/&#x27;wa:rkpleis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">工作场所</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At the workplace everyone felt tired.</div>          <div class="root"><span class="lbl">根</span>work(工作) + place(地方) → 工作的地方 → 职场</div>          <div class="zt"><span class="lbl">真题</span>In the workplace, feedback may not be so welcome to managers with a fixed mindset. 在职场中，固定思维模式的管理者可能不太欢 迎反馈。(2016)</div>          <div class="fam"><span class="lbl">族</span>workspace n. 工作空间</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">workshop</span>
+          <span class="ipa">/&#x27;w3:rk∫a:p/</span>
+          <span class="pos">n.</span>
+          <span class="cn">车间；工场；作坊；研讨会；讲习班</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They held a workshop and voted to enforce one simple rule</div>          <div class="mnem"><span class="lbl">记</span>work(工作)+ shop(工坊)→ 车间。</div>          <div class="root"><span class="lbl">根</span>work(工作) + shop(坊) → 干活的作坊 → 车间、研讨会</div>          <div class="zt"><span class="lbl">真题</span>Teachers reported significant motivational changes in 27% of the children in the growth mindset workshop. 教师们报告说，在成长思维 模式讲习班中，27%的孩子的动机发生了重大 变化。</div>          <div class="fam"><span class="lbl">族</span>workshopper n. 研讨会参加者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">enforce</span>
+          <span class="ipa">/ın&#x27;fo:rs/</span>
+          <span class="pos">v.</span>
+          <span class="cn">强迫，执行(法律)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>voted to enforce one simple rule</div>          <div class="mnem"><span class="lbl">记</span>使（en）你身上有一种力量 (860) (force)。你小时候不想上学，妈妈给你身上一 种力量，那就是“强迫”你去上学啊。</div>          <div class="root"><span class="lbl">根</span>en(使) + force(力量) → 使有力量 → 执行、强制</div>          <div class="zt"><span class="lbl">真题</span>Lead accumulation worldwide decreased significantly after the use of unleaded gas in the US was enforced by law. 法律强制在美国使 用无铅气体后，世界范围内的铅蓄积量显著下降。</div>          <div class="fam"><span class="lbl">族</span>enforcement n. 执行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">reinforce</span>
+          <span class="ipa">/irian&#x27;foirs/</span>
+          <span class="pos">v.</span>
+          <span class="cn">加强，加固；给……加强力量，增援</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>reinforce every lock with a second key</div>          <div class="mnem"><span class="lbl">记</span>再次（re）往里（in）增加力量 (force)，就是“增援”的意思。</div>          <div class="root"><span class="lbl">根</span>re(再) + in(往里) + force(力量) → 再加力 → 加强、增援</div>          <div class="zt"><span class="lbl">真题</span>Our job as designers is to reinforce the airline&#x27;s brand. 作为设计师，我们的工作是强化 航空公司的品牌。(2020)</div>          <div class="fam"><span class="lbl">族</span>reinforcement n. 加强</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4 · Day 25</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

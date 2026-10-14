@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 21 · The Studio in the Old Barn</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 21 · 11/2 · Unit 3~4 第 601-630 词</div>
+  <h1>The Studio in the Old Barn<span class="cn">旧谷仓里的摄影棚</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-21.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2901"><p class="en"><span class="w" data-s="43" data-e="171">Every</span> <span class="w" data-s="213" data-e="725">October,</span> <span class="w" data-s="853" data-e="1067">the</span> <span class="w target" data-s="1323" data-e="1664" title="收获，成果 v. 收割；采集">harvest</span> <span class="w" data-s="1707" data-e="1877">brought</span> <span class="w" data-s="1920" data-e="2091">the</span> <span class="w" data-s="2133" data-e="2219">whole</span> <span class="w" data-s="2261" data-e="2603">valley</span> <span class="w" data-s="2645" data-e="2901">together.</span></p><p class="zh">每年十月，收割把整个山谷的人都聚到一起。</p></div>
+<div class="pair" data-s0="3115" data-s1="7424"><p class="en"><span class="w" data-s="3115" data-e="3328">The</span> <span class="w target" data-s="3755" data-e="4053" title="产量 v. 出产；屈服">yield</span> <span class="w" data-s="4096" data-e="4224">from</span> <span class="w" data-s="4267" data-e="4395">those</span> <span class="w" data-s="4437" data-e="4608">small</span> <span class="w" data-s="4651" data-e="5120">fields</span> <span class="w" data-s="5163" data-e="5248">was</span> <span class="w" data-s="5291" data-e="5461">never</span> <span class="w" data-s="5504" data-e="5717">large,</span> <span class="w" data-s="6016" data-e="6485">but</span> <span class="w" data-s="6528" data-e="6699">it</span> <span class="w" data-s="6741" data-e="6784">was</span> <span class="w" data-s="6827" data-e="6955">enough</span> <span class="w" data-s="6997" data-e="7211">for</span> <span class="w" data-s="7253" data-e="7424">everyone.</span></p><p class="zh">那几小块地的产量从来不高，但对每个人来说都够用了。</p></div>
+<div class="pair" data-s0="8200" data-s1="11869"><p class="en"><span class="w" data-s="8200" data-e="8285">By</span> <span class="w" data-s="8328" data-e="8413">the</span> <span class="w" data-s="8456" data-e="8541">time</span> <span class="w" data-s="8584" data-e="8755">the</span> <span class="w" data-s="8797" data-e="8968">rice</span> <span class="w" data-s="9011" data-e="9139">was</span> <span class="w target" data-s="9181" data-e="9437" title="成熟的，成年的；技艺精湛的 v. 成熟， 成长">mature,</span> <span class="w" data-s="9651" data-e="9907">the</span> <span class="w" data-s="10077" data-e="10419">farmers</span> <span class="w" data-s="10461" data-e="10589">had</span> <span class="w" data-s="10632" data-e="10845">already</span> <span class="w target" data-s="10888" data-e="11400" title="犁 v. 犁,耕">ploughed</span> <span class="w" data-s="11443" data-e="11528">the</span> <span class="w" data-s="11571" data-e="11613">next</span> <span class="w" data-s="11656" data-e="11869">field.</span></p><p class="zh">等稻子成熟时，农民们已经把下一块地犁好了。</p></div>
+<div class="pair" data-s0="12168" data-s1="14941"><p class="en"><span class="w" data-s="12168" data-e="12893">Farming</span> <span class="w" data-s="12936" data-e="13064">was</span> <span class="w" data-s="13107" data-e="13235">still</span> <span class="w" data-s="13277" data-e="13491">the</span> <span class="w target" data-s="13533" data-e="13875" title="首要的；占支配地位的；(基因)显性的；优 势的">dominant</span> <span class="w" data-s="13917" data-e="14003">way</span> <span class="w" data-s="14045" data-e="14173">of</span> <span class="w" data-s="14216" data-e="14344">life</span> <span class="w" data-s="14387" data-e="14600">in</span> <span class="w" data-s="14643" data-e="14685">the</span> <span class="w" data-s="14728" data-e="14941">village.</span></p><p class="zh">在村里，种地仍然是占主导地位的生活方式。</p></div>
+<div class="pair" data-s0="15112" data-s1="17459"><p class="en"><span class="w" data-s="15112" data-e="15667">In</span> <span class="w" data-s="15709" data-e="15837">the</span> <span class="w" data-s="15880" data-e="15965">house,</span> <span class="w" data-s="16221" data-e="16349">however,</span> <span class="w" data-s="16563" data-e="16861">the</span> <span class="w" data-s="16947" data-e="17075">work</span> <span class="w" data-s="17117" data-e="17245">was</span> <span class="w" data-s="17288" data-e="17459">different.</span></p><p class="zh">然而，屋子里的活计就完全不同了。</p></div>
+<div class="pair" data-s0="18145" data-s1="21047"><p class="en"><span class="w" data-s="18145" data-e="18444">Cooking,</span> <span class="w" data-s="18572" data-e="19041">washing</span> <span class="w" data-s="19084" data-e="19255">and</span> <span class="w" data-s="19297" data-e="19639">cleaning</span> <span class="w" data-s="19681" data-e="19809">were</span> <span class="w" data-s="19852" data-e="20193">endless</span> <span class="w target" data-s="20236" data-e="20705" title="家庭的;本国的n. 家庭矛盾">domestic</span> <span class="w target" data-s="20748" data-e="21047" title="家庭杂务；日常事务；例行工作；乏味无聊的 工作 adj.枯燥的；不鲜明的；迟钝的；萧条的">chores.</span></p><p class="zh">做饭、洗衣、打扫，是没完没了的家务。</p></div>
+<div class="pair" data-s0="21303" data-s1="25783"><p class="en"><span class="w" data-s="21303" data-e="21815">They</span> <span class="w" data-s="21857" data-e="21985">were</span> <span class="w target" data-s="22028" data-e="22241" title="">dull</span> <span class="w" data-s="22284" data-e="22497">and</span> <span class="w target" data-s="22540" data-e="22924" title="单调的,乏味的">tedious,</span> <span class="w" data-s="23137" data-e="23308">and</span> <span class="w" data-s="23436" data-e="23777">after</span> <span class="w" data-s="23820" data-e="23991">a</span> <span class="w" data-s="24033" data-e="24119">few</span> <span class="w" data-s="24161" data-e="24289">hours</span> <span class="w" data-s="24332" data-e="24673">they</span> <span class="w" data-s="24716" data-e="24887">made</span> <span class="w" data-s="24929" data-e="25143">anyone</span> <span class="w" data-s="25185" data-e="25484">feel</span> <span class="w target" data-s="25527" data-e="25783" title="愚蠢的;哑的;无言的">dumb.</span></p><p class="zh">这些活又枯燥又乏味，干上几个钟头，谁都会觉得自己变笨了。</p></div>
+<div class="pair" data-s0="25996" data-s1="27745"><p class="en"><span class="w" data-s="25996" data-e="26508">So</span> <span class="w" data-s="26593" data-e="26849">Li</span> <span class="w" data-s="26892" data-e="27105">Wei</span> <span class="w" data-s="27148" data-e="27233">made</span> <span class="w" data-s="27276" data-e="27361">a</span> <span class="w target" data-s="27404" data-e="27745" title="工作计划；日程安排；(公共汽车、火车等的) 时间表；(价目、费用等的)清单，一览表 v. 安排，预定">schedule.</span></p><p class="zh">于是李薇给自己排了一张时间表。</p></div>
+<div class="pair" data-s0="28231" data-s1="32881"><p class="en"><span class="w" data-s="28231" data-e="28316">Her</span> <span class="w target" data-s="28359" data-e="28615" title="计划；方案；阴谋">scheme</span> <span class="w" data-s="28657" data-e="28743">was</span> <span class="w" data-s="28785" data-e="28999">simple:</span> <span class="w" data-s="29297" data-e="30023">finish</span> <span class="w" data-s="30065" data-e="30236">the</span> <span class="w target" data-s="30279" data-e="30535" title="家庭杂务；日常事务；例行工作；乏味无聊的 工作 adj.枯燥的；不鲜明的；迟钝的；萧条的">chores</span> <span class="w" data-s="30577" data-e="30748">before</span> <span class="w" data-s="30791" data-e="31047">noon,</span> <span class="w" data-s="31303" data-e="31857">then</span> <span class="w" data-s="31900" data-e="32113">work</span> <span class="w" data-s="32156" data-e="32327">on</span> <span class="w" data-s="32369" data-e="32455">her</span> <span class="w" data-s="32497" data-e="32625">own</span> <span class="w" data-s="32668" data-e="32881">project.</span></p><p class="zh">她的方案很简单：中午前干完家务，然后做自己的事。</p></div>
+<div class="pair" data-s0="33265" data-s1="37745"><p class="en"><span class="w" data-s="33265" data-e="33991">She</span> <span class="w" data-s="34033" data-e="34204">wrote</span> <span class="w" data-s="34247" data-e="34375">it</span> <span class="w" data-s="34417" data-e="34460">on</span> <span class="w" data-s="34503" data-e="34588">the</span> <span class="w" data-s="34631" data-e="34716">first</span> <span class="w" data-s="34759" data-e="34972">page</span> <span class="w" data-s="35015" data-e="35185">of</span> <span class="w" data-s="35228" data-e="35313">her</span> <span class="w target" data-s="35356" data-e="35697" title="(会议的)议程表，议事日程">agenda</span> <span class="w" data-s="35740" data-e="35996">and</span> <span class="w" data-s="36124" data-e="36508">turned</span> <span class="w" data-s="36551" data-e="36721">it</span> <span class="w" data-s="36764" data-e="36935">into</span> <span class="w" data-s="36977" data-e="37105">a</span> <span class="w" data-s="37148" data-e="37276">daily</span> <span class="w target" data-s="37319" data-e="37745" title="常规；日常工作；例行程序">routine.</span></p><p class="zh">她把它写在记事本的第一页上，慢慢变成了一种日常习惯。</p></div>
+<div class="pair" data-s0="37959" data-s1="40775"><p class="en"><span class="w" data-s="37959" data-e="38556">Her</span> <span class="w" data-s="38599" data-e="39025">project</span> <span class="w" data-s="39068" data-e="39367">was</span> <span class="w" data-s="39409" data-e="39537">the</span> <span class="w" data-s="39580" data-e="39708">old</span> <span class="w" data-s="39751" data-e="40092">barn</span> <span class="w" data-s="40135" data-e="40391">behind</span> <span class="w" data-s="40433" data-e="40647">the</span> <span class="w" data-s="40689" data-e="40775">house.</span></p><p class="zh">她的项目是屋后的旧谷仓。</p></div>
+<div class="pair" data-s0="41589" data-s1="45771"><p class="en"><span class="w" data-s="41589" data-e="41717">She</span> <span class="w" data-s="41760" data-e="41931">walked</span> <span class="w" data-s="41973" data-e="42187">through</span> <span class="w" data-s="42229" data-e="42357">the</span> <span class="w" data-s="42400" data-e="42613">narrow</span> <span class="w target" data-s="42656" data-e="43040" title="通过;通路，通道；文章">passage</span> <span class="w" data-s="43083" data-e="43211">at</span> <span class="w" data-s="43253" data-e="43339">the</span> <span class="w" data-s="43381" data-e="43424">back</span> <span class="w" data-s="43467" data-e="43723">and</span> <span class="w" data-s="43765" data-e="44320">studied</span> <span class="w" data-s="44363" data-e="44448">the</span> <span class="w target" data-s="44491" data-e="44917" title="内部adj.内部的">interior</span> <span class="w" data-s="44960" data-e="45131">and</span> <span class="w" data-s="45173" data-e="45259">the</span> <span class="w target" data-s="45301" data-e="45771" title="外部，表面 adj.外部的，外在的；表面的">exterior.</span></p><p class="zh">她穿过后面那条窄窄的通道，仔细看了看里面和外面。</p></div>
+<div class="pair" data-s0="45984" data-s1="50123"><p class="en"><span class="w" data-s="45984" data-e="46539">The</span> <span class="w target" data-s="46624" data-e="47051" title="外部的">external</span> <span class="w" data-s="47093" data-e="47349">walls</span> <span class="w" data-s="47392" data-e="47563">were</span> <span class="w" data-s="47605" data-e="47861">grey</span> <span class="w" data-s="47904" data-e="48032">stone;</span> <span class="w" data-s="48373" data-e="48800">the</span> <span class="w target" data-s="48843" data-e="49184" title="内部的；内政的；国内的">internal</span> <span class="w" data-s="49227" data-e="49568">walls</span> <span class="w" data-s="49611" data-e="49696">were</span> <span class="w" data-s="49739" data-e="49867">dark</span> <span class="w" data-s="49909" data-e="50123">wood.</span></p><p class="zh">外墙是灰色的石头，内墙是深色的木头。</p></div>
+<div class="pair" data-s0="50464" data-s1="53877"><p class="en"><span class="w" data-s="50464" data-e="50592">She</span> <span class="w" data-s="50635" data-e="50805">worked</span> <span class="w" data-s="50848" data-e="51061">for</span> <span class="w" data-s="51104" data-e="51232">the</span> <span class="w target" data-s="51275" data-e="51445" title="本地人 adj. 地方性的,当地的">local</span> <span class="w" data-s="51488" data-e="51701">paper,</span> <span class="w" data-s="52000" data-e="52171">a</span> <span class="w" data-s="52341" data-e="52512">small</span> <span class="w target" data-s="52555" data-e="52939" title="中等的；中号的n. (传播信息的)媒介， 手段，方法；工具">medium</span> <span class="w" data-s="52981" data-e="53152">with</span> <span class="w" data-s="53195" data-e="53280">a</span> <span class="w" data-s="53323" data-e="53408">young</span> <span class="w" data-s="53451" data-e="53877">readership.</span></p><p class="zh">她给当地一家报纸干活，那是一家面向年轻读者的小媒体。</p></div>
+<div class="pair" data-s0="54655" data-s1="59604"><p class="en"><span class="w" data-s="54655" data-e="54740">Her</span> <span class="w" data-s="54783" data-e="55380">photographs</span> <span class="w" data-s="55423" data-e="55551">were</span> <span class="w" data-s="55593" data-e="55807">only</span> <span class="w" data-s="55849" data-e="56063">of</span> <span class="w target" data-s="56105" data-e="56617" title="中等的，中间的，中级的n. 中级学生">intermediate</span> <span class="w" data-s="56660" data-e="56831">quality</span> <span class="w" data-s="56873" data-e="57257">then,</span> <span class="w" data-s="57428" data-e="57556">and</span> <span class="w" data-s="57897" data-e="58025">the</span> <span class="w target" data-s="58068" data-e="58153" title="大众传播媒介，大众传播工具(指电视、广播、 报纸、互联网）">media</span> <span class="w" data-s="58196" data-e="58495">paid</span> <span class="w" data-s="58537" data-e="58751">little</span> <span class="w" data-s="58793" data-e="59092">attention</span> <span class="w" data-s="59135" data-e="59391">to</span> <span class="w" data-s="59433" data-e="59604">her.</span></p><p class="zh">那时她的照片只算中等水平，媒体几乎没注意过她。</p></div>
+<div class="pair" data-s0="59732" data-s1="62804"><p class="en"><span class="w" data-s="59732" data-e="60329">Still,</span> <span class="w" data-s="60543" data-e="60671">she</span> <span class="w" data-s="60969" data-e="61140">had</span> <span class="w" data-s="61183" data-e="61268">to</span> <span class="w target" data-s="61311" data-e="61567" title="探明；定位；位于">locate</span> <span class="w" data-s="61609" data-e="61737">a</span> <span class="w" data-s="61780" data-e="61823">good</span> <span class="w target" data-s="61865" data-e="62079" title="使坐落在 n. 位置">site</span> <span class="w" data-s="62121" data-e="62335">for</span> <span class="w" data-s="62377" data-e="62463">a</span> <span class="w" data-s="62505" data-e="62804">studio.</span></p><p class="zh">不过，她得先给摄影棚找一个好位置。</p></div>
+<div class="pair" data-s0="63416" data-s1="68792"><p class="en"><span class="w" data-s="63416" data-e="63544">She</span> <span class="w" data-s="63586" data-e="63800">decided</span> <span class="w" data-s="63842" data-e="64141">to</span> <span class="w target" data-s="64184" data-e="64568" title="分配，调拨">allocate</span> <span class="w" data-s="64610" data-e="64738">half</span> <span class="w" data-s="64781" data-e="64994">her</span> <span class="w" data-s="65037" data-e="65378">savings</span> <span class="w" data-s="65421" data-e="65506">to</span> <span class="w" data-s="65549" data-e="65634">the</span> <span class="w" data-s="65677" data-e="65890">roof</span> <span class="w" data-s="65933" data-e="66232">and</span> <span class="w" data-s="66616" data-e="66744">to</span> <span class="w target" data-s="66786" data-e="67128" title="位于；将……置于使坐落于；处于(某种)状况">situate</span> <span class="w" data-s="67170" data-e="67298">the</span> <span class="w" data-s="67341" data-e="67682">darkroom</span> <span class="w" data-s="67725" data-e="67896">in</span> <span class="w" data-s="67938" data-e="67981">the</span> <span class="w" data-s="68024" data-e="68152">corner</span> <span class="w" data-s="68194" data-e="68493">near</span> <span class="w" data-s="68536" data-e="68664">the</span> <span class="w" data-s="68706" data-e="68792">window.</span></p><p class="zh">她决定把一半积蓄分给屋顶，把暗房安置在靠窗的角落。</p></div>
+<div class="pair" data-s0="69090" data-s1="73357"><p class="en"><span class="w" data-s="69090" data-e="69901">When</span> <span class="w" data-s="69944" data-e="70072">she</span> <span class="w" data-s="70114" data-e="70626">photographed</span> <span class="w" data-s="70669" data-e="70754">the</span> <span class="w" data-s="70797" data-e="71096">farmers,</span> <span class="w" data-s="71266" data-e="71736">she</span> <span class="w" data-s="71778" data-e="71992">asked</span> <span class="w" data-s="72034" data-e="72248">them</span> <span class="w" data-s="72290" data-e="72418">to</span> <span class="w target" data-s="72461" data-e="72632" title="(为画像、拍照等摆的)姿势 v. 摆姿势；造成；引起 (083)">pose</span> <span class="w" data-s="72674" data-e="72930">among</span> <span class="w" data-s="72973" data-e="73101">the</span> <span class="w" data-s="73144" data-e="73357">rice.</span></p><p class="zh">给农民拍照时，她请他们站在稻田里摆姿势。</p></div>
+<div class="pair" data-s0="73613" data-s1="77752"><p class="en"><span class="w" data-s="73613" data-e="73698">She</span> <span class="w" data-s="73741" data-e="74125">corrected</span> <span class="w" data-s="74168" data-e="74296">their</span> <span class="w target" data-s="74338" data-e="74722" title="姿势，态度；立场">posture,</span> <span class="w" data-s="74893" data-e="75106">then</span> <span class="w" data-s="75362" data-e="75576">bent</span> <span class="w" data-s="75618" data-e="75789">down</span> <span class="w" data-s="75832" data-e="76130">to</span> <span class="w target" data-s="76173" data-e="76472" title="(使)暴露，(使)显露；使接触；揭露；曝光">expose</span> <span class="w" data-s="76514" data-e="76728">the</span> <span class="w" data-s="76770" data-e="76898">film</span> <span class="w" data-s="76941" data-e="77197">to</span> <span class="w" data-s="77240" data-e="77325">the</span> <span class="w" data-s="77368" data-e="77453">morning</span> <span class="w" data-s="77496" data-e="77752">light.</span></p><p class="zh">她纠正他们的姿态，然后蹲下去，让胶片在晨光中曝光。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">harvest</span>
+          <span class="ipa">/&#x27;ha:rvist/</span>
+          <span class="pos"></span>
+          <span class="cn">收获，成果 v. 收割；采集</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every October, the harvest brought the whole valley together.</div>          <div class="mnem"><span class="lbl">记</span>harv 想成 have 有，est 想成最 高级，有最多的东西，那就是“收获”的时候啊。</div>          <div class="root"><span class="lbl">根</span>源自古英语 hærfest(秋季) → 秋季收割 → 收获</div>          <div class="zt"><span class="lbl">真题</span>Prices typically returned to normal with the next harvest. 价格通常会在下一次收获时 恢复正常。(2016)</div>          <div class="fam"><span class="lbl">族</span>harvester n. 收割机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">yield</span>
+          <span class="ipa">/ji:1d/</span>
+          <span class="pos">n.</span>
+          <span class="cn">产量 v. 出产；屈服</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The yield from those small fields was never large</div>          <div class="mnem"><span class="lbl">记</span>爷爷(yi)老的(eld)。爷爷很老 了，还在种庄稼，“生产”粮食。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：yield a good crop 出产好庄稼 → 产量；屈服</div>          <div class="zt"><span class="lbl">真题</span>Their food yields have begun to decrease sharply in recent years. 近年来，他们的粮食产 量已开始急剧下降。</div>          <div class="fam"><span class="lbl">族</span>yielding adj. 顺从的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">mature</span>
+          <span class="ipa">/mə&#x27;t∫ur/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">成熟的，成年的；技艺精湛的 v. 成熟， 成长</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>By the time the rice was mature</div>          <div class="mnem"><span class="lbl">记</span>妈妈（ma）真的（ture）成熟了。 一个女人只有当了母亲才真正“成熟”了。</div>          <div class="root"><span class="lbl">根</span>拉丁 maturus(成熟的，及时的) → 成熟</div>          <div class="zt"><span class="lbl">真题</span>He has been teaching for sixteen years, and is able to think and speak like a mature adult.他已经从教16年了，能够像一个成熟的 成年人一样思考和说话了。</div>          <div class="fam"><span class="lbl">族</span>maturity n. 成熟 / immature adj. 不成熟的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">plough</span>
+          <span class="ipa">/plau/</span>
+          <span class="pos">n.</span>
+          <span class="cn">犁 v. 犁,耕</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the farmers had already ploughed the next field</div>          <div class="mnem"><span class="lbl">记</span>一个趴（p）在那的老人（lough 的谐音），在“耕地”。 只有当你成功了，你才会发现 第四单元 整个世界都对你和颜悦色！</div>          <div class="root"><span class="lbl">根</span>靠搭配记：plough the field 犁地 → 犁</div>          <div class="zt"><span class="lbl">真题</span>Land currently ploughed up for crops might be able to revert (回返) to forest or wilderness. 目前用来种植的土地可能会恢复为 森林或荒野。</div>          <div class="fam"><span class="lbl">族</span>ploughman n. 耕田的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">dominant</span>
+          <span class="ipa">/&#x27;da:minənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">首要的；占支配地位的；(基因)显性的；优 势的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Farming was still the dominant way of life in the village.</div>          <div class="mnem"><span class="lbl">记</span>domin（词根，表示“主人”）+ ant(“……的”)→有统治权的→首要的；占支配 地位的。</div>          <div class="root"><span class="lbl">根</span>domin(主人、支配) + ant(……的) → 有支配权的</div>          <div class="zt"><span class="lbl">真题</span>It is playing a dominant role in the film market.它在电影市场上发挥着主导作用。 (2013)</div>          <div class="fam"><span class="lbl">族</span>dominate v. 支配 / dominance n. 优势</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">domestic</span>
+          <span class="ipa">/də&#x27;mestık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">家庭的;本国的n. 家庭矛盾</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>were endless domestic chores</div>          <div class="root"><span class="lbl">根</span>dom(家，拉丁 domus) + estic → 家里的</div>          <div class="zt"><span class="lbl">真题</span>To lower domestic food prices, some countries limited or stopped their grain exports. 为了降低国内食品价格，一些国家限制或停止 了粮食出口。(2016)</div>          <div class="fam"><span class="lbl">族</span>domesticate v. 驯养 / domesticity n. 家庭生活</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">chore</span>
+          <span class="ipa">/t∫ə:r/</span>
+          <span class="pos">n.</span>
+          <span class="cn">家庭杂务；日常事务；例行工作；乏味无聊的 工作 adj.枯燥的；不鲜明的；迟钝的；萧条的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>endless domestic chores</div>          <div class="mnem"><span class="lbl">记</span>读了(du)两本(11想成两本)书， 都不感兴趣→枯燥的。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：do the chores 做家务 → 家庭杂务</div>          <div class="zt"><span class="lbl">真题</span>Well-functioning machines relieve them of dull tasks or repetitive processes. 运行良好 的机器可以减轻他们枯燥的任务或重复的过程。</div>          <div class="fam"><span class="lbl">族</span>chores n.(复数) 家务活</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">dull</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They were dull and tedious</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a dull day 无聊的一天 → 枯燥的</div>          <div class="fam"><span class="lbl">族</span>dullness n. 枯燥 / dullard n. 愚钝的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">dumb</span>
+          <span class="ipa">/d^m/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">愚蠢的;哑的;无言的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they made anyone feel dumb</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：du(毒)十mb(面 包，拼音首字母缩写)→吃了毒面包变成了哑巴 →哑的，无言的。</div>          <div class="root"><span class="lbl">根</span>古英语 dumb(说不出话) → 哑的 → 愚蠢的</div>          <div class="fam"><span class="lbl">族</span>dumbly adv. 无言地 / dumbness n. 哑</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">tedious</span>
+          <span class="ipa">/&#x27;ti:diəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">单调的,乏味的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They were dull and tedious</div>          <div class="mnem"><span class="lbl">记</span>发音类似：踢地而死。→这部 电影冗长乏味到让人踢地而死→乏味的。</div>          <div class="root"><span class="lbl">根</span>tedi(厌烦，拉丁 taedium) + ous(……的) → 令人厌烦的</div>          <div class="zt"><span class="lbl">真题</span>It was a hard and tedious job. 它是一项 艰苦而乏味的工作。(2020)</div>          <div class="fam"><span class="lbl">族</span>tedium n. 乏味 / tediously adv. 冗长地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">schedule</span>
+          <span class="ipa">/&#x27;sked3u:l/</span>
+          <span class="pos">n.</span>
+          <span class="cn">工作计划；日程安排；(公共汽车、火车等的) 时间表；(价目、费用等的)清单，一览表 v. 安排，预定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>So Li Wei made a schedule.</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：死(s)车(che)堵 (du)了(le)，耽误了我们的“日程安排”。</div>          <div class="root"><span class="lbl">根</span>源自拉丁 schedula(小纸片) → 写在纸片上的 → 日程表</div>          <div class="zt"><span class="lbl">真题</span>The notion that as parents we need to schedule every minute of their time is not doing them a great service. 作为父母，我们需要 安排他们每一分钟的时间，这种想法对他们没 有什么好处。(2020)</div>          <div class="fam"><span class="lbl">族</span>scheduled adj. 预定的 / reschedule v. 重新安排</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">scheme</span>
+          <span class="ipa">/ski:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">计划；方案；阴谋</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her scheme was simple</div>          <div class="mnem"><span class="lbl">记</span>把s想象成一个s型美女，那就 是我爱上了一个美女，为了追求她，我(me)计划 躲到美女(s)的车里(che 是车的汉语拼音)，这 是我的“计划；阴谋”。结果美女(s)在车里发现 了我，我的计划被识破了。</div>          <div class="root"><span class="lbl">根</span>源自希腊 schema(形状、安排) → 计划、方案</div>          <div class="zt"><span class="lbl">真题</span>Universities want the government to introduce a loan scheme for tuition fees. 大学 希望政府推出一项学费贷款计划。</div>          <div class="fam"><span class="lbl">族</span>schemer n. 阴谋家 / schematic adj. 纲要的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">agenda</span>
+          <span class="ipa">/ə&#x27;dzendə/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(会议的)议程表，议事日程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She wrote it on the first page of her agenda</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以拆成：a（一）十 gen(发音似“件”)+da(大)，连在一起就是“一 件大(事)”，大事当然要放在自己的日程表上→ 议程表，议事日程。</div>          <div class="root"><span class="lbl">根</span>ag(做) + enda(复数词尾) → 要做的事 → 议事日程</div>          <div class="fam"><span class="lbl">族</span>agent n. 代理人 / agency n. 机构</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">routine</span>
+          <span class="ipa">/ru:&#x27;ti:n/</span>
+          <span class="pos"></span>
+          <span class="cn">常规；日常工作；例行程序</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>turned it into a daily routine</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“路听”。 很多老板行程比较满，在路上听秘书说下一个 例行安排→日常工作。</div>          <div class="root"><span class="lbl">根</span>route(路线) + ine → 老走同一条路 → 例行公事</div>          <div class="zt"><span class="lbl">真题</span>What they found was that it wasn&#x27;t breakfast itself that caused the participants to lose weight: it was changing their normal routine.他们发现，并不是早餐本身导致了参与 者的体重减轻，而是改变了他们的日常生活导 致的。(2019)</div>          <div class="fam"><span class="lbl">族</span>routinely adv. 例行地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">passage</span>
+          <span class="ipa">/&#x27;pæsid3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">通过;通路，通道；文章</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She walked through the narrow passage at the back</div>          <div class="mnem"><span class="lbl">记</span>pass(通过)这个动词我们很熟 悉，passage是它的名词：通过，通道。</div>          <div class="root"><span class="lbl">根</span>pass(通过) + age(名词后缀) → 通过；通道</div>          <div class="zt"><span class="lbl">真题</span>We can conclude from the passage that romantic love is becoming increasingly important in family relationships. 从文章中我们可以得出 结论，浪漫的爱情在家庭关系中变得越来越重 要。(2013)</div>          <div class="fam"><span class="lbl">族</span>pass v. 通过 / passenger n. 乘客</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">interior</span>
+          <span class="ipa">/ın&#x27;triər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">内部adj.内部的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>studied the interior and the exterior</div>          <div class="root"><span class="lbl">根</span>inter(在……内) + ior(比较级) → 更靠里的 → 内部</div>          <div class="zt"><span class="lbl">真题</span>But our primary concern is to deliver an interior that maximizes comfort to create a pleasant environment.但我们主要关心的是提 供一个最大限度地令人感到舒适的内部环境， 以创造一种愉快的氛围。</div>          <div class="fam"><span class="lbl">族</span>interiorly adv. 在内部</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">exterior</span>
+          <span class="ipa">/ık&#x27;stiəriə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">外部，表面 adj.外部的，外在的；表面的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>studied the interior and the exterior</div>          <div class="root"><span class="lbl">根</span>exter(外面) + ior(比较级) → 更靠外的 → 外部</div>          <div class="zt"><span class="lbl">真题</span>Online office workers posted photos and videos of the raccoon, resting on window edges and climbing up the building&#x27;s concrete exterior. 办公室工作人员在网上发布了这只浣熊的照片 和视频，它在窗户边休息，还爬上了大楼的混凝 土外墙。(2019)</div>          <div class="fam"><span class="lbl">族</span>exteriorly adv. 在外部</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">external</span>
+          <span class="ipa">/ık&#x27;st3:rnl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">外部的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The external walls were grey stone</div>          <div class="root"><span class="lbl">根</span>extern(外面) + al(……的) → 外部的</div>          <div class="zt"><span class="lbl">真题</span>What is the response of many educators to external rewards for their students? 许 多教 育工作者对学生获得外部奖励的反应是 什么？</div>          <div class="fam"><span class="lbl">族</span>externally adv. 外部地 / externalize v. 使外化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">internal</span>
+          <span class="ipa">/ın&#x27;t3:rnl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">内部的；内政的；国内的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the internal walls were dark wood</div>          <div class="root"><span class="lbl">根</span>intern(里面) + al(……的) → 内部的</div>          <div class="zt"><span class="lbl">真题</span>She was on an internal flight from London to Manchester. 她在从伦敦到曼彻斯特 的国内航班上。</div>          <div class="fam"><span class="lbl">族</span>internally adv. 内部地 / internalize v. 使内化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">media</span>
+          <span class="ipa">/&#x27;mi:diə/</span>
+          <span class="pos"></span>
+          <span class="cn">大众传播媒介，大众传播工具(指电视、广播、 报纸、互联网）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the media paid little attention to her</div>          <div class="root"><span class="lbl">根</span>medi(中间) + a(复数) → 中间传话的东西 → 媒体</div>          <div class="zt"><span class="lbl">真题</span>Many more people with HSAM started to contact researchers due to the mass media. (082) 由于大众媒体的影响，越来越多的超强记忆症 患者开始联系研究人员。(2017)</div>          <div class="fam"><span class="lbl">族</span>medium n. 媒介 / mediate v. 调解</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">medium</span>
+          <span class="ipa">/&#x27;mi:diəm/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">中等的；中号的n. (传播信息的)媒介， 手段，方法；工具</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small medium with a young readership</div>          <div class="mnem"><span class="lbl">记</span>首字母(m)我们太熟悉了：s小 码；m中码；1大码。所以该单词就是“中号的”。</div>          <div class="root"><span class="lbl">根</span>medi(中间) + um → 中间的那个 → 中等的；媒介</div>          <div class="zt"><span class="lbl">真题</span>How you deal with and manage those emotions dictates short, medium and long term trading performance and success. 你如何 处理和管理那些情绪决定短期、中期和长期的 交易业绩和成功。</div>          <div class="fam"><span class="lbl">族</span>media n. 媒体 / mediate v. 调解</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">intermediate</span>
+          <span class="ipa">/ntər&#x27;mi:diət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">中等的，中间的，中级的n. 中级学生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her photographs were only of intermediate quality then</div>          <div class="mnem"><span class="lbl">记</span>inter(中间的)+media(媒体， 媒介)+te→在中间的媒体，不是很差的，也不 是很好的媒体→中等的，中级的。</div>          <div class="root"><span class="lbl">根</span>inter(在……之间) + medi(中间) + ate → 处在中间的</div>          <div class="zt"><span class="lbl">真题</span>Fewer than half of Americans say they cook at an intermediate level and only 20% describe their cooking skills as advanced. 不到 一半的美国人说他们的烹饪水平是中级的，只 有20%的人说他们的烹饪技能是高级的。</div>          <div class="fam"><span class="lbl">族</span>intermediately adv. 居中地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">local</span>
+          <span class="ipa">/&#x27;ləukl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">本地人 adj. 地方性的,当地的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She worked for the local paper</div>          <div class="root"><span class="lbl">根</span>loc(地方) + al(……的) → 地方的、当地的</div>          <div class="zt"><span class="lbl">真题</span>In his spare time, he visited the local art galleries, and the paintings are now lodged deep in his autobiographical memories. 在业余 时间，他参观了当地的艺术画廊，这些画现在深 深地留在了他的自传记忆中。(2017)</div>          <div class="fam"><span class="lbl">族</span>locate v. 定位 / locality n. 地区</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">locate</span>
+          <span class="ipa">/ləu&#x27;keit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">探明；定位；位于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Still, she had to locate a good site for a studio.</div>          <div class="mnem"><span class="lbl">记</span>lo想成“姥姥”，cate读成“剋 第四单元 他”，也就是姥姥要打他，得先找到他啊，“定位” 他的位置。</div>          <div class="root"><span class="lbl">根</span>loc(地方) + ate(动词后缀) → 找到地方 → 定位</div>          <div class="zt"><span class="lbl">真题</span>Some of the world&#x27;s most innovative companies are located here. 世界上一些最具创 新性的公司都坐落在这里。(2020)</div>          <div class="fam"><span class="lbl">族</span>location n. 位置 / local adj. 当地的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">allocate</span>
+          <span class="ipa">/&#x27;æləkeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">分配，调拨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She decided to allocate half her savings to the roof</div>          <div class="mnem"><span class="lbl">记</span>一再地（al)确定位置(locate)，</div>          <div class="root"><span class="lbl">根</span>al(一再) + locate(定位) → 一再确定给谁 → 分配</div>          <div class="fam"><span class="lbl">族</span>allocation n. 分配 / allocator n. 分配者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">site</span>
+          <span class="ipa">/sait/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使坐落在 n. 位置</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>locate a good site for a studio</div>          <div class="mnem"><span class="lbl">记</span>单词的前三个字母是“sit”，就 是“坐，位于”→使坐落在。</div>          <div class="root"><span class="lbl">根</span>拉丁 situs(位置) → 位置 → 使坐落在</div>          <div class="zt"><span class="lbl">真题</span>It is an old city with many sites of historical interest.它是一座有许多名胜古迹的 古城。(2015)</div>          <div class="fam"><span class="lbl">族</span>situate v. 使位于 / situation n. 情况</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">situate</span>
+          <span class="ipa">/&#x27;sit∫ueit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">位于；将……置于使坐落于；处于(某种)状况</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to situate the darkroom in the corner</div>          <div class="mnem"><span class="lbl">记</span>这个单词让我们立刻想到 situation(情况，形势，位置)，situate就是它的 动词→位于，将……置于。</div>          <div class="root"><span class="lbl">根</span>situ(位置) + ate → 使处于某位置 → 位于</div>          <div class="zt"><span class="lbl">真题</span>The test site was situated in southwestern New Mexico. 该试验场位于新墨西哥州西 南部。</div>          <div class="fam"><span class="lbl">族</span>situation n. 情况 / situated adj. 位于……的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">pose</span>
+          <span class="ipa">/pəz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(为画像、拍照等摆的)姿势 v. 摆姿势；造成；引起 (083)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she asked them to pose among the rice</div>          <div class="root"><span class="lbl">根</span>源自拉丁 ponere(放) → 摆好放着 → 姿势</div>          <div class="zt"><span class="lbl">真题</span>It poses a great challenge for customers to do math. 对客户来说算数是一项很大的挑 战。(2016)</div>          <div class="fam"><span class="lbl">族</span>position n. 位置 / posture n. 姿势</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">posture</span>
+          <span class="ipa">/&#x27;ppst∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">姿势，态度；立场</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She corrected their posture</div>          <div class="mnem"><span class="lbl">记</span>post 摆放，posture 就是它的名 词，姿势。</div>          <div class="root"><span class="lbl">根</span>pos(放) + ture → 身体摆放的样子 → 姿势</div>          <div class="fam"><span class="lbl">族</span>pose v. 摆姿势 / postural adj. 姿势的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">expose</span>
+          <span class="ipa">/ık&#x27;spəuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)暴露，(使)显露；使接触；揭露；曝光</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>bent down to expose the film to the morning light</div>          <div class="mnem"><span class="lbl">记</span>ex(出)十pose(放，放置)，连在 一起就是“往外放”，把一个东西往外放→曝光。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + pose(放) → 往外放 → 暴露、曝光</div>          <div class="zt"><span class="lbl">真题</span>Or they may wish to expose their children to another culture, and the opportunity to learn a second language. 或者，他们可能希望让 孩子接触另一种文化，并有机会学习第二语言。</div>          <div class="fam"><span class="lbl">族</span>exposure n. 暴露 / exposition n. 阐释</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3~4 · Day 21</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

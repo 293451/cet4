@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 24 · The Notebook in the Cabinet</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 24 · 11/5 · Unit 4 第 691-720 词</div>
+  <h1>The Notebook in the Cabinet<span class="cn">柜子里的那本笔记</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-24.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4224"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">old</span> <span class="w target" data-s="341" data-e="725" title="小木屋;机舱；客舱">cabin</span> <span class="w" data-s="768" data-e="981">stood</span> <span class="w" data-s="1024" data-e="1195">at</span> <span class="w" data-s="1237" data-e="1323">the</span> <span class="w" data-s="1365" data-e="1451">edge</span> <span class="w" data-s="1493" data-e="1579">of</span> <span class="w" data-s="1621" data-e="1664">the</span> <span class="w" data-s="1707" data-e="1920">village,</span> <span class="w" data-s="2091" data-e="2773">beside</span> <span class="w" data-s="2816" data-e="2944">a</span> <span class="w" data-s="2987" data-e="3072">field</span> <span class="w" data-s="3115" data-e="3456">where</span> <span class="w target" data-s="3499" data-e="3797" title="">cattle</span> <span class="w" data-s="3840" data-e="4224">grazed.</span></p><p class="zh">那间旧小木屋立在村子的边上，旁边是一片放牛的草地。</p></div>
+<div class="pair" data-s0="4480" data-s1="11136"><p class="en"><span class="w" data-s="4480" data-e="5461">Inside,</span> <span class="w" data-s="5760" data-e="5931">a</span> <span class="w" data-s="6144" data-e="6443">wooden</span> <span class="w target" data-s="6485" data-e="6869" title="内阁；储藏柜，陈列柜">cabinet</span> <span class="w" data-s="6912" data-e="7040">held</span> <span class="w" data-s="7083" data-e="7296">twenty</span> <span class="w" data-s="7339" data-e="7595">years</span> <span class="w" data-s="7637" data-e="7808">of</span> <span class="w" data-s="7851" data-e="8107">letters,</span> <span class="w" data-s="8277" data-e="8533">and</span> <span class="w" data-s="8576" data-e="9003">a</span> <span class="w" data-s="9045" data-e="9131">thick</span> <span class="w target" data-s="9173" data-e="9600" title="缆绳，电缆；电报，网线">cable</span> <span class="w" data-s="9643" data-e="9813">ran</span> <span class="w" data-s="9856" data-e="10112">from</span> <span class="w" data-s="10155" data-e="10240">the</span> <span class="w" data-s="10283" data-e="10453">roof</span> <span class="w" data-s="10496" data-e="10667">down</span> <span class="w" data-s="10709" data-e="10880">to</span> <span class="w" data-s="10923" data-e="11008">the</span> <span class="w" data-s="11051" data-e="11136">road.</span></p><p class="zh">屋里有一个木柜子，装着二十年的信件；一根粗电缆从屋顶一直拉到路边。</p></div>
+<div class="pair" data-s0="11741" data-s1="14472"><p class="en"><span class="w" data-s="11741" data-e="11869">In</span> <span class="w" data-s="11912" data-e="11997">the</span> <span class="w" data-s="12040" data-e="12168">square</span> <span class="w" data-s="12210" data-e="12509">there</span> <span class="w" data-s="12552" data-e="12680">was</span> <span class="w" data-s="12722" data-e="12808">a</span> <span class="w" data-s="12850" data-e="13021">stone</span> <span class="w target" data-s="13064" data-e="13576" title="雕像，雕塑">statue</span> <span class="w" data-s="13618" data-e="13746">of</span> <span class="w" data-s="13789" data-e="14130">Nora&#x27;s</span> <span class="w" data-s="14173" data-e="14472">grandfather.</span></p><p class="zh">广场上有一尊诺拉祖父的石像。</p></div>
+<div class="pair" data-s0="14813" data-s1="18013"><p class="en"><span class="w" data-s="14813" data-e="15026">A</span> <span class="w target" data-s="15453" data-e="15794" title="十年，十年期">decade</span> <span class="w" data-s="15837" data-e="16008">ago</span> <span class="w" data-s="16050" data-e="16306">he</span> <span class="w" data-s="16349" data-e="16520">had</span> <span class="w" data-s="16562" data-e="16605">been</span> <span class="w" data-s="16648" data-e="16690">a</span> <span class="w" data-s="16733" data-e="16818">man</span> <span class="w" data-s="16861" data-e="17032">of</span> <span class="w" data-s="17074" data-e="17160">high</span> <span class="w target" data-s="17202" data-e="17629" title="法律地位(或身份);地位；职位">status</span> <span class="w" data-s="17672" data-e="17757">in</span> <span class="w" data-s="17800" data-e="17842">the</span> <span class="w" data-s="17885" data-e="18013">town.</span></p><p class="zh">十年前，他是镇上地位很高的人。</p></div>
+<div class="pair" data-s0="18269" data-s1="23176"><p class="en"><span class="w" data-s="18269" data-e="18738">In</span> <span class="w target" data-s="18909" data-e="19208" title="先前的，以往的；(时间上)稍前的">previous</span> <span class="w" data-s="19250" data-e="19592">years,</span> <span class="w" data-s="19848" data-e="20146">and</span> <span class="w" data-s="20189" data-e="20360">even</span> <span class="w target" data-s="20402" data-e="20616" title="先前的；较早的；优先的；较重要的">prior</span> <span class="w" data-s="20658" data-e="20872">to</span> <span class="w" data-s="20914" data-e="21042">that,</span> <span class="w" data-s="21256" data-e="21469">his</span> <span class="w" data-s="21640" data-e="21938">first</span> <span class="w target" data-s="21981" data-e="22493" title="优先，优先权；优先事项">priority</span> <span class="w" data-s="22536" data-e="22706">had</span> <span class="w" data-s="22749" data-e="22877">been</span> <span class="w" data-s="22920" data-e="23005">the</span> <span class="w" data-s="23048" data-e="23176">school.</span></p><p class="zh">在以前那些年里，甚至更早的时候，他的头等大事一直是学校。</p></div>
+<div class="pair" data-s0="23560" data-s1="25224"><p class="en"><span class="w" data-s="23560" data-e="23645">He</span> <span class="w" data-s="23688" data-e="23816">had</span> <span class="w" data-s="23858" data-e="24072">fought</span> <span class="w" data-s="24114" data-e="24242">for</span> <span class="w target" data-s="24285" data-e="24669" title="自由">liberty</span> <span class="w" data-s="24712" data-e="24797">all</span> <span class="w" data-s="24840" data-e="25010">his</span> <span class="w" data-s="25053" data-e="25224">life.</span></p><p class="zh">他一生都在为自由而战。</p></div>
+<div class="pair" data-s0="26107" data-s1="30672"><p class="en"><span class="w" data-s="26107" data-e="26235">He</span> <span class="w" data-s="26277" data-e="26491">helped</span> <span class="w target" data-s="26533" data-e="26917" title="使自由；解放；使摆脱约束(或限制)">liberate</span> <span class="w" data-s="26960" data-e="27088">the</span> <span class="w" data-s="27131" data-e="27387">village</span> <span class="w" data-s="27429" data-e="27557">from</span> <span class="w" data-s="27600" data-e="27728">a</span> <span class="w" data-s="27771" data-e="27856">bad</span> <span class="w" data-s="27899" data-e="28411">landlord,</span> <span class="w" data-s="28581" data-e="28752">and</span> <span class="w" data-s="28880" data-e="29179">every</span> <span class="w" data-s="29221" data-e="29435">choice</span> <span class="w" data-s="29477" data-e="29691">he</span> <span class="w" data-s="29733" data-e="29861">made</span> <span class="w" data-s="29904" data-e="30160">was</span> <span class="w target" data-s="30203" data-e="30672" title="故意的；深思熟虑的 v. 仔细考虑，深思 熟虑">deliberate.</span></p><p class="zh">他帮着把村子从坏地主手里解放出来，他做的每一个选择都是深思熟虑的。</p></div>
+<div class="pair" data-s0="30843" data-s1="32891"><p class="en"><span class="w" data-s="30843" data-e="31525">Nora</span> <span class="w" data-s="31568" data-e="31696">found</span> <span class="w" data-s="31739" data-e="31909">a</span> <span class="w" data-s="31952" data-e="32208">notebook</span> <span class="w" data-s="32251" data-e="32379">in</span> <span class="w" data-s="32421" data-e="32507">the</span> <span class="w target" data-s="32549" data-e="32891" title="内阁；储藏柜，陈列柜">cabinet.</span></p><p class="zh">诺拉在柜子里找到了一本笔记本。</p></div>
+<div class="pair" data-s0="33061" data-s1="34981"><p class="en"><span class="w" data-s="33061" data-e="33488">The</span> <span class="w target" data-s="33531" data-e="33701" title="作家，作者">author</span> <span class="w" data-s="33744" data-e="34000">was</span> <span class="w" data-s="34043" data-e="34171">her</span> <span class="w" data-s="34213" data-e="34597">grandfather</span> <span class="w" data-s="34640" data-e="34981">himself.</span></p><p class="zh">作者就是她祖父本人。</p></div>
+<div class="pair" data-s0="35365" data-s1="37413"><p class="en"><span class="w" data-s="35365" data-e="35792">The</span> <span class="w" data-s="35920" data-e="36048">town</span> <span class="w target" data-s="36091" data-e="36517" title="专家，权威人士；权威，威信；许可，授权；当 局，官方">authority</span> <span class="w" data-s="36560" data-e="36773">had</span> <span class="w" data-s="36816" data-e="36987">never</span> <span class="w" data-s="37029" data-e="37243">read</span> <span class="w" data-s="37285" data-e="37413">it.</span></p><p class="zh">镇上的官方从来没有读过它。</p></div>
+<div class="pair" data-s0="38060" data-s1="42583"><p class="en"><span class="w" data-s="38060" data-e="38231">The</span> <span class="w" data-s="38274" data-e="38487">pages</span> <span class="w" data-s="38530" data-e="38700">were</span> <span class="w target" data-s="38743" data-e="39170" title="真正的，真实的；可靠的">authentic</span> <span class="w" data-s="39212" data-e="39383">and</span> <span class="w target" data-s="39426" data-e="39852" title="真正的;真诚的，真挚的">genuine,</span> <span class="w" data-s="39938" data-e="40108">and</span> <span class="w" data-s="40364" data-e="40620">inside</span> <span class="w" data-s="40663" data-e="40919">them</span> <span class="w" data-s="40962" data-e="41132">was</span> <span class="w" data-s="41175" data-e="41260">the</span> <span class="w" data-s="41303" data-e="41431">mind</span> <span class="w" data-s="41474" data-e="41730">of</span> <span class="w" data-s="41772" data-e="41815">a</span> <span class="w" data-s="41858" data-e="41986">quiet</span> <span class="w target" data-s="42028" data-e="42583" title="天才；天资，天赋；(特别的)才能，本领">genius.</span></p><p class="zh">那些纸页是真实而真挚的，里面装着一颗安静的天才的心。</p></div>
+<div class="pair" data-s0="42796" data-s1="46124"><p class="en"><span class="w" data-s="42796" data-e="43436">Her</span> <span class="w" data-s="43479" data-e="43650">own</span> <span class="w" data-s="43692" data-e="43906">writing,</span> <span class="w" data-s="44119" data-e="44332">she</span> <span class="w" data-s="44418" data-e="44631">felt,</span> <span class="w" data-s="44844" data-e="44972">was</span> <span class="w target" data-s="45228" data-e="45740" title="劣等的；下级的；差的">inferior</span> <span class="w" data-s="45783" data-e="45996">to</span> <span class="w" data-s="46039" data-e="46124">his.</span></p><p class="zh">她觉得自己的文字比不上他的。</p></div>
+<div class="pair" data-s0="46903" data-s1="52407"><p class="en"><span class="w" data-s="46903" data-e="47031">But</span> <span class="w" data-s="47073" data-e="47201">his</span> <span class="w" data-s="47244" data-e="47457">style</span> <span class="w" data-s="47500" data-e="47756">was</span> <span class="w target" data-s="47799" data-e="48311" title="级别(或地位、职位)更高的人，上级，上司 adj. 更高级的；更好的">superior,</span> <span class="w" data-s="48481" data-e="48780">its</span> <span class="w target" data-s="49036" data-e="49804" title="优势；优越性">superiority</span> <span class="w" data-s="49847" data-e="49932">was</span> <span class="w" data-s="49975" data-e="50188">clear,</span> <span class="w" data-s="50487" data-e="50700">and</span> <span class="w" data-s="51041" data-e="51127">a</span> <span class="w" data-s="51169" data-e="51255">few</span> <span class="w" data-s="51297" data-e="51596">pages</span> <span class="w" data-s="51639" data-e="51895">were</span> <span class="w target" data-s="51937" data-e="52407" title="极佳的，卓越的；质量极高的">superb.</span></p><p class="zh">但他的风格更胜一筹，他的优越之处一望而知，还有几页写得极为精彩。</p></div>
+<div class="pair" data-s0="52620" data-s1="54455"><p class="en"><span class="w" data-s="52620" data-e="53217">Still,</span> <span class="w" data-s="53388" data-e="53559">no</span> <span class="w" data-s="53729" data-e="53900">one</span> <span class="w" data-s="53943" data-e="54028">is</span> <span class="w target" data-s="54071" data-e="54455" title="最高的，至高无上的；最大的">supreme.</span></p><p class="zh">不过，没有人是至高无上的。</p></div>
+<div class="pair" data-s0="54668" data-s1="57057"><p class="en"><span class="w" data-s="54668" data-e="55095">She</span> <span class="w" data-s="55137" data-e="55308">wanted</span> <span class="w" data-s="55351" data-e="55564">the</span> <span class="w" data-s="55607" data-e="55692">whole</span> <span class="w target" data-s="55735" data-e="56076" title="街坊，四邻；街道；附近地区，邻近">community</span> <span class="w" data-s="56119" data-e="56375">to</span> <span class="w" data-s="56417" data-e="56588">read</span> <span class="w" data-s="56631" data-e="56759">the</span> <span class="w" data-s="56801" data-e="57057">notebook.</span></p><p class="zh">她想让整个社区都读到这本笔记。</p></div>
+<div class="pair" data-s0="57571" data-s1="62307"><p class="en"><span class="w" data-s="57571" data-e="57656">The</span> <span class="w" data-s="57699" data-e="57997">nearest</span> <span class="w target" data-s="58040" data-e="58723" title="电信；电讯">telecommunications</span> <span class="w" data-s="58765" data-e="59320">tower</span> <span class="w" data-s="59363" data-e="59533">stood</span> <span class="w" data-s="59576" data-e="59832">two</span> <span class="w target" data-s="59875" data-e="60173" title="木块，块；街区；障碍物v.妨碍，阻塞">blocks</span> <span class="w" data-s="60216" data-e="60429">away,</span> <span class="w" data-s="60685" data-e="60941">so</span> <span class="w" data-s="61197" data-e="61368">she</span> <span class="w" data-s="61411" data-e="61539">put</span> <span class="w" data-s="61581" data-e="61709">the</span> <span class="w" data-s="61752" data-e="61965">pages</span> <span class="w" data-s="62008" data-e="62307">online.</span></p><p class="zh">最近的电信塔就在两个街区外，于是她把那些纸页放到了网上。</p></div>
+<div class="pair" data-s0="62691" data-s1="65165"><p class="en"><span class="w" data-s="62691" data-e="62947">Her</span> <span class="w" data-s="63288" data-e="63672">neighbours</span> <span class="w" data-s="63715" data-e="63843">were</span> <span class="w target" data-s="63885" data-e="64312" title="好交际的;友善的">sociable</span> <span class="w" data-s="64355" data-e="64611">and</span> <span class="w target" data-s="64739" data-e="65165" title="悠闲的；随和的；不慌不忙的">easy-going.</span></p><p class="zh">她的邻居们好交际又随和。</p></div>
+<div class="pair" data-s0="65549" data-s1="70840"><p class="en"><span class="w" data-s="65549" data-e="65677">They</span> <span class="w" data-s="65720" data-e="65848">began</span> <span class="w" data-s="65891" data-e="66147">to</span> <span class="w target" data-s="66189" data-e="66659" title="联想；联系；交往 n. 同事；伙伴；合伙人">associate</span> <span class="w" data-s="66701" data-e="66915">the</span> <span class="w" data-s="66957" data-e="67043">old</span> <span class="w" data-s="67085" data-e="67256">man</span> <span class="w" data-s="67299" data-e="67512">with</span> <span class="w" data-s="67555" data-e="67640">the</span> <span class="w" data-s="67683" data-e="67768">town</span> <span class="w" data-s="67811" data-e="68024">again,</span> <span class="w" data-s="68195" data-e="68365">and</span> <span class="w" data-s="68707" data-e="68835">the</span> <span class="w" data-s="68877" data-e="69133">friendship</span> <span class="w" data-s="69176" data-e="69389">between</span> <span class="w" data-s="69432" data-e="69816">Nora</span> <span class="w" data-s="69859" data-e="69987">and</span> <span class="w" data-s="70029" data-e="70115">the</span> <span class="w" data-s="70157" data-e="70328">village</span> <span class="w" data-s="70371" data-e="70499">was</span> <span class="w target" data-s="70541" data-e="70840" title="互相的，彼此的">mutual.</span></p><p class="zh">他们又开始把这位老人和这座小镇联系在一起，诺拉和村子之间的情谊是相互的。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">cabinet</span>
+          <span class="ipa">/&#x27;kæbinət/</span>
+          <span class="pos">n.</span>
+          <span class="cn">内阁；储藏柜，陈列柜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a wooden cabinet held twenty years of letters</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“开杯奶他”， 他从“储藏柜”里开杯奶。</div>          <div class="root"><span class="lbl">根</span>cabin(小屋) + et(小) → 小屋子一样的柜子 → 橱柜、内阁</div>          <div class="zt"><span class="lbl">真题</span>They are fond of sleeping in cabinets. 他 们喜欢睡在橱柜里。(2018)</div>          <div class="fam"><span class="lbl">族</span>cabinetmaker n. 家具木匠</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">cabin</span>
+          <span class="ipa">/&#x27;kæbın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">小木屋;机舱；客舱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old cabin stood at the edge of the village</div>          <div class="mnem"><span class="lbl">记</span>ca(想成 car 车)十 bin(箱)，由 车箱联想到轮船的客舱，小木屋。</div>          <div class="root"><span class="lbl">根</span>源自拉丁 capanna(小屋) → 小木屋、客舱</div>          <div class="zt"><span class="lbl">真题</span>The lower oxygen pressure found in an aircraft cabin is equivalent to that at 6000~8000 feet of altitude. 飞机机舱的氧气压较低，等同 于海拔 6000～8000 英尺的气压。(2019)</div>          <div class="fam"><span class="lbl">族</span>cabinet n. 橱柜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">cable</span>
+          <span class="ipa">/&#x27;keıbl/</span>
+          <span class="pos"></span>
+          <span class="cn">缆绳，电缆；电报，网线</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a thick cable ran from the roof down to the road</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：可以（ca）包 (ble)。“电缆”可以用橡胶包。</div>          <div class="root"><span class="lbl">根</span>源自拉丁 capulum(绳索) → 粗绳 → 电缆</div>          <div class="zt"><span class="lbl">真题</span>The development of fiber-optic(光 纤) cables allowed for billions of bits of information to be received every minute. 光纤电缆的发展使得 每分钟可以接收数十亿比特的信息。(2017)</div>          <div class="fam"><span class="lbl">族</span>cabling n. 电缆系统</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">cattle</span>
+          <span class="ipa">/&#x27;kætl/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>beside a field where cattle grazed</div>          <div class="root"><span class="lbl">根</span>源自拉丁 capitale(财产) → 家里最值钱的牲口 → 牛</div>          <div class="zt"><span class="lbl">真题</span>However, raising cattle, pigs, and other land-based animals requires vast sums of grain and water. 然而，饲养牛、猪和其他陆地动物需 要大量的粮食和水。(2022)</div>          <div class="fam"><span class="lbl">族</span>cattleman n. 养牛人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">status</span>
+          <span class="ipa">/&#x27;steitəs/</span>
+          <span class="pos"></span>
+          <span class="cn">法律地位(或身份);地位；职位</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he had been a man of high status in the town</div>          <div class="mnem"><span class="lbl">记</span>单词分成两部分：stat想成国家 state，us我们。在我们国家，我们的地位都是平 等的，所以该单词意为“地位”。</div>          <div class="root"><span class="lbl">根</span>stat(站，拉丁 stare) + us → 站在什么位置 → 地位</div>          <div class="zt"><span class="lbl">真题</span>People&#x27;s earnings are closely related to people&#x27;s social status. 人们的收入与其社会地 位密切相关。</div>          <div class="fam"><span class="lbl">族</span>statute n. 法规 / static adj. 静止的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">statue</span>
+          <span class="ipa">/&#x27;stæt∫u:/</span>
+          <span class="pos"></span>
+          <span class="cn">雕像，雕塑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was a stone statue of Nora&#x27;s grandfather</div>          <div class="root"><span class="lbl">根</span>stat(站) + ue → 站着不动的像 → 雕像</div>          <div class="fam"><span class="lbl">族</span>statuette n. 小雕像</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">liberty</span>
+          <span class="ipa">/&#x27;libərti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">自由</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had fought for liberty all his life.</div>          <div class="mnem"><span class="lbl">记</span>liber发音类似“隶搏”。奴隶拼 搏为自由啊，ty名词后缀，表状态→自由。</div>          <div class="root"><span class="lbl">根</span>liber(自由，拉丁 liber) + ty(名词后缀) → 自由</div>          <div class="fam"><span class="lbl">族</span>liberate v. 解放 / liberal adj. 自由的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">liberate</span>
+          <span class="ipa">/&#x27;libəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使自由；解放；使摆脱约束(或限制)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He helped liberate the village from a bad landlord</div>          <div class="root"><span class="lbl">根</span>liber(自由) + ate(动词后缀) → 使自由 → 解放</div>          <div class="fam"><span class="lbl">族</span>liberty n. 自由 / liberation n. 解放</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">deliberate</span>
+          <span class="ipa">/dr&#x27;libərət, dr&#x27;libəreit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">故意的；深思熟虑的 v. 仔细考虑，深思 熟虑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every choice he made was deliberate</div>          <div class="mnem"><span class="lbl">记</span>liber发音类似“隶搏”。奴隶拼 搏为“自由”啊。de(弟)+liber(自由)十ate(后 缀)→弟弟真想要自由还是不想要？当然想要 啊，所以该单词的意思是“故意的”。</div>          <div class="root"><span class="lbl">根</span>de(加强) + liber(衡量) + ate → 反复掂量 → 深思熟虑的</div>          <div class="zt"><span class="lbl">真题</span>To see if there was a deliberate cover-up of the problem. 看看是否有人故意掩盖问题。</div>          <div class="fam"><span class="lbl">族</span>deliberation n. 深思</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">decade</span>
+          <span class="ipa">/&#x27;dekeıd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">十年，十年期</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A decade ago he had been a man of high status</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：弟弟(de)剋的 (cade)。小时候弟弟在你脸上抓了一个伤痕 “十年”后才消失。</div>          <div class="root"><span class="lbl">根</span>dec(十，希腊 deka) + ade → 十年</div>          <div class="zt"><span class="lbl">真题</span>Over the past three decades, the industry has made some efforts to improve the quality of its offerings. 在过去的 30 年里，该行业已经 做出了一些努力来提高其产品的质量。(2016)</div>          <div class="fam"><span class="lbl">族</span>decadal adj. 十年一度的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">author</span>
+          <span class="ipa">/&#x27;o:0ə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">作家，作者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The author was her grandfather himself.</div>          <div class="root"><span class="lbl">根</span>auth(增长、创始) + or(人) → 创造东西的人 → 作者</div>          <div class="zt"><span class="lbl">真题</span>The criticism the author received from his mother changed him as a person. 作者从母 亲那里受到的批评改变了他的为人。(2015) 例 The author did not understand the importance of giving until he was in late thirties. 作者直到 快40岁时才明白给予的重要性。</div>          <div class="fam"><span class="lbl">族</span>authorship n. 著作权</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">authority</span>
+          <span class="ipa">/ə&#x27;θ:rəti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">专家，权威人士；权威，威信；许可，授权；当 局，官方</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The town authority had never read it.</div>          <div class="root"><span class="lbl">根</span>author(创始者) + ity(名词后缀) → 有创立之权 → 权威</div>          <div class="zt"><span class="lbl">真题</span>In 1862 Congress authorized two western railroad companies to build lines. 1862 年，国会 授权两家西部铁路公司建设线路。</div>          <div class="fam"><span class="lbl">族</span>authorize v. 授权 / authoritative adj. 权威的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">authentic</span>
+          <span class="ipa">/&#x27;θentik/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">真正的，真实的；可靠的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The pages were authentic and genuine</div>          <div class="mnem"><span class="lbl">记</span>这个单词的前半部分想成 author(作者)，作者的思想才是“可靠的”。</div>          <div class="root"><span class="lbl">根</span>auth(创始者) + entic → 出自本人之手 → 真正的</div>          <div class="zt"><span class="lbl">真题</span>But sharing our experiences in an authentic way to connect with other people is what makes us interesting. 但是以一种真实的 方式分享我们的经历以便与他人建立联系，可 以让我们变得有趣。(2021)</div>          <div class="fam"><span class="lbl">族</span>authenticity n. 真实性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">genuine</span>
+          <span class="ipa">/&#x27;dzenjuin/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">真正的;真诚的，真挚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The pages were authentic and genuine</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：姐牛。姐姐 很牛，那姐姐就是“真正的”牛。</div>          <div class="root"><span class="lbl">根</span>genu(出生，拉丁 gignere) + ine → 天生就有的 → 真正的</div>          <div class="zt"><span class="lbl">真题</span>It may prevent people from developing a genuine sense of community. 它可能会阻碍人 们形成真正的社区意识。</div>          <div class="fam"><span class="lbl">族</span>genuinely adv. 真正地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">genius</span>
+          <span class="ipa">/&#x27;dzi:niəs/</span>
+          <span class="pos"></span>
+          <span class="cn">天才；天资，天赋；(特别的)才能，本领</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>inside them was the mind of a quiet genius</div>          <div class="mnem"><span class="lbl">记</span>发音类似：哥哥(ge)牛死(nius) 了。哥哥怎么那么牛呢？别人弄不好的东西， 哥哥瞬间搞定→天才。</div>          <div class="root"><span class="lbl">根</span>gen(生) + ius → 与生俱来的才能 → 天才</div>          <div class="zt"><span class="lbl">真题</span>I had heard that genius could show itself at an early age. 我听说天赋在很小的时候就能 表现出来。</div>          <div class="fam"><span class="lbl">族</span>ingenious adj. 巧妙的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">previous</span>
+          <span class="ipa">/&#x27;pri:viəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">先前的，以往的；(时间上)稍前的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In previous years</div>          <div class="mnem"><span class="lbl">记</span>pre表示在前面的，vi想象成 vip(重要的人)，ous形容词后缀。你以前也是示人的后缀)→上司，上级。 (093) 第四单元 个大v啊，说明你现在已经没落了→先前的。</div>          <div class="root"><span class="lbl">根</span>pre(前) + vi(路) + ous(……的) → 前一段路上的 → 先前的</div>          <div class="zt"><span class="lbl">真题</span>The majority of previous research has focused on how we learn and remember new information.大部分之前的研究侧重于我们如 何学习和记忆新信息。(2017)</div>          <div class="fam"><span class="lbl">族</span>previously adv. 先前</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">prior</span>
+          <span class="ipa">/&#x27;praiər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">先前的；较早的；优先的；较重要的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>even prior to that</div>          <div class="root"><span class="lbl">根</span>pri(前，拉丁 prior) + or → 更在前的 → 先前的</div>          <div class="zt"><span class="lbl">真题</span>Prior to the new study, little was known about the risks of getting directly infected by common respiratory viruses. 在这项新研究之 前，人们对直接感染普通呼吸道病毒的风险知 之甚少。(2019)</div>          <div class="fam"><span class="lbl">族</span>priority n. 优先事项</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">priority</span>
+          <span class="ipa">/prai&#x27;orəti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">优先，优先权；优先事项</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his first priority had been the school</div>          <div class="mnem"><span class="lbl">记</span>pri(优先的，在前的)+or(表示 人的后缀)+ity(名词后缀)→你前面的那个人 就是优先于你的人→优先，优先权。</div>          <div class="root"><span class="lbl">根</span>prior(在前的) + ity(名词后缀) → 排在前面的 → 优先事项</div>          <div class="zt"><span class="lbl">真题</span>After mail service stops due to weather, the agency&#x27;s top priority is ensuring that employees are safe.因天气原因暂停邮件服务 后，该机构的首要任务是确保员工的安全。</div>          <div class="fam"><span class="lbl">族</span>prioritize v. 优先处理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">inferior</span>
+          <span class="ipa">/ın&#x27;fiəriə(r)/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">劣等的；下级的；差的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was inferior to his</div>          <div class="mnem"><span class="lbl">记</span>里面(in)是废的(fer的谐音)， 一个人内在是废的，那就是“差的，劣等的”。</div>          <div class="root"><span class="lbl">根</span>infer(下面的，拉丁 inferus) + ior(比较级) → 更下面的 → 较差的</div>          <div class="zt"><span class="lbl">真题</span>Brain scientists call this effect “asymmetric dominance&quot; and it means that people gravitate toward the choice nearest a clearly inferior option. 大脑科学家称这种效应为“不对称优 势”，它意味着人们会倾向于选择最接近明显较 差的选项。</div>          <div class="fam"><span class="lbl">族</span>inferiority n. 劣势</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">superior</span>
+          <span class="ipa">/su:&#x27;pıriər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">级别(或地位、职位)更高的人，上级，上司 adj. 更高级的；更好的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>But his style was superior</div>          <div class="mnem"><span class="lbl">记</span>超越(super)你的那个人(or表</div>          <div class="root"><span class="lbl">根</span>super(在上面) + ior(比较级) → 更上面的 → 更好的；上级</div>          <div class="zt"><span class="lbl">真题</span>They feel superior in science and technology. 他们觉得自己在科学技术上有优 势.(2017)</div>          <div class="fam"><span class="lbl">族</span>superiority n. 优势</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">superiority</span>
+          <span class="ipa">/su:piərı&#x27;prəti/</span>
+          <span class="pos"></span>
+          <span class="cn">优势；优越性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>its superiority was clear</div>          <div class="mnem"><span class="lbl">记</span>super(超越)十i(我)十or(表示 人的后缀)十ity(名词后缀)→超越别人的东西 就是自己的优势→优势；优越性。</div>          <div class="root"><span class="lbl">根</span>superior(更好的) + ity(名词后缀) → 更好的程度 → 优势</div>          <div class="fam"><span class="lbl">族</span>superior adj. 更好的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">superb</span>
+          <span class="ipa">/su:&#x27;p3:b/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">极佳的，卓越的；质量极高的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a few pages were superb</div>          <div class="mnem"><span class="lbl">记</span>super 超越，b 读成汉语拼音的 “不”，那单词解释为“不能再超越了”，意思就是 “极好的，卓越的”。</div>          <div class="root"><span class="lbl">根</span>super(超越) + b → 不能再超越 → 极佳的</div>          <div class="fam"><span class="lbl">族</span>superbly adv. 极好地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">supreme</span>
+          <span class="ipa">/su:&#x27;pri:m/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">最高的，至高无上的；最大的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Still, no one is supreme.</div>          <div class="mnem"><span class="lbl">记</span>supre 想成 super(超越)，me 我，就是超越了自己。人一旦连自己都能超越， 就是“至高无上的，最高的”。</div>          <div class="root"><span class="lbl">根</span>supre(超越，拉丁 supremus) + me → 超越一切 → 最高的</div>          <div class="zt"><span class="lbl">真题</span>The Supreme Court has delivered its opinion in a controversial case. 最高法院对一 个有争议的案件发表了意见。</div>          <div class="fam"><span class="lbl">族</span>supremacy n. 至高无上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">mutual</span>
+          <span class="ipa">/&#x27;mju:t∫uəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">互相的，彼此的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the friendship between Nora and the village was mutual</div>          <div class="root"><span class="lbl">根</span>mut(改变、交换) + ual(……的) → 互相交换的 → 相互的</div>          <div class="zt"><span class="lbl">真题</span>They shared mutual friends in school. 他 们在学校有共同的朋友。(2015)</div>          <div class="fam"><span class="lbl">族</span>mutually adv. 互相地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">telecommunications</span>
+          <span class="ipa">/telikəmju:nı&#x27;ker∫nz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">电信；电讯</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The nearest telecommunications tower stood two blocks away</div>          <div class="root"><span class="lbl">根</span>tele(远) + communications(通信) → 远距离通信 → 电信</div>          <div class="zt"><span class="lbl">真题</span>Mobile telecommunications capacity is expected to double in Shanghai this year. 今年， 上海的移动通信容量预计将翻一番。</div>          <div class="fam"><span class="lbl">族</span>telecommunication n. 电信</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">community</span>
+          <span class="ipa">/kə&#x27;mju:nəti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">街坊，四邻；街道；附近地区，邻近</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She wanted the whole community to read the notebook.</div>          <div class="mnem"><span class="lbl">记</span>communication n. 表达，交流； 交际；传递；通信。交流一般都在一个“群体”中 进行。 neighbourhood（美 neighborhood） /&#x27;neibəhud/</div>          <div class="root"><span class="lbl">根</span>com(共同) + mun(服务) + ity → 一起生活的人 → 社区</div>          <div class="zt"><span class="lbl">真题</span>You can walk in parks or along a river or in your neighborhood. 你可以在公园里、河边或 附近地区散步。 例 She was called the Lark in the neighborhood. 她在附近被称为百灵鸟。</div>          <div class="fam"><span class="lbl">族</span>commune n. 公社 / communal adj. 公共的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">block</span>
+          <span class="ipa">/blpk/</span>
+          <span class="pos">n.</span>
+          <span class="cn">木块，块；街区；障碍物v.妨碍，阻塞</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>two blocks away</div>          <div class="mnem"><span class="lbl">记</span>可以结合 clock(时钟)来记这个 单词，街上(block)的时钟(clock)不(b)准了。</div>          <div class="root"><span class="lbl">根</span>与 clock 一起记：街上(block)的钟(clock)不准了 → 街区、阻塞</div>          <div class="zt"><span class="lbl">真题</span>Japan says fear of disease is its main reason to block fresh imports. 日本表示，对疾 病的恐惧是阻止新鲜进口的主要原因。(2018) 例 The key to our room is attached to a large plastic block with the room number on it. 我们 房间的钥匙系在一块写着房间号的大塑料 块上。 例 It&#x27;s only a couple blocks away. 它离这里只 有几个街区。</div>          <div class="fam"><span class="lbl">族</span>blockage n. 堵塞</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">associate</span>
+          <span class="ipa">/ə&#x27;səusieit, ə&#x27;səusiət/</span>
+          <span class="pos">v.</span>
+          <span class="cn">联想；联系；交往 n. 同事；伙伴；合伙人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They began to associate the old man with the town again</div>          <div class="mnem"><span class="lbl">记</span>NBA 全 称就 是：National Basketball Association.</div>          <div class="root"><span class="lbl">根</span>as(向) + soci(同伴) + ate → 结成同伴 → 联系；同事</div>          <div class="zt"><span class="lbl">真题</span>Blue is associated with the positive (094) qualities of trust, efficiency, quietness, coolness, reflection and calm、蓝色与信任、效率、安静、沉 着、反思和冷静等积极的品质有关。</div>          <div class="fam"><span class="lbl">族</span>association n. 协会 / associated adj. 相关的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">sociable</span>
+          <span class="ipa">/&#x27;səu∫əbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">好交际的;友善的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her neighbours were sociable and easy-going.</div>          <div class="root"><span class="lbl">根</span>soci(同伴) + able(能) → 能跟人做伴的 → 好交际的</div>          <div class="zt"><span class="lbl">真题</span>Being sociable looks like a good way to add years to your life. 善于交际似乎是延长寿 命的好方法。(2010)</div>          <div class="fam"><span class="lbl">族</span>social adj. 社会的 / society n. 社会</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">easy-going</span>
+          <span class="ipa">/izi&#x27;gəuı/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">悠闲的；随和的；不慌不忙的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her neighbours were sociable and easy-going.</div>          <div class="root"><span class="lbl">根</span>easy(轻松) + going(走) → 走路都慢悠悠的 → 随和的</div>          <div class="zt"><span class="lbl">真题</span>Frankly, Mary is not what I&#x27;d call “easy- going”.坦率地说，玛丽不是我称为“随和 的”人。</div>          <div class="fam"><span class="lbl">族</span>easy adj. 容易的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4 · Day 24</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

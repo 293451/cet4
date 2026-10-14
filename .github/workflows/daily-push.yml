@@ -40,12 +40,11 @@ jobs:
             python build/push_web.py
           fi
 
-      # 让仓库保持「活跃」，避免 GitHub 在 60 天无活动后自动禁用定时任务
+      # 让仓库保持「活跃」，避免 GitHub 在 60 天无活动后自动禁用定时任务。
+      # 用空提交，不产生文件，也就不和 .gitignore 打架。
       - name: 保活
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          date -u +"%Y-%m-%d %H:%M UTC" > .last_push
-          git add .last_push
-          git diff --quiet --cached || git commit -m "chore: 保活 $(date -u +%Y-%m-%d)"
+          git commit --allow-empty -m "chore: 每日保活 $(date -u +%Y-%m-%d)"
           git push

@@ -23,6 +23,7 @@ def _strip(w: str) -> str:
 
 
 def match(token: str, targets: list[dict]):
+    """与 render.py 的 match_target 保持一致（选最优而非最先）"""
     t = re.sub(r"[^a-z]", "", token.lower())
     if len(t) < 3:
         return None
@@ -30,21 +31,25 @@ def match(token: str, targets: list[dict]):
         if re.sub(r"[^a-z]", "", w["w"].lower()) == t:
             return w
     t_stem = _strip(t).replace("i", "y")
+    best, best_score = None, -1
     for w in targets:
         base = re.sub(r"[^a-z]", "", w["w"].lower())
         if len(base) < 3:
             continue
-        if _strip(base).replace("i", "y") == t_stem or base.replace("i", "y") == t_stem:
-            return w
-    for w in targets:
-        base = re.sub(r"[^a-z]", "", w["w"].lower())
-        if len(base) < 3:
-            continue
-        b = _strip(base).replace("i", "y")
-        a, bb = (t_stem, b) if len(t_stem) <= len(b) else (b, t_stem)
-        if len(a) >= 4 and bb.startswith(a) and len(bb) - len(a) <= 4:
-            return w
-    return None
+        b_fold = base.replace("i", "y")
+        b_stem = _strip(base).replace("i", "y")
+        score = -1
+        if b_stem == t_stem or b_fold == t_stem:
+            score = 100 - abs(len(base) - len(t))
+        elif b_fold == t.replace("i", "y"):
+            score = 95 - abs(len(base) - len(t))
+        else:
+            a, b = (t_stem, b_stem) if len(t_stem) <= len(b_stem) else (b_stem, t_stem)
+            if len(a) >= 4 and b.startswith(a) and len(b) - len(a) <= 4:
+                score = 50 - (len(b) - len(a))
+        if score > best_score:
+            best, best_score = w, score
+    return best
 
 
 days = sorted(p.name.split("-")[1] for p in (ROOT / "content").glob("day-*"))
@@ -61,7 +66,11 @@ for d in days:
     h = hp.read_text(encoding="utf-8")
     data = json.loads((ROOT / "content" / f"day-{d}" / "words.json").read_text(encoding="utf-8"))
 
-    ws = re.findall(r'class="w(?: target)?"[^>]*>([^<]+)<', h)
+    # ⚠️ 必须反转义：HTML 里的 &quot; / &#x27; 是渲染时 escape 的产物，
+    # 不还原就会拿到 'collapse.&quot;' 这种脏文本，导致误判为「未覆盖」。
+    import html as _html
+
+    ws = [_html.unescape(x) for x in re.findall(r'class="w(?: target)?"[^>]*>([^<]+)<', h)]
     hit = set()
     for x in ws:
         m = match(x, data["words"])

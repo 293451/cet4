@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 16 · The Museum Above the Harbour</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 16 · 10/28 · Unit 3 第 451-480 词</div>
+  <h1>The Museum Above the Harbour<span class="cn">海港上的博物馆</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-16.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5163"><p class="en"><span class="w" data-s="43" data-e="341">Omar</span> <span class="w" data-s="384" data-e="555">once</span> <span class="w" data-s="597" data-e="811">served</span> <span class="w" data-s="853" data-e="1067">on</span> <span class="w" data-s="1109" data-e="1195">a</span> <span class="w target" data-s="1237" data-e="1621" title="潜水艇 adj. 海底的，海平面下的">submarine,</span> <span class="w" data-s="1792" data-e="2005">and</span> <span class="w" data-s="2219" data-e="2347">he</span> <span class="w" data-s="2389" data-e="2475">can</span> <span class="w" data-s="2517" data-e="2645">still</span> <span class="w target" data-s="2688" data-e="3029" title="">recall</span> <span class="w" data-s="3072" data-e="3285">the</span> <span class="w" data-s="3328" data-e="3456">cold,</span> <span class="w" data-s="3755" data-e="4011">dark</span> <span class="w" data-s="4053" data-e="4352">water</span> <span class="w" data-s="4395" data-e="4693">of</span> <span class="w" data-s="4736" data-e="4779">the</span> <span class="w" data-s="4821" data-e="4907">deep</span> <span class="w" data-s="4949" data-e="5163">sea.</span></p><p class="zh">奥马尔曾在潜艇上服役，他至今还能想起深海那冰冷黑暗的海水。</p></div>
+<div class="pair" data-s0="5504" data-s1="11648"><p class="en"><span class="w" data-s="5504" data-e="5632">When</span> <span class="w" data-s="5675" data-e="5803">the</span> <span class="w" data-s="5845" data-e="5888">boat</span> <span class="w" data-s="5931" data-e="6101">had</span> <span class="w" data-s="6144" data-e="6272">to</span> <span class="w target" data-s="6315" data-e="6699" title="淹没；掩盖；使沉浸于">submerge,</span> <span class="w" data-s="6869" data-e="7296">the</span> <span class="w" data-s="7339" data-e="7467">whole</span> <span class="w" data-s="7509" data-e="7808">crew</span> <span class="w" data-s="7851" data-e="8021">held</span> <span class="w" data-s="8064" data-e="8235">their</span> <span class="w" data-s="8277" data-e="8405">breath;</span> <span class="w" data-s="8789" data-e="9472">minutes</span> <span class="w" data-s="9515" data-e="9771">later</span> <span class="w" data-s="9813" data-e="10155">it</span> <span class="w" data-s="10197" data-e="10453">would</span> <span class="w target" data-s="10496" data-e="10752" title="浮现；出现；兴起">emerge</span> <span class="w" data-s="10795" data-e="10965">again</span> <span class="w" data-s="11008" data-e="11264">into</span> <span class="w" data-s="11307" data-e="11477">the</span> <span class="w" data-s="11520" data-e="11648">light.</span></p><p class="zh">当潜艇必须下潜时，全船人都屏住呼吸；几分钟后，它又会浮出水面，重见天光。</p></div>
+<div class="pair" data-s0="11861" data-s1="16171"><p class="en"><span class="w" data-s="11861" data-e="12544">One</span> <span class="w" data-s="12587" data-e="12843">night</span> <span class="w" data-s="12885" data-e="13184">a</span> <span class="w" data-s="13227" data-e="13568">pipe</span> <span class="w" data-s="13611" data-e="13781">broke,</span> <span class="w" data-s="13995" data-e="14336">and</span> <span class="w" data-s="14379" data-e="14549">the</span> <span class="w" data-s="14592" data-e="14848">captain</span> <span class="w" data-s="14891" data-e="15019">called</span> <span class="w" data-s="15061" data-e="15232">it</span> <span class="w" data-s="15275" data-e="15403">an</span> <span class="w target" data-s="15445" data-e="16171" title="紧急情况，非常时刻">emergency.</span></p><p class="zh">一天夜里，一根管子爆了，船长说这是紧急情况。</p></div>
+<div class="pair" data-s0="17116" data-s1="21340"><p class="en"><span class="w" data-s="17116" data-e="17202">That</span> <span class="w" data-s="17244" data-e="17415">was</span> <span class="w" data-s="17458" data-e="17543">the</span> <span class="w" data-s="17586" data-e="17671">year</span> <span class="w" data-s="17714" data-e="18055">Omar</span> <span class="w" data-s="18098" data-e="18268">began</span> <span class="w" data-s="18311" data-e="18482">to</span> <span class="w" data-s="18524" data-e="18652">love</span> <span class="w target" data-s="18695" data-e="19036" title="海洋的;海产的；海事的">marine</span> <span class="w" data-s="19079" data-e="19250">life,</span> <span class="w" data-s="19506" data-e="19719">and</span> <span class="w" data-s="19847" data-e="19932">he</span> <span class="w" data-s="19975" data-e="20103">wrote</span> <span class="w" data-s="20146" data-e="20231">it</span> <span class="w" data-s="20274" data-e="20359">all</span> <span class="w" data-s="20402" data-e="20530">in</span> <span class="w" data-s="20572" data-e="20615">a</span> <span class="w" data-s="20658" data-e="20786">small</span> <span class="w target" data-s="20828" data-e="21170" title="备忘录">memo</span> <span class="w" data-s="21212" data-e="21340">book.</span></p><p class="zh">就是那一年，奥马尔开始爱上海洋生物，并把一切都写进一本小备忘录里。</p></div>
+<div class="pair" data-s0="21596" data-s1="25692"><p class="en"><span class="w" data-s="21596" data-e="22066">Today</span> <span class="w" data-s="22108" data-e="22279">he</span> <span class="w" data-s="22322" data-e="22535">runs</span> <span class="w" data-s="22578" data-e="22620">a</span> <span class="w" data-s="22663" data-e="22748">tiny</span> <span class="w" data-s="22791" data-e="23303">museum</span> <span class="w" data-s="23346" data-e="23474">on</span> <span class="w" data-s="23516" data-e="23559">the</span> <span class="w" data-s="23602" data-e="23815">coast,</span> <span class="w" data-s="24028" data-e="24370">and</span> <span class="w" data-s="24412" data-e="24583">every</span> <span class="w target" data-s="24626" data-e="25095" title="(一件)展览品，陈列品；(在法庭上出示的)物 证，证据.展览；展出；表现，显出(感情、品质 或能力)">exhibit</span> <span class="w" data-s="25138" data-e="25308">tells</span> <span class="w" data-s="25351" data-e="25479">a</span> <span class="w" data-s="25522" data-e="25692">story.</span></p><p class="zh">如今他在海边经营一座小小的博物馆，每一件展品都有一段故事。</p></div>
+<div class="pair" data-s0="26076" data-s1="29319"><p class="en"><span class="w" data-s="26076" data-e="26162">He</span> <span class="w" data-s="26204" data-e="26418">likes</span> <span class="w" data-s="26460" data-e="26546">to</span> <span class="w target" data-s="26588" data-e="26844" title="&amp; v. 陈列；展览；表演；表现；(计算机屏幕上 的)显示">display</span> <span class="w" data-s="26887" data-e="27100">the</span> <span class="w" data-s="27143" data-e="27442">models</span> <span class="w" data-s="27484" data-e="27655">in</span> <span class="w" data-s="27698" data-e="27783">the</span> <span class="w" data-s="27826" data-e="27911">same</span> <span class="w" data-s="27954" data-e="28210">order</span> <span class="w" data-s="28252" data-e="28508">as</span> <span class="w" data-s="28551" data-e="28636">that</span> <span class="w" data-s="28679" data-e="28850">old</span> <span class="w" data-s="28892" data-e="29319">voyage.</span></p><p class="zh">他喜欢照那次航行的顺序来陈列模型。</p></div>
+<div class="pair" data-s0="30031" data-s1="32591"><p class="en"><span class="w" data-s="30031" data-e="30116">When</span> <span class="w" data-s="30159" data-e="30287">the</span> <span class="w" data-s="30329" data-e="30372">door</span> <span class="w" data-s="30415" data-e="30756">opens,</span> <span class="w" data-s="30884" data-e="31140">a</span> <span class="w target" data-s="31353" data-e="31695" title="微风;轻而易举的事">breeze</span> <span class="w" data-s="31737" data-e="31865">from</span> <span class="w" data-s="31908" data-e="31993">the</span> <span class="w" data-s="32036" data-e="32121">sea</span> <span class="w" data-s="32164" data-e="32377">comes</span> <span class="w" data-s="32420" data-e="32591">in.</span></p><p class="zh">门一开，海上的微风就吹了进来。</p></div>
+<div class="pair" data-s0="32804" data-s1="36601"><p class="en"><span class="w" data-s="32804" data-e="33316">In</span> <span class="w" data-s="33359" data-e="33529">winter</span> <span class="w" data-s="33572" data-e="33871">the</span> <span class="w" data-s="33913" data-e="34041">bay</span> <span class="w" data-s="34084" data-e="34169">will</span> <span class="w target" data-s="34212" data-e="34553" title="">freeze,</span> <span class="w" data-s="34724" data-e="34980">and</span> <span class="w" data-s="35108" data-e="35535">visitors</span> <span class="w target" data-s="35577" data-e="35919" title="&amp; n. 压；挤；捏 v.冻；冻结；使结冰 pk id iy of frozen food. 电视的普及导致了冷冻食品的 普及。(2015)">squeeze</span> <span class="w" data-s="35961" data-e="36089">past</span> <span class="w" data-s="36132" data-e="36388">one</span> <span class="w" data-s="36431" data-e="36601">another.</span></p><p class="zh">冬天海湾会结冰，游客们只能挤着互相错身。</p></div>
+<div class="pair" data-s0="36857" data-s1="38735"><p class="en"><span class="w" data-s="36857" data-e="37753">Children</span> <span class="w target" data-s="37796" data-e="38052" title="&amp;. v. 凝视；注视">gaze</span> <span class="w" data-s="38095" data-e="38223">at</span> <span class="w" data-s="38265" data-e="38308">the</span> <span class="w" data-s="38351" data-e="38436">model</span> <span class="w" data-s="38479" data-e="38735">boat.</span></p><p class="zh">孩子们会盯着那艘模型船看。</p></div>
+<div class="pair" data-s0="39384" data-s1="43181"><p class="en"><span class="w" data-s="39384" data-e="39597">Most</span> <span class="w" data-s="39640" data-e="39981">adults</span> <span class="w" data-s="40024" data-e="40194">only</span> <span class="w target" data-s="40237" data-e="40536" title="匆匆一看；一瞥 .瞥一眼；扫视">glance</span> <span class="w" data-s="40578" data-e="40706">at</span> <span class="w" data-s="40749" data-e="40920">it,</span> <span class="w" data-s="41048" data-e="41218">and</span> <span class="w" data-s="41304" data-e="41389">a</span> <span class="w" data-s="41432" data-e="41517">few</span> <span class="w" data-s="41560" data-e="41730">catch</span> <span class="w" data-s="41773" data-e="41901">a</span> <span class="w target" data-s="41944" data-e="42200" title="一瞥；一看 v. 瞥见；看一眼">glimpse</span> <span class="w" data-s="42242" data-e="42328">of</span> <span class="w" data-s="42370" data-e="42413">the</span> <span class="w" data-s="42456" data-e="42840">captain&#x27;s</span> <span class="w" data-s="42882" data-e="43181">logbook.</span></p><p class="zh">大多数大人只是瞥一眼，少数人能瞄到船长的旧航海日志。</p></div>
+<div class="pair" data-s0="43394" data-s1="46808"><p class="en"><span class="w" data-s="43394" data-e="44077">One</span> <span class="w" data-s="44120" data-e="44333">man</span> <span class="w target" data-s="44376" data-e="44674" title="(at)凝视，盯着看">stared</span> <span class="w" data-s="44717" data-e="44888">at</span> <span class="w" data-s="44930" data-e="44973">a</span> <span class="w" data-s="45016" data-e="45314">photograph,</span> <span class="w" data-s="45570" data-e="45784">and</span> <span class="w" data-s="45869" data-e="45997">then</span> <span class="w" data-s="46040" data-e="46082">he</span> <span class="w target" data-s="46125" data-e="46338" title="怒目而视；强光，炫目的光 v. 发出刺眼的光线；怒视">glared</span> <span class="w" data-s="46381" data-e="46552">at</span> <span class="w" data-s="46594" data-e="46637">his</span> <span class="w" data-s="46680" data-e="46808">phone.</span></p><p class="zh">有个人盯着一张照片看了一会儿，随后又瞪着自己的手机。</p></div>
+<div class="pair" data-s0="47495" data-s1="52359"><p class="en"><span class="w" data-s="47495" data-e="47580">A</span> <span class="w" data-s="47623" data-e="47708">note</span> <span class="w" data-s="47751" data-e="47879">on</span> <span class="w" data-s="47921" data-e="48007">the</span> <span class="w" data-s="48049" data-e="48135">wall</span> <span class="w target" data-s="48177" data-e="48732" title="提醒；使想起">reminded</span> <span class="w" data-s="48775" data-e="49073">Omar</span> <span class="w" data-s="49116" data-e="49244">of</span> <span class="w" data-s="49287" data-e="49329">his</span> <span class="w" data-s="49372" data-e="49500">promise:</span> <span class="w" data-s="49841" data-e="50737">this</span> <span class="w" data-s="50780" data-e="51036">small</span> <span class="w target" data-s="51079" data-e="51463" title="纪念碑(或馆、堂、像等);历史遗迹；有历史价 值的建筑；有永久价值的作品">monument</span> <span class="w" data-s="51505" data-e="51719">must</span> <span class="w" data-s="51761" data-e="51975">never</span> <span class="w target" data-s="52017" data-e="52359" title="褪色，逐渐消失">fade.</span></p><p class="zh">墙上的一张便条提醒奥马尔他自己许下的诺言：这座小小的纪念碑绝不能被淡忘。</p></div>
+<div class="pair" data-s0="52572" data-s1="56241"><p class="en"><span class="w" data-s="52572" data-e="53383">Last</span> <span class="w" data-s="53425" data-e="53596">spring</span> <span class="w" data-s="53639" data-e="53895">a</span> <span class="w" data-s="53937" data-e="54065">young</span> <span class="w" data-s="54108" data-e="54279">man</span> <span class="w" data-s="54321" data-e="54492">asked</span> <span class="w" data-s="54535" data-e="54705">for</span> <span class="w" data-s="54748" data-e="54876">work,</span> <span class="w" data-s="55089" data-e="55345">so</span> <span class="w" data-s="55388" data-e="55687">Omar</span> <span class="w target" data-s="55729" data-e="56113" title="雇用；应用；运用；使用">employed</span> <span class="w" data-s="56156" data-e="56241">him.</span></p><p class="zh">去年春天，一个年轻人来求职，奥马尔雇用了他。</p></div>
+<div class="pair" data-s0="56497" data-s1="59484"><p class="en"><span class="w" data-s="56497" data-e="56583">It</span> <span class="w" data-s="56625" data-e="56753">was</span> <span class="w" data-s="56796" data-e="56881">the</span> <span class="w" data-s="56924" data-e="57223">boy&#x27;s</span> <span class="w" data-s="57265" data-e="57351">first</span> <span class="w target" data-s="57393" data-e="57948" title="工作；职业；受雇；就业">employment,</span> <span class="w" data-s="58161" data-e="58289">and</span> <span class="w" data-s="58673" data-e="58801">he</span> <span class="w" data-s="58844" data-e="58972">was</span> <span class="w" data-s="59015" data-e="59143">proud</span> <span class="w" data-s="59185" data-e="59399">of</span> <span class="w" data-s="59441" data-e="59484">it.</span></p><p class="zh">这是男孩的第一份工作，他为此很得意。</p></div>
+<div class="pair" data-s0="60199" data-s1="63228"><p class="en"><span class="w" data-s="60199" data-e="60284">But</span> <span class="w" data-s="60327" data-e="60412">he</span> <span class="w" data-s="60455" data-e="60540">was</span> <span class="w" data-s="60583" data-e="60924">lazy,</span> <span class="w" data-s="61052" data-e="61223">and</span> <span class="w" data-s="61564" data-e="61777">in</span> <span class="w" data-s="61820" data-e="61863">the</span> <span class="w" data-s="61905" data-e="62033">end</span> <span class="w" data-s="62076" data-e="62460">Omar</span> <span class="w" data-s="62503" data-e="62673">had</span> <span class="w" data-s="62716" data-e="62801">to</span> <span class="w target" data-s="62844" data-e="62929" title="火 v. 解雇；射击">fire</span> <span class="w" data-s="62972" data-e="63228">him.</span></p><p class="zh">但他很懒，最后奥马尔不得不解雇他。</p></div>
+<div class="pair" data-s0="63441" data-s1="69287"><p class="en"><span class="w" data-s="63441" data-e="64252">The</span> <span class="w" data-s="64295" data-e="64423">boy</span> <span class="w" data-s="64465" data-e="64679">began</span> <span class="w" data-s="64721" data-e="64892">to</span> <span class="w target" data-s="64935" data-e="65148" title="密谋；策划n. 故事情节；密谋">plot</span> <span class="w" data-s="65191" data-e="65404">something</span> <span class="w" data-s="65447" data-e="65873">unkind,</span> <span class="w" data-s="66129" data-e="66385">and</span> <span class="w" data-s="66471" data-e="66769">he</span> <span class="w" data-s="66812" data-e="66983">said</span> <span class="w" data-s="67025" data-e="67196">he</span> <span class="w" data-s="67239" data-e="67324">would</span> <span class="w" data-s="67367" data-e="67452">take</span> <span class="w" data-s="67495" data-e="67623">a</span> <span class="w target" data-s="67665" data-e="67751" title="射击;开枪(或炮);枪(或炮)声;优秀(或不高 明等的)射手，枪手，炮手；击球；射门；投篮； 发射">shot</span> <span class="w" data-s="67793" data-e="68049">at</span> <span class="w" data-s="68092" data-e="68135">the</span> <span class="w" data-s="68177" data-e="68519">museum</span> <span class="w" data-s="68561" data-e="68732">in</span> <span class="w" data-s="68775" data-e="68860">the</span> <span class="w" data-s="68903" data-e="68988">local</span> <span class="w" data-s="69031" data-e="69287">paper.</span></p><p class="zh">男孩于是开始策划一件不太善意的事，他说要在本地报纸上给博物馆来一枪。</p></div>
+<div class="pair" data-s0="69981" data-s1="74205"><p class="en"><span class="w" data-s="69981" data-e="70109">The</span> <span class="w" data-s="70152" data-e="70237">hall</span> <span class="w" data-s="70280" data-e="70451">is</span> <span class="w target" data-s="70493" data-e="70621" title="水平的；平坦的；枯燥的；无趣的；平淡的； 单调的 n.一套房间；公寓；单元房">flat</span> <span class="w" data-s="70664" data-e="71005">and</span> <span class="w" data-s="71048" data-e="71176">old,</span> <span class="w" data-s="71389" data-e="71560">and</span> <span class="w" data-s="71901" data-e="72072">every</span> <span class="w" data-s="72115" data-e="72541">Saturday</span> <span class="w" data-s="72584" data-e="72968">Omar</span> <span class="w" data-s="73011" data-e="73224">would</span> <span class="w target" data-s="73267" data-e="73523" title="使充气;膨胀;(使)涨价">inflate</span> <span class="w" data-s="73565" data-e="73736">a</span> <span class="w" data-s="73779" data-e="73949">rubber</span> <span class="w" data-s="73992" data-e="74205">whale.</span></p><p class="zh">展厅又平又旧，每个星期六奥马尔都会吹一只橡皮鲸鱼。</p></div>
+<div class="pair" data-s0="74419" data-s1="78984"><p class="en"><span class="w" data-s="74419" data-e="74547">In</span> <span class="w" data-s="75016" data-e="75357">autumn</span> <span class="w" data-s="75400" data-e="75528">the</span> <span class="w" data-s="75571" data-e="75784">fog</span> <span class="w" data-s="75827" data-e="75912">is</span> <span class="w target" data-s="75955" data-e="76168" title="密集的，稠密的">dense,</span> <span class="w" data-s="76381" data-e="76595">and</span> <span class="w" data-s="76893" data-e="77107">water</span> <span class="w target" data-s="77149" data-e="77704" title="压缩；变浓">condenses</span> <span class="w" data-s="77747" data-e="77917">on</span> <span class="w" data-s="77960" data-e="78045">the</span> <span class="w" data-s="78088" data-e="78173">cold</span> <span class="w" data-s="78216" data-e="78429">glass</span> <span class="w" data-s="78472" data-e="78728">of</span> <span class="w" data-s="78771" data-e="78856">the</span> <span class="w" data-s="78899" data-e="78984">cases.</span></p><p class="zh">秋天，雾很浓，水汽在冰凉的玻璃柜面上凝成水珠。</p></div>
+<div class="pair" data-s0="79411" data-s1="83037"><p class="en"><span class="w" data-s="79411" data-e="79539">His</span> <span class="w" data-s="79581" data-e="79709">old</span> <span class="w" data-s="79752" data-e="80008">wool</span> <span class="w" data-s="80051" data-e="80349">sweater</span> <span class="w" data-s="80392" data-e="80563">tends</span> <span class="w" data-s="80605" data-e="80733">to</span> <span class="w target" data-s="80776" data-e="81075" title="起皱；收缩，缩水；退缩；畏缩">shrink,</span> <span class="w" data-s="81203" data-e="81373">and</span> <span class="w" data-s="81629" data-e="81757">the</span> <span class="w" data-s="81800" data-e="81885">ink</span> <span class="w" data-s="81928" data-e="82056">on</span> <span class="w" data-s="82099" data-e="82184">the</span> <span class="w" data-s="82227" data-e="82440">labels</span> <span class="w" data-s="82483" data-e="82653">has</span> <span class="w target" data-s="82696" data-e="83037" title="褪色，逐渐消失">faded.</span></p><p class="zh">他的旧羊毛衫容易缩水，标签上的墨水也褪了色。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">exhibit</span>
+          <span class="ipa">/ıg&#x27;zrbit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(一件)展览品，陈列品；(在法庭上出示的)物 证，证据.展览；展出；表现，显出(感情、品质 或能力)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every exhibit tells a story</div>          <div class="mnem"><span class="lbl">记</span>ex（向外），hibi（发音很像 Hebe,人名)，Hebe把自己所有的物品(t)都向 外→展出；展览。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + hibit(拿住) → 拿出来给人看</div>          <div class="zt"><span class="lbl">真题</span>Carême&#x27;s creative works were exhibited in the shop windows by his master. 卡莱姆的 创意作品被他的主人陈列在商店的橱窗里。</div>          <div class="fam"><span class="lbl">族</span>exhibition n. 展览；展览会</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">display</span>
+          <span class="ipa">/dı&#x27;splei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 陈列；展览；表演；表现；(计算机屏幕上 的)显示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He likes to display the models</div>          <div class="root"><span class="lbl">根</span>dis(分开) + play(折) → 展开给人看</div>          <div class="zt"><span class="lbl">真题</span>Carême&#x27;s cooking displays became the symbol of fine French dining. 卡莱姆的烹饪展 示成了法国美食的象征。</div>          <div class="fam"><span class="lbl">族</span>display n./v. 陈列；显示</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">breeze</span>
+          <span class="ipa">/briiz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">微风;轻而易举的事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a breeze from the sea comes in</div>          <div class="mnem"><span class="lbl">记</span>清风的纸巾，英文不就是 Breeze 吗？</div>          <div class="root"><span class="lbl">根</span>联想：清风牌纸巾就叫 Breeze</div>          <div class="zt"><span class="lbl">真题</span>If you understand the material and have the ability to articulate your thoughts, they should be a breeze. 如果你理解了这些材料，并 且有能力表达你的想法，它们应该是轻而易举 的事。</div>          <div class="fam"><span class="lbl">族</span>breezy adj. 有微风的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">freeze</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In winter the bay will freeze</div>          <div class="root"><span class="lbl">根</span>联想：frozen food 冷冻食品 → 冻住</div>          <div class="fam"><span class="lbl">族</span>frozen adj. 冰冻的 / freezing adj. 极冷的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">squeeze</span>
+          <span class="ipa">/skwiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp; n. 压；挤；捏 v.冻；冻结；使结冰 pk id iy of frozen food. 电视的普及导致了冷冻食品的 普及。(2015)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>visitors squeeze past one another</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“死贵死”。 想买件衣服，价格太贵，你就往下压价啊，能便 宜些吗？→挤；压。 freeze (froze, frozen) /fri:z/</div>          <div class="root"><span class="lbl">根</span>谐音「死贵死」→ 往下压价 → 压、挤</div>          <div class="zt"><span class="lbl">真题</span>Leave a basin of water outside in the freezing weather, and it will soon freeze. 在极 冷的天把一盆水放在室外，水很快会结冰。</div>          <div class="fam"><span class="lbl">族</span>squeeze n. 挤压 / squeezed adj. 挤出的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">emerge</span>
+          <span class="ipa">/ı&#x27;məird3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">浮现；出现；兴起</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>minutes later it would emerge again into the light</div>          <div class="mnem"><span class="lbl">记</span>e(出)me(我)r(阿)ge(哥)→我 和阿哥都出来了→出现。</div>          <div class="root"><span class="lbl">根</span>e(出) + merg(沉) → 从水里出来</div>          <div class="zt"><span class="lbl">真题</span>If a new competitor emerges to threaten your business, you may need to change direction.如果一个新的竞争对手出现，威胁到 你的业务，你可能需要改变方向。(2023)</div>          <div class="fam"><span class="lbl">族</span>emergence n. 出现 / emergency n. 紧急情况</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">submerge</span>
+          <span class="ipa">/səb&#x27;m3:rd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">淹没；掩盖；使沉浸于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>When the boat had to submerge</div>          <div class="mnem"><span class="lbl">记</span>sub(下面)me(我)r(阿)ge(哥) →我和阿哥不会游泳，都沉没到水下了→淹没。</div>          <div class="root"><span class="lbl">根</span>sub(下面) + merg(沉) → 沉到下面去</div>          <div class="fam"><span class="lbl">族</span>submerged adj. 被淹没的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">emergency</span>
+          <span class="ipa">/1&#x27;mə:dzənsi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">紧急情况，非常时刻</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the captain called it an emergency</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“眼冒金星”。 眼冒金星的时候，当然是“紧急情况”了。</div>          <div class="root"><span class="lbl">根</span>与 emerge 同源：突然冒出来的事</div>          <div class="zt"><span class="lbl">真题</span>Across the country, 285 emergency management teams are devoted to crisis (061) control. 全国有 285 个应急管理小组致力于危 机控制。(2019)</div>          <div class="fam"><span class="lbl">族</span>emergent adj. 新兴的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">submarine</span>
+          <span class="ipa">/isabmə&#x27;ri:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">潜水艇 adj. 海底的，海平面下的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Omar once served on a submarine</div>          <div class="mnem"><span class="lbl">记</span>sub 在下面，marine 发音类似 “(淹)没人”。那就是在下面把人给淹没了，在 哪个下面？水里，海里。这个单词的意思就是 “海底的，海平面下的”。</div>          <div class="root"><span class="lbl">根</span>sub(下面) + marine(海) → 海面下的</div>          <div class="zt"><span class="lbl">真题</span>A French submarine detected the device&#x27;s homing signal five days later. 五天后，一艘法 国潜艇探测到该装置的归航信号。(2010)</div>          <div class="fam"><span class="lbl">族</span>marine adj. 海洋的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">marine</span>
+          <span class="ipa">/mə&#x27;ri:n/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">海洋的;海产的；海事的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Omar began to love marine life</div>          <div class="root"><span class="lbl">根</span>mar(海) + ine(……的) → 海的</div>          <div class="fam"><span class="lbl">族</span>submarine n. 潜水艇 / maritime adj. 海事的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">gaze</span>
+          <span class="ipa">/geiz/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp;. v. 凝视；注视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Children gaze at the model boat</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“尬死”。有个人 一直用眼睛“凝视”你，是不是很尴尬？</div>          <div class="root"><span class="lbl">根</span>谐音「尬死」→ 被人盯着很尴尬</div>          <div class="zt"><span class="lbl">真题</span>When looking at angry humans, they. tended to turn away their gaze. 当看到愤怒的 人类时，它们往往会转移视线。(2016)</div>          <div class="fam"><span class="lbl">族</span>gaze n. 凝视</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">glance</span>
+          <span class="ipa">/glæns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">匆匆一看；一瞥 .瞥一眼；扫视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Most adults only glance at it</div>          <div class="mnem"><span class="lbl">记</span>glance的谐音是“哥懒死”，哥 哥懒得不愿意多看几眼，只是“瞥一眼”。 (062)</div>          <div class="root"><span class="lbl">根</span>谐音「哥懒死」→ 懒得看，只瞥一眼</div>          <div class="zt"><span class="lbl">真题</span>You very likely give other passengers a quick glance to size them up and to assure them that you mean no threat. 你很可能会快 速瞥一眼其他的乘客，以评估他们，并向他们保 证你没有威胁。</div>          <div class="fam"><span class="lbl">族</span>glance at 瞥一眼</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">glimpse</span>
+          <span class="ipa">/glımps/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一瞥；一看 v. 瞥见；看一眼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a few catch a glimpse of the captain&#x27;s logbook</div>          <div class="mnem"><span class="lbl">记</span>哥哥(g)立在(li)妹妹(m)前面 “看一眼”(se 想成 see)妹妹。</div>          <div class="root"><span class="lbl">根</span>g(哥) + limps(想成 limbs 腿) → 只看一眼</div>          <div class="zt"><span class="lbl">真题</span>People crowded outside the bakery, straining for a glimpse of the latest sweet food created by the young chef who worked inside. 人们挤在面包房外，争先恐后地想一睹在里面 工作的年轻厨师制作的最新甜食。 例 The human mind can glimpse a rapidly changing scene.人类的大脑可以瞥见一个迅速 变化的场景。</div>          <div class="fam"><span class="lbl">族</span>catch a glimpse of 瞥见</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">stare</span>
+          <span class="ipa">/steə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(at)凝视，盯着看</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One man stared at a photograph</div>          <div class="mnem"><span class="lbl">记</span>街上(st 想成 street)盯着一个 (a) 阿姨(re英文字母的谐音)→凝视，盯着看。</div>          <div class="root"><span class="lbl">根</span>联想：street(街) + a(一个) → 街上盯着一个人看</div>          <div class="zt"><span class="lbl">真题</span>You just stare across the table blankly with your mouth hanging open. 你只是张着嘴， 茫然地盯着桌子对面。(2022)</div>          <div class="fam"><span class="lbl">族</span>stare at 盯着看</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">glare</span>
+          <span class="ipa">/gleə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">怒目而视；强光，炫目的光 v. 发出刺眼的光线；怒视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then he glared at his phone</div>          <div class="mnem"><span class="lbl">记</span>哥(g)拉(la)阿姨(re)，设想哥 哥在街上拉一个阿姨的衣服，阿姨是不是回头 “怒目而视”？</div>          <div class="root"><span class="lbl">根</span>gl- 常表「光」(glow/glare) + are → 刺眼的光；瞪眼</div>          <div class="zt"><span class="lbl">真题</span>He glared at the girls with his fiery red eyes and cried. 他用火红的眼睛瞪着姑娘们，哭 了起来。</div>          <div class="fam"><span class="lbl">族</span>glaring adj. 刺眼的；明显的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">remind</span>
+          <span class="ipa">/ri&#x27;maind/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提醒；使想起</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A note on the wall reminded Omar</div>          <div class="mnem"><span class="lbl">记</span>再次(re表示重复)让你的思想 (mind)记得我的名字叫大雁，那就是“提醒；使 想起”。</div>          <div class="root"><span class="lbl">根</span>re(再) + mind(心、想法) → 让人再想一次</div>          <div class="zt"><span class="lbl">真题</span>Some services, however, remind us that life will eventually return, in some form, to normal.然而，一些服务提醒我们，生活最终将 以某种形式恢复正常。(2019)</div>          <div class="fam"><span class="lbl">族</span>reminder n. 提醒；提示物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">recall</span>
+          <span class="ipa">/rı&#x27;kə:l/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he can still recall the cold, dark water</div>          <div class="mnem"><span class="lbl">记</span>re(再一次)+call(呼唤)，再一 次呼唤→回想起。</div>          <div class="root"><span class="lbl">根</span>re(再) + call(呼唤) → 再叫回来 → 想起</div>          <div class="zt"><span class="lbl">真题</span>“I felt empowered because I broke through my own limitations,&quot;she recalls. “我 觉得自己被赋予了力量，因为我突破了自己的 局限。”她回忆道。(2017)</div>          <div class="fam"><span class="lbl">族</span>recall n. 记忆力；召回</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">monument</span>
+          <span class="ipa">/&#x27;mpnjumənt/</span>
+          <span class="pos"></span>
+          <span class="cn">纪念碑(或馆、堂、像等);历史遗迹；有历史价 值的建筑；有永久价值的作品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>this small monument must never fade</div>          <div class="mnem"><span class="lbl">记</span>单词的发音类似“牦牛门特”。 牦牛门特是什么？→历史遗迹；纪念馆。</div>          <div class="root"><span class="lbl">根</span>mon(提醒) + u + ment(名词后缀) → 让人想起的东西</div>          <div class="zt"><span class="lbl">真题</span>It is a historical monument. 它是一座历 史纪念碑。 例 These recordings are a monument to his talent as a pianist. 这些录音是展现他钢琴家才 华的不朽之作。</div>          <div class="fam"><span class="lbl">族</span>monumental adj. 巨大的；不朽的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">memo</span>
+          <span class="ipa">/&#x27;meməu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">备忘录</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in a small memo book</div>          <div class="root"><span class="lbl">根</span>联想：memory(记忆) 的缩写 → 帮人记事的小纸</div>          <div class="zt"><span class="lbl">真题</span>I have to finish this memo and put it in the mail. 我必须完成这份备忘录并把它寄 出去。</div>          <div class="fam"><span class="lbl">族</span>memorandum n. 备忘录 / memory n. 记忆</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">shot</span>
+          <span class="ipa">/∫a:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">射击;开枪(或炮);枪(或炮)声;优秀(或不高 明等的)射手，枪手，炮手；击球；射门；投篮； 发射</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would take a shot at the museum</div>          <div class="root"><span class="lbl">根</span>shoot(射击) 的名词 → 一枪；一投</div>          <div class="zt"><span class="lbl">真题</span>It is impossible that a single shot of education, administered in childhood and early adulthood, will be able to support a sustained, 60-year career. 在童年和成年早期接受一次教 育，不可能支撑一个持续60年的职业生涯。 (2019) (063) 第三单元</div>          <div class="fam"><span class="lbl">族</span>shoot v. 射击 / shotgun n. 猎枪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">fire</span>
+          <span class="ipa">/&#x27;farər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">火 v. 解雇；射击</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Omar had to fire him</div>          <div class="root"><span class="lbl">根</span>本义「火」→ 开火 → 把某人「轰」走即解雇</div>          <div class="zt"><span class="lbl">真题</span>She doesn&#x27;t want to use her name for fear of being fired from her job. 她不想使用自己的 名字，因为害怕被解雇。</div>          <div class="fam"><span class="lbl">族</span>firefighter n. 消防员 / firing n. 解雇</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">employ</span>
+          <span class="ipa">/ım&#x27;pləı/</span>
+          <span class="pos">v.</span>
+          <span class="cn">雇用；应用；运用；使用</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>so Omar employed him</div>          <div class="mnem"><span class="lbl">记</span>使(em)捕捞(ploy的谐音)，我 们想要捕捞一艘沉船，要“雇用”一些人。</div>          <div class="root"><span class="lbl">根</span>em(使) + ploy(用) → 使人为自己所用</div>          <div class="zt"><span class="lbl">真题</span>It is said that all of us employ a mix of both these types of planning. 据说我们所有人 都混合使用这几种计划。(2015)</div>          <div class="fam"><span class="lbl">族</span>employee n. 雇员 / employer n. 雇主</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">employment</span>
+          <span class="ipa">/ım&#x27;pləimənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">工作；职业；受雇；就业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was the boy&#x27;s first employment</div>          <div class="root"><span class="lbl">根</span>employ(雇用) + ment(名词后缀)</div>          <div class="zt"><span class="lbl">真题</span>As the world migrant crisis intensifies, employment is becoming a global concern. 随 着世界移民危机的加剧，就业正成为一个全球 性问题。</div>          <div class="fam"><span class="lbl">族</span>unemployment n. 失业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">plot</span>
+          <span class="ipa">/plpt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">密谋；策划n. 故事情节；密谋</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The boy began to plot something unkind</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“扑(p)捞他 (lot)”。有船掉水里了，打捞之前要“策划”一 下，如何更有效地搜救。</div>          <div class="root"><span class="lbl">根</span>谐音「扑捞他」→ 打捞之前先策划一下</div>          <div class="zt"><span class="lbl">真题</span>But if you forget the plot of the movie or don&#x27;t remember even seeing it, that&#x27;s far more concerning.但如果你忘记了电影情节，或者甚 至不记得看过这部电影，那就更令人担忧了。 (2018)</div>          <div class="fam"><span class="lbl">族</span>plotter n. 密谋者 / plot n. 情节</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">flat</span>
+          <span class="ipa">/flæt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">水平的；平坦的；枯燥的；无趣的；平淡的； 单调的 n.一套房间；公寓；单元房</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The hall is flat and old</div>          <div class="mnem"><span class="lbl">记</span>飞来(fl 想成 fly)停留在(at)上 面。超人飞过来，停留在一块“平坦的”岩石 上面。</div>          <div class="root"><span class="lbl">根</span>联想：fly(飞) + at(在) → 飞过来停在平处</div>          <div class="zt"><span class="lbl">真题</span>Our beach is so flat that it&#x27;s very common for the tide to come around the back of people and cut them off from the beach. 我们的海滩 很平坦，所以潮水经常会从人们的背后卷过来， 使他们与海滩隔绝。(2019)</div>          <div class="fam"><span class="lbl">族</span>flatten v. 弄平 / flat n. 公寓</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">inflate</span>
+          <span class="ipa">/ın&#x27;flert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使充气;膨胀;(使)涨价</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would inflate a rubber whale</div>          <div class="mnem"><span class="lbl">记</span>in前缀表示反义，flat平的，让 它不再平平的，鼓起来啊，那不就是“充气；膨 胀”吗？</div>          <div class="root"><span class="lbl">根</span>in(使) + flat(平的) → 让平的鼓起来</div>          <div class="zt"><span class="lbl">真题</span>Swimming circles can be blown by mouth or inflated by machines. 游泳圈可以用嘴吹起 来，也可以用机器充气。</div>          <div class="fam"><span class="lbl">族</span>inflation n. 膨胀；通货膨胀</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">dense</span>
+          <span class="ipa">/dens/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">密集的，稠密的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In autumn the fog is dense</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“(den) 死”，“扽”在河南话中是“拽”，连在一起就是拽 死也拽不开，为什么拽不开呢？→稠密的。</div>          <div class="root"><span class="lbl">根</span>谐音「扽死」→ 拽都拽不开 → 稠密</div>          <div class="fam"><span class="lbl">族</span>density n. 密度 / densely adv. 密集地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">condense</span>
+          <span class="ipa">/kən&#x27;dens/</span>
+          <span class="pos">v.</span>
+          <span class="cn">压缩；变浓</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>water condenses on the cold glass of the cases</div>          <div class="mnem"><span class="lbl">记</span>con(所有的)十dense(稠密的) →使所有的变得稠密，想象挤压海绵是不是这 样？→压缩。</div>          <div class="root"><span class="lbl">根</span>con(一起) + dense(稠密) → 挤到一起变稠</div>          <div class="fam"><span class="lbl">族</span>condensed adj. 浓缩的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">shrink</span>
+          <span class="ipa">/∫rınk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">起皱；收缩，缩水；退缩；畏缩</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His old wool sweater tends to shrink</div>          <div class="mnem"><span class="lbl">记</span>sh 发音类似“洗”，r 想象成花， ink墨水，那就是我的花毛衣弄上了墨水，洗了 一次，结果“缩水”了。</div>          <div class="root"><span class="lbl">根</span>联想：sh(洗) + rink(想成花毛衣) → 一洗就缩</div>          <div class="zt"><span class="lbl">真题</span>Its purpose is to build and maintain bone and muscle mass, both of which shrink with age.它的目的是建立和维持骨骼和肌肉质量， 这两者都随着年龄的增长而萎缩。(2013)</div>          <div class="fam"><span class="lbl">族</span>shrinkage n. 收缩</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">fade</span>
+          <span class="ipa">/feid/</span>
+          <span class="pos">v.</span>
+          <span class="cn">褪色，逐渐消失</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ink on the labels has faded</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“废的”，买了一 件羊毛衫，洗一次就废了→“褪色”了啊。</div>          <div class="root"><span class="lbl">根</span>谐音「废的」→ 洗一次就废了 → 褪色</div>          <div class="zt"><span class="lbl">真题</span>When students feel isolated, their motivation to continue begins to fade. 当学生 们感到孤立时，他们继续学习的动力就会开始 消退。</div>          <div class="fam"><span class="lbl">族</span>faded adj. 褪色的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 16</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

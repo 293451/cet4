@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 30 · The Garden Behind the Science Building</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 30 · 11/11 · Unit 5 第 871-900 词</div>
+  <h1>The Garden Behind the Science Building<span class="cn">理科楼后面的菜园</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-30.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3285"><p class="en"><span class="w" data-s="43" data-e="341">Behind</span> <span class="w" data-s="384" data-e="512">the</span> <span class="w" data-s="555" data-e="683">science</span> <span class="w" data-s="725" data-e="1024">building</span> <span class="w" data-s="1067" data-e="1323">at</span> <span class="w" data-s="1365" data-e="1621">Weston</span> <span class="w" data-s="1664" data-e="2048">College</span> <span class="w" data-s="2091" data-e="2347">there</span> <span class="w" data-s="2432" data-e="2560">is</span> <span class="w" data-s="2603" data-e="2645">a</span> <span class="w" data-s="2688" data-e="2816">small</span> <span class="w" data-s="2859" data-e="3285">garden.</span></p><p class="zh">在韦斯顿学院理科楼的后面，有一个小菜园。</p></div>
+<div class="pair" data-s0="3456" data-s1="8149"><p class="en"><span class="w" data-s="3456" data-e="3669">The</span> <span class="w" data-s="3968" data-e="4267">garden</span> <span class="w" data-s="4309" data-e="4395">is</span> <span class="w" data-s="4437" data-e="4565">older</span> <span class="w" data-s="4608" data-e="4864">than</span> <span class="w" data-s="4907" data-e="4992">the</span> <span class="w" data-s="5035" data-e="5419">college&#x27;s</span> <span class="w target" data-s="5461" data-e="5845" title="(男)主人，雇主；能手；擅长……者，硕士学位 v. 精通；掌握，控制(情绪)；控制(动物或人)">master&#x27;s</span> <span class="w" data-s="5888" data-e="6272">programme</span> <span class="w" data-s="6315" data-e="6528">and</span> <span class="w" data-s="6741" data-e="6912">older</span> <span class="w" data-s="6955" data-e="7168">than</span> <span class="w" data-s="7211" data-e="7339">most</span> <span class="w" data-s="7381" data-e="7552">of</span> <span class="w" data-s="7595" data-e="7680">the</span> <span class="w target" data-s="7723" data-e="8149" title="课程">curriculum.</span></p><p class="zh">这个菜园比学院的硕士项目还老，比大部分课程都老。</p></div>
+<div class="pair" data-s0="8320" data-s1="12725"><p class="en"><span class="w" data-s="8320" data-e="8704">A</span> <span class="w target" data-s="8747" data-e="9088" title="老兵,退伍军人；老手">veteran</span> <span class="w" data-s="9131" data-e="9472">teacher,</span> <span class="w" data-s="9600" data-e="9813">Mr.</span> <span class="w" data-s="10719" data-e="10933">Hale,</span> <span class="w" data-s="11146" data-e="11701">started</span> <span class="w" data-s="11743" data-e="11957">it</span> <span class="w" data-s="11999" data-e="12255">thirty</span> <span class="w" data-s="12298" data-e="12469">years</span> <span class="w" data-s="12511" data-e="12725">ago.</span></p><p class="zh">三十年前，一位老教师黑尔先生开辟了它。</p></div>
+<div class="pair" data-s0="12981" data-s1="17546"><p class="en"><span class="w" data-s="12981" data-e="13535">To</span> <span class="w" data-s="13663" data-e="13877">a</span> <span class="w target" data-s="13919" data-e="14175" title="非专业人员；外行；门外汉 t te ted by laymen. 它们太复杂了，无法被外行欣赏。">layman,</span> <span class="w" data-s="14389" data-e="14602">the</span> <span class="w" data-s="14687" data-e="15071">garden</span> <span class="w" data-s="15114" data-e="15199">looks</span> <span class="w" data-s="15242" data-e="15413">like</span> <span class="w" data-s="15455" data-e="15583">a</span> <span class="w target" data-s="15626" data-e="15797" title="">layer</span> <span class="w" data-s="15839" data-e="15925">of</span> <span class="w" data-s="15967" data-e="16223">weeds</span> <span class="w" data-s="16266" data-e="16437">on</span> <span class="w" data-s="16479" data-e="16565">a</span> <span class="w target" data-s="16607" data-e="16778" title="">layer</span> <span class="w" data-s="16821" data-e="16949">of</span> <span class="w" data-s="16991" data-e="17077">old</span> <span class="w" data-s="17119" data-e="17546">soil.</span></p><p class="zh">在外行眼里，这个菜园就是一层野草盖着一层老土。</p></div>
+<div class="pair" data-s0="17717" data-s1="21002"><p class="en"><span class="w" data-s="17717" data-e="18399">To</span> <span class="w" data-s="18442" data-e="18527">an</span> <span class="w target" data-s="18570" data-e="18869" title="业余爱好者；外行 adj. 业余的">amateur</span> <span class="w" data-s="18911" data-e="19338">gardener,</span> <span class="w" data-s="19466" data-e="19637">it</span> <span class="w" data-s="19765" data-e="20063">is</span> <span class="w" data-s="20106" data-e="20149">a</span> <span class="w" data-s="20191" data-e="20319">careful</span> <span class="w" data-s="20362" data-e="20661">piece</span> <span class="w" data-s="20703" data-e="20831">of</span> <span class="w target" data-s="20874" data-e="21002" title="艺术；艺术作品；人文科学，文科(如语言、历 史、文学);技能；技巧">art.</span></p><p class="zh">在业余园艺爱好者眼里，它却是一件用心的艺术品。</p></div>
+<div class="pair" data-s0="21215" data-s1="24927"><p class="en"><span class="w" data-s="21215" data-e="21983">Mr.</span> <span class="w" data-s="22197" data-e="22410">Hale</span> <span class="w" data-s="22453" data-e="22709">is</span> <span class="w" data-s="22751" data-e="22879">a</span> <span class="w target" data-s="22922" data-e="23391" title="先驱，先锋，拓荒者v. 当开拓者，倡导">pioneer</span> <span class="w" data-s="23434" data-e="23690">of</span> <span class="w" data-s="23733" data-e="23946">city</span> <span class="w" data-s="23989" data-e="24373">farming</span> <span class="w" data-s="24415" data-e="24543">in</span> <span class="w" data-s="24586" data-e="24671">this</span> <span class="w" data-s="24714" data-e="24927">state.</span></p><p class="zh">黑尔先生是本州都市耕作的先驱。</p></div>
+<div class="pair" data-s0="26035" data-s1="31709"><p class="en"><span class="w" data-s="26035" data-e="26120">He</span> <span class="w target" data-s="26163" data-e="26376" title="后面，背部，后方v.抚养，饲养，栽培">rears</span> <span class="w" data-s="26419" data-e="26760">chickens,</span> <span class="w" data-s="26973" data-e="27443">keeps</span> <span class="w" data-s="27485" data-e="27827">rabbits</span> <span class="w" data-s="27869" data-e="27997">and</span> <span class="w target" data-s="28040" data-e="28680" title="培育，培养；开垦，耕作">cultivates</span> <span class="w" data-s="28723" data-e="29064">fifty</span> <span class="w" data-s="29107" data-e="29235">kinds</span> <span class="w" data-s="29277" data-e="29448">of</span> <span class="w" data-s="29491" data-e="29832">vegetables;</span> <span class="w" data-s="30045" data-e="30259">he</span> <span class="w" data-s="30387" data-e="30515">does</span> <span class="w" data-s="30557" data-e="30643">not</span> <span class="w target" data-s="30685" data-e="30984" title="饲养，繁殖；培养，养育">breed</span> <span class="w" data-s="31027" data-e="31155">anything</span> <span class="w" data-s="31197" data-e="31539">for</span> <span class="w" data-s="31581" data-e="31709">money.</span></p><p class="zh">他养鸡、养兔，还种五十种蔬菜；他养任何东西都不是为了卖钱。</p></div>
+<div class="pair" data-s0="31923" data-s1="35933"><p class="en"><span class="w" data-s="31923" data-e="32136">He</span> <span class="w" data-s="32264" data-e="32648">uses</span> <span class="w" data-s="32691" data-e="32947">no</span> <span class="w target" data-s="32989" data-e="33331" title="化学制品；化学品 adj.与化学有关的；用 化学方法制造的；化学作用的">chemical</span> <span class="w" data-s="33373" data-e="33629">spray,</span> <span class="w" data-s="33843" data-e="34013">and</span> <span class="w" data-s="34099" data-e="34355">he</span> <span class="w" data-s="34397" data-e="34568">never</span> <span class="w" data-s="34611" data-e="34952">tires</span> <span class="w" data-s="34995" data-e="35123">of</span> <span class="w" data-s="35165" data-e="35293">telling</span> <span class="w" data-s="35336" data-e="35592">students</span> <span class="w" data-s="35635" data-e="35933">why.</span></p><p class="zh">他不用任何化学喷剂，总是不厌其烦地告诉学生为什么。</p></div>
+<div class="pair" data-s0="36584" data-s1="40338"><p class="en"><span class="w" data-s="36584" data-e="36669">The</span> <span class="w" data-s="36712" data-e="37010">soil</span> <span class="w" data-s="37053" data-e="37138">is</span> <span class="w target" data-s="37181" data-e="37480" title="滋养，养育，培养；怀有(情感或信念等)">nourished</span> <span class="w" data-s="37522" data-e="37693">by</span> <span class="w" data-s="37736" data-e="37906">leaves,</span> <span class="w" data-s="38205" data-e="38589">and</span> <span class="w" data-s="38632" data-e="38802">the</span> <span class="w" data-s="38845" data-e="39016">plants</span> <span class="w target" data-s="39058" data-e="39442" title="滋养，养育，培养；怀有(情感或信念等)">nourish</span> <span class="w" data-s="39485" data-e="39613">the</span> <span class="w" data-s="39656" data-e="39741">people</span> <span class="w" data-s="39784" data-e="39997">who</span> <span class="w" data-s="40040" data-e="40210">eat</span> <span class="w" data-s="40253" data-e="40338">them.</span></p><p class="zh">土壤靠落叶滋养，而植物又滋养吃它们的人。</p></div>
+<div class="pair" data-s0="40509" data-s1="44776"><p class="en"><span class="w target" data-s="40509" data-e="41618" title="(中等、专科学校或大学的)二年级学生">Sophomores,</span> <span class="w target" data-s="41789" data-e="42557" title="年少的；地位较低的 . 晚辈；下属；三年 级学生">juniors</span> <span class="w" data-s="42600" data-e="42770">and</span> <span class="w target" data-s="42813" data-e="43240" title="长辈的；较高的；高级的 n. 长辈；上司； 毕业班的学生">seniors</span> <span class="w" data-s="43282" data-e="43538">all</span> <span class="w" data-s="43581" data-e="43837">take</span> <span class="w" data-s="43880" data-e="44008">a</span> <span class="w" data-s="44050" data-e="44136">turn</span> <span class="w" data-s="44178" data-e="44392">in</span> <span class="w" data-s="44434" data-e="44477">the</span> <span class="w" data-s="44520" data-e="44776">garden.</span></p><p class="zh">大二、大三和大四的学生都要轮流到菜园里干活。</p></div>
+<div class="pair" data-s0="44904" data-s1="48317"><p class="en"><span class="w" data-s="44904" data-e="45373">One</span> <span class="w target" data-s="45416" data-e="45970" title="(中等、专科学校或大学的)二年级学生">sophomore,</span> <span class="w" data-s="46141" data-e="46525">Lin,</span> <span class="w" data-s="46738" data-e="46952">is</span> <span class="w" data-s="47208" data-e="47634">studying</span> <span class="w target" data-s="47677" data-e="48317" title="社会学">sociology.</span></p><p class="zh">有个叫林的大二学生，学的是社会学。</p></div>
+<div class="pair" data-s0="49013" data-s1="53749"><p class="en"><span class="w" data-s="49013" data-e="49099">A</span> <span class="w target" data-s="49141" data-e="49483" title="年少的；地位较低的 . 晚辈；下属；三年 级学生">junior</span> <span class="w" data-s="49525" data-e="49739">is</span> <span class="w" data-s="49781" data-e="49952">writing</span> <span class="w" data-s="49995" data-e="50208">about</span> <span class="w target" data-s="50251" data-e="50677" title="思维方式；逻辑，逻辑学">logic,</span> <span class="w" data-s="50805" data-e="50976">and</span> <span class="w" data-s="51317" data-e="51573">a</span> <span class="w target" data-s="51616" data-e="51915" title="长辈的；较高的；高级的 n. 长辈；上司； 毕业班的学生">senior</span> <span class="w" data-s="51957" data-e="52171">is</span> <span class="w" data-s="52213" data-e="52555">drawing</span> <span class="w" data-s="52597" data-e="52640">the</span> <span class="w" data-s="52683" data-e="52981">garden</span> <span class="w" data-s="53024" data-e="53195">with</span> <span class="w target" data-s="53237" data-e="53749" title="几何(学);几何形状；几何图形；几何结构">geometry.</span></p><p class="zh">一个大三学生在写关于逻辑的文章，一个大四学生用几何来画这个菜园。</p></div>
+<div class="pair" data-s0="53963" data-s1="57461"><p class="en"><span class="w" data-s="53963" data-e="54347">There</span> <span class="w" data-s="54859" data-e="55029">is</span> <span class="w" data-s="55072" data-e="55157">also</span> <span class="w" data-s="55200" data-e="55413">a</span> <span class="w target" data-s="55456" data-e="55797" title="辍学者；退学者；拒绝传统社会的人">dropout</span> <span class="w" data-s="55840" data-e="56011">who</span> <span class="w" data-s="56053" data-e="56181">came</span> <span class="w" data-s="56224" data-e="56395">back</span> <span class="w" data-s="56437" data-e="56565">to</span> <span class="w" data-s="56608" data-e="56779">college</span> <span class="w" data-s="56821" data-e="57077">at</span> <span class="w" data-s="57120" data-e="57461">forty.</span></p><p class="zh">还有一个辍学者，四十岁又回到了学校。</p></div>
+<div class="pair" data-s0="57967" data-s1="60996"><p class="en"><span class="w" data-s="57967" data-e="58052">He</span> <span class="w" data-s="58095" data-e="58223">wants</span> <span class="w" data-s="58265" data-e="58436">a</span> <span class="w target" data-s="58479" data-e="58991" title="单身汉；学士">bachelor&#x27;s</span> <span class="w" data-s="59033" data-e="59161">degree,</span> <span class="w" data-s="59375" data-e="59588">and</span> <span class="w" data-s="59801" data-e="59972">then</span> <span class="w" data-s="60015" data-e="60228">perhaps</span> <span class="w" data-s="60271" data-e="60527">a</span> <span class="w target" data-s="60569" data-e="60996" title="(男)主人，雇主；能手；擅长……者，硕士学位 v. 精通；掌握，控制(情绪)；控制(动物或人)">master&#x27;s.</span></p><p class="zh">他想拿一个学士学位，然后再读个硕士。</p></div>
+<div class="pair" data-s0="61167" data-s1="63855"><p class="en"><span class="w" data-s="61167" data-e="61764">Mr.</span> <span class="w" data-s="61935" data-e="62148">Hale</span> <span class="w" data-s="62191" data-e="62361">says</span> <span class="w" data-s="62404" data-e="62617">the</span> <span class="w" data-s="62660" data-e="63001">garden</span> <span class="w" data-s="63044" data-e="63129">is</span> <span class="w" data-s="63172" data-e="63300">his</span> <span class="w target" data-s="63343" data-e="63855" title="代表作；杰作；名著">masterpiece.</span></p><p class="zh">黑尔先生说，这个菜园就是他的代表作。</p></div>
+<div class="pair" data-s0="64111" data-s1="68548"><p class="en"><span class="w" data-s="64111" data-e="64665">He</span> <span class="w" data-s="64708" data-e="64836">is</span> <span class="w" data-s="64879" data-e="64921">not</span> <span class="w" data-s="64964" data-e="65135">the</span> <span class="w" data-s="65177" data-e="65305">most</span> <span class="w target" data-s="65348" data-e="65903" title="见多识广的；老练的；精密的；先进的">sophisticated</span> <span class="w" data-s="65945" data-e="66201">man,</span> <span class="w" data-s="66415" data-e="66628">but</span> <span class="w" data-s="66884" data-e="67012">he</span> <span class="w" data-s="67055" data-e="67140">is</span> <span class="w" data-s="67183" data-e="67225">the</span> <span class="w" data-s="67268" data-e="67396">most</span> <span class="w target" data-s="67439" data-e="67993" title="有才智的，聪明的">intelligent</span> <span class="w" data-s="68036" data-e="68164">one</span> <span class="w" data-s="68207" data-e="68377">I</span> <span class="w" data-s="68420" data-e="68548">know.</span></p><p class="zh">他不是最精明世故的人，却是我认识的最聪明的人。</p></div>
+<div class="pair" data-s0="69201" data-s1="73851"><p class="en"><span class="w" data-s="69201" data-e="69286">He</span> <span class="w" data-s="69329" data-e="69457">has</span> <span class="w" data-s="69499" data-e="69627">a</span> <span class="w" data-s="69670" data-e="69798">quiet</span> <span class="w target" data-s="69841" data-e="70481" title="智力，思维能力">intellect</span> <span class="w" data-s="70523" data-e="70737">and</span> <span class="w" data-s="70779" data-e="71377">an</span> <span class="w target" data-s="71419" data-e="71974" title="智力的；聪明的；理智的 n. 知识分子">intellectual</span> <span class="w" data-s="72017" data-e="72699">curiosity</span> <span class="w" data-s="72742" data-e="73041">that</span> <span class="w" data-s="73211" data-e="73382">never</span> <span class="w" data-s="73425" data-e="73851">stops.</span></p><p class="zh">他有一颗安静的大脑，和一份从不停止的求知的好奇心。</p></div>
+<div class="pair" data-s0="74065" data-s1="78502"><p class="en"><span class="w" data-s="74065" data-e="74662">He</span> <span class="w" data-s="74705" data-e="74833">is</span> <span class="w target" data-s="74875" data-e="75345" title="明确表达；清楚说明 adj.善于表达的；口 齿清楚的">articulate</span> <span class="w" data-s="75387" data-e="75558">too:</span> <span class="w" data-s="75771" data-e="76283">he</span> <span class="w" data-s="76326" data-e="76539">can</span> <span class="w" data-s="76582" data-e="76753">explain</span> <span class="w" data-s="76795" data-e="77094">a</span> <span class="w" data-s="77137" data-e="77222">whole</span> <span class="w" data-s="77265" data-e="77521">season</span> <span class="w" data-s="77563" data-e="77947">in</span> <span class="w" data-s="77990" data-e="78203">ten</span> <span class="w" data-s="78246" data-e="78502">minutes.</span></p><p class="zh">他也很会表达：十分钟就能把一整季的事讲清楚。</p></div>
+<div class="pair" data-s0="79320" data-s1="82776"><p class="en"><span class="w" data-s="79320" data-e="79405">He</span> <span class="w target" data-s="79448" data-e="80003" title="承认;认可；致谢">acknowledges</span> <span class="w" data-s="80045" data-e="80259">that</span> <span class="w" data-s="80301" data-e="80387">he</span> <span class="w" data-s="80429" data-e="80557">learned</span> <span class="w" data-s="80600" data-e="80813">most</span> <span class="w" data-s="80856" data-e="81069">of</span> <span class="w" data-s="81112" data-e="81197">it</span> <span class="w" data-s="81240" data-e="81325">from</span> <span class="w" data-s="81368" data-e="81453">his</span> <span class="w target" data-s="81496" data-e="81752" title="同龄人；同等的人；贵族v. 仔细看，端详">peers,</span> <span class="w" data-s="81965" data-e="82221">not</span> <span class="w" data-s="82392" data-e="82563">from</span> <span class="w" data-s="82605" data-e="82776">books.</span></p><p class="zh">他承认，这些大多是他从同龄人那里学来的，而不是从书本里。</p></div>
+<div class="pair" data-s0="83075" data-s1="88195"><p class="en"><span class="w" data-s="83075" data-e="83757">His</span> <span class="w" data-s="83800" data-e="84013">idea</span> <span class="w" data-s="84056" data-e="84312">is</span> <span class="w" data-s="84355" data-e="84611">simple:</span> <span class="w" data-s="84867" data-e="85293">a</span> <span class="w" data-s="85336" data-e="85507">team</span> <span class="w" data-s="85549" data-e="85763">is</span> <span class="w target" data-s="85805" data-e="86232" title="可共用的；可共存的；兼容的；(因志趣等相 投而)关系好的，和睦相处的">compatible</span> <span class="w" data-s="86275" data-e="86488">when</span> <span class="w" data-s="86531" data-e="86659">each</span> <span class="w" data-s="86701" data-e="86915">person</span> <span class="w" data-s="86957" data-e="87299">does</span> <span class="w" data-s="87341" data-e="87597">what</span> <span class="w" data-s="87640" data-e="87725">he</span> <span class="w" data-s="87768" data-e="87853">is</span> <span class="w" data-s="87896" data-e="87981">good</span> <span class="w" data-s="88024" data-e="88195">at.</span></p><p class="zh">他的想法很简单：当每个人都做自己擅长的事，一个团队就是合得来的。</p></div>
+<div class="pair" data-s0="88711" data-s1="90801"><p class="en"><span class="w" data-s="88711" data-e="88881">Every</span> <span class="w" data-s="88924" data-e="89393">autumn</span> <span class="w" data-s="89436" data-e="89521">the</span> <span class="w" data-s="89564" data-e="89820">garden</span> <span class="w" data-s="89863" data-e="90119">feeds</span> <span class="w" data-s="90161" data-e="90289">two</span> <span class="w" data-s="90332" data-e="90503">hundred</span> <span class="w" data-s="90545" data-e="90801">students.</span></p><p class="zh">每年秋天，这个菜园养活两百个学生。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">sophomore</span>
+          <span class="ipa">/&#x27;sa:fəməir/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(中等、专科学校或大学的)二年级学生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One sophomore, Lin, is studying sociology</div>          <div class="root"><span class="lbl">根</span>sopho(智慧) + more(傻瓜) → 从傻瓜到有智慧的中间站 → 大二学生</div>          <div class="zt"><span class="lbl">真题</span>Olivia Rubin, a sophomore at Emory, says she hardly even considers take-homes true exams. 埃默里大学大二学生奥利维亚·鲁宾 说，她甚至不认为带回家的考试是真正的考试。</div>          <div class="fam"><span class="lbl">族</span>freshman n. 大一新生 / junior n. 大三学生</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">junior</span>
+          <span class="ipa">/&#x27;dzu:niər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">年少的；地位较低的 . 晚辈；下属；三年 级学生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A junior is writing about logic</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：嘱你儿。嘱 咐你儿子，因为他是“晚辈”。</div>          <div class="root"><span class="lbl">根</span>jun(年轻) + ior(较……的) → 较年轻的 → 大三学生；晚辈</div>          <div class="zt"><span class="lbl">真题</span>I designed an eight-session workshop for 91 students whose math grades were declining in their first year of junior high. 我为 91 名数 学成绩正在下降的初一学生设计了一个8课时 的讲习班。(2016)</div>          <div class="fam"><span class="lbl">族</span>junior high 初中 / senior adj. 年长的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">senior</span>
+          <span class="ipa">/&#x27;si:niər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">长辈的；较高的；高级的 n. 长辈；上司； 毕业班的学生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a senior is drawing the garden with geometry</div>          <div class="root"><span class="lbl">根</span>sen(老) + ior(较……的) → 较年长的 → 大四学生；高级的</div>          <div class="zt"><span class="lbl">真题</span>At the very top are the senior executives. 位于最高层的正是高管们。</div>          <div class="fam"><span class="lbl">族</span>seniority n. 资历 / senior high 高中</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">bachelor</span>
+          <span class="ipa">/&#x27;bæt∫ələ(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">单身汉；学士</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He wants a bachelor&#x27;s degree</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“掰扯了”。他 刚和女朋友闹掰了，回归了单身→单身汉。 (114)</div>          <div class="root"><span class="lbl">根</span>谐音「掰扯了」：和女朋友掰了，回归单身 → 单身汉；学士</div>          <div class="zt"><span class="lbl">真题</span>Students earn their bachelor of science in nursing in a year.学生们在一年内获得护理学 学士学位。</div>          <div class="fam"><span class="lbl">族</span>bachelor&#x27;s degree 学士学位 / master n. 硕士</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">master</span>
+          <span class="ipa">/&#x27;mæstər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(男)主人，雇主；能手；擅长……者，硕士学位 v. 精通；掌握，控制(情绪)；控制(动物或人)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and then perhaps a master&#x27;s</div>          <div class="root"><span class="lbl">根</span>源自拉丁 magister(首领) → 主人；能手；硕士；掌握</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s a good problem to have, but it can be a tough skill to master. 这是一个很好的问题， 但它可能是一个很难掌握的技能。(2022)</div>          <div class="fam"><span class="lbl">族</span>mastery n. 精通 / masterpiece n. 杰作</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">masterpiece</span>
+          <span class="ipa">/&#x27;mæstərpi:s/</span>
+          <span class="pos">n.</span>
+          <span class="cn">代表作；杰作；名著</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the garden is his masterpiece</div>          <div class="mnem"><span class="lbl">记</span>master名词的含义为“主人，大 师”，所以这个单词当动词讲是“控制，精通”。 那 masterpiece 就是大师的一件(a piece of) 东 西→杰作；名著。</div>          <div class="root"><span class="lbl">根</span>master(大师) + piece(一件作品) → 大师的一件东西 → 杰作</div>          <div class="zt"><span class="lbl">真题</span>He shaped delicious masterpieces out of flour，butter and sugar.他用面粉、黄油和糖做 出了美味的杰作。</div>          <div class="fam"><span class="lbl">族</span>master n. 大师 / masterly adj. 精湛的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">dropout</span>
+          <span class="ipa">/&#x27;dra:paut/</span>
+          <span class="pos">n.</span>
+          <span class="cn">辍学者；退学者；拒绝传统社会的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There is also a dropout who came back to college</div>          <div class="mnem"><span class="lbl">记</span>drop 落下，out 出去。“辍学 者”不就是落下、出去的人吗？</div>          <div class="root"><span class="lbl">根</span>drop(落下) + out(出去) → 掉队出去的人 → 辍学者</div>          <div class="zt"><span class="lbl">真题</span>We encourage students to go on to college whether they are prepared or not, or have a clear sense of purpose or interest, and now have the highest college dropout rate in the world. 我们鼓励学生上大学，无论他们是否 准备好，或有明确的目标或兴趣，结果现在拥有 世界上最高的大学辍学率。</div>          <div class="fam"><span class="lbl">族</span>drop out 退学 / drop-out 也可指退学率</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">layman</span>
+          <span class="ipa">/&#x27;leimən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">非专业人员；外行；门外汉 t te ted by laymen. 它们太复杂了，无法被外行欣赏。</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To a layman, the garden looks like a layer of weeds</div>          <div class="mnem"><span class="lbl">记</span>每天不用心，躺着（lay)做事的 人(man)，做什么事情都不会做得很好，就是个 “门外汉”。</div>          <div class="root"><span class="lbl">根</span>lay(世俗的、非专业的) + man(人) → 非专业的人 → 外行</div>          <div class="fam"><span class="lbl">族</span>laity n. 外行(总称) / expert n. 专家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">layer</span>
+          <span class="ipa">/&#x27;lerər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a layer of weeds on a layer of old soil</div>          <div class="root"><span class="lbl">根</span>lay(放) + er → 一层层摞起来 → 层</div>          <div class="zt"><span class="lbl">真题</span>The earth is composed of several layers. 地球由几层组成。 (115) 第五单元</div>          <div class="fam"><span class="lbl">族</span>lay v. 放置 / layered adj. 分层的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">amateur</span>
+          <span class="ipa">/&#x27;æmətə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">业余爱好者；外行 adj. 业余的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>To an amateur gardener, it is a careful piece of art</div>          <div class="mnem"><span class="lbl">记</span>ama发音类似“爱莫(能助)”； teur发音类似“他”。连在一起就是：他爱莫能 助，为什么？“业余的”，专业水平不够啊。</div>          <div class="root"><span class="lbl">根</span>amat(爱) + eur(人) → 出于爱好做事的人 → 业余爱好者</div>          <div class="fam"><span class="lbl">族</span>amateurish adj. 业余的，不熟练的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">veteran</span>
+          <span class="ipa">/&#x27;vetərən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">老兵,退伍军人；老手</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A veteran teacher, Mr. Hale, started it thirty years ago</div>          <div class="root"><span class="lbl">根</span>源自拉丁 vetus(老的) → 老兵；老手</div>          <div class="zt"><span class="lbl">真题</span>The fast-track trend fills a need, but it&#x27;s also creating some tension between newcomers and veterans. 快速通道的趋势满足了需求，但 也在新人和老手之间制造了一些紧张。</div>          <div class="fam"><span class="lbl">族</span>veteran adj. 老练的 / rookie n. 新手</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">sophisticated</span>
+          <span class="ipa">/sə&#x27;fistıkeitıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">见多识广的；老练的；精密的；先进的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He is not the most sophisticated man</div>          <div class="root"><span class="lbl">根</span>源自希腊 sophos(智慧) → 懂门道的 → 老练的；精密的</div>          <div class="zt"><span class="lbl">真题</span>USPS has sophisticated emergency plans for natural disasters. 美国邮政有应对自然灾害 的精密应急计划。(2019)</div>          <div class="fam"><span class="lbl">族</span>sophistication n. 老练，精密</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">nourish</span>
+          <span class="ipa">/&#x27;n3:rıʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">滋养，养育，培养；怀有(情感或信念等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the plants nourish the people who eat them</div>          <div class="mnem"><span class="lbl">记</span>该单词发音有nurse(护士）的 音，单词中间的r，想象成娇嫩的花，护士把你像 花一样“养育，培养”啊。</div>          <div class="root"><span class="lbl">根</span>nour(养育) + ish(动词) → 养育，滋养</div>          <div class="fam"><span class="lbl">族</span>nourishment n. 营养 / nutritious adj. 有营养的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">cultivate</span>
+          <span class="ipa">/&#x27;kaltiveit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">培育，培养；开垦，耕作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cultivates fifty kinds of vegetables</div>          <div class="mnem"><span class="lbl">记</span>这个单词源于 culture(文化）， ate是动词后缀，那就是为了使你有文化，需要 “培养，培育”你。</div>          <div class="root"><span class="lbl">根</span>cult(耕种) + ivate → 耕地；培育人</div>          <div class="zt"><span class="lbl">真题</span>We can cultivate a growth mindset in children by telling success stories that emphasize hard work and love of learning. 我们 可以通过讲述强调努力工作和热爱学习的成功 故事来培养孩子的成长心态。</div>          <div class="fam"><span class="lbl">族</span>cultivation n. 培育 / culture n. 文化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">rear</span>
+          <span class="ipa">/rI/</span>
+          <span class="pos">n.</span>
+          <span class="cn">后面，背部，后方v.抚养，饲养，栽培</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He rears chickens</div>          <div class="mnem"><span class="lbl">记</span>真的(rea 想成 real)有花(r)，哪 里真的有花？背后有个刺绣啊。那为什么 “rear(后面)”的动词意为“抚养，栽培”呢？是 无论你在前线多痛苦，“后方”都有父母的支持 和关爱。</div>          <div class="root"><span class="lbl">根</span>联想：real(真的)有花(r)，花在后面养着 → 抚养；后面</div>          <div class="zt"><span class="lbl">真题</span>The rear section of the brain does not contract with age. 大脑后部不会随着年龄的增 长而收缩。</div>          <div class="fam"><span class="lbl">族</span>rear n. 后面 / rear up 养大</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">breed</span>
+          <span class="ipa">/bri:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">饲养，繁殖；培养，养育</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he does not breed anything for money</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“哺育 的”，哺育的不就是“养育；饲养”吗？</div>          <div class="root"><span class="lbl">根</span>谐音「哺育的」→ 抚养，饲养；繁殖</div>          <div class="zt"><span class="lbl">真题</span>Hard times breed hard feelings. 艰难时期 会酿成怨气。(2013)</div>          <div class="fam"><span class="lbl">族</span>breeding n. 繁殖 / breeder n. 饲养员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">intelligent</span>
+          <span class="ipa">/ın&#x27;telıdzənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有才智的，聪明的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he is the most intelligent one I know</div>          <div class="root"><span class="lbl">根</span>intel(在……之间) + lig(选) + ent → 会挑信息 → 聪明的</div>          <div class="zt"><span class="lbl">真题</span>Some studies have found that first-born children are more intelligent than their later- born.一些研究发现，头胎的孩子比后生的孩子 更聪明。(2018)</div>          <div class="fam"><span class="lbl">族</span>intelligence n. 智力 / intellectually adv. 智力上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">intellect</span>
+          <span class="ipa">/&#x27;Intəlekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">智力，思维能力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He has a quiet intellect</div>          <div class="mnem"><span class="lbl">记</span>intel 读音类似“因特(网)”，lect 词根表“选择”。选择因特网的人，用因特网工 作的人，是什么人？→有“智力”的人。</div>          <div class="root"><span class="lbl">根</span>intel(在……之间) + lect(选) → 挑选判断的能力 → 智力</div>          <div class="zt"><span class="lbl">真题</span>Computer technology enabled the researchers to obtain precise measurements of the volume of the front and side sections of the brain, which relate to intellect and emotion. 计 算机技术使研究人员能够获得与智力和情绪相 关的大脑前部和侧部的体积的精确测量值。</div>          <div class="fam"><span class="lbl">族</span>intellectual adj. 智力的 / intelligent adj. 聪明的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">intellectual</span>
+          <span class="ipa">/iIntə&#x27;lekt∫uəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">智力的；聪明的；理智的 n. 知识分子</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an intellectual curiosity that never stops</div>          <div class="root"><span class="lbl">根</span>intellect(智力) + ual → 智力上的；知识分子</div>          <div class="zt"><span class="lbl">真题</span>It is not worth it to waste our physical, intellectual and spiritual energy worrying about things that are beyond our control. 浪费我们的 体力、智力和精神去担心我们无法控制的事情 是不值得的。(2016)</div>          <div class="fam"><span class="lbl">族</span>intellect n. 智力 / intellectual property 知识产权</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">acknowledge</span>
+          <span class="ipa">/ək&#x27;nplıdz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">承认;认可；致谢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He acknowledges that he learned most of it from his peers</div>          <div class="mnem"><span class="lbl">记</span>knowledge n.知识，我“承认” 他有知识，很博学。</div>          <div class="root"><span class="lbl">根</span>ac(加强) + knowledge(知道) → 表示知道 → 承认；致谢</div>          <div class="zt"><span class="lbl">真题</span>I also acknowledge that we have a work- life problem. 我也承认我们有工作与生活的问 题。(2020)</div>          <div class="fam"><span class="lbl">族</span>acknowledgement n. 承认，感谢</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">pioneer</span>
+          <span class="ipa">/ıparə&#x27;nIr/</span>
+          <span class="pos">n.</span>
+          <span class="cn">先驱，先锋，拓荒者v. 当开拓者，倡导</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mr. Hale is a pioneer of city farming</div>          <div class="mnem"><span class="lbl">记</span>披(pi)荆斩棘的一个(one)人 (er结尾表示人)→先锋，先驱。</div>          <div class="root"><span class="lbl">根</span>联想：披(pi)荆斩棘的一个(one)人(er) → 先锋，拓荒者</div>          <div class="zt"><span class="lbl">真题</span>Dr. Herbert Benson, a pioneer in mind/ body medicine, says that the repetitive action of needlework can induce a relaxed state. 赫伯 特·本森博士是身心医学的先驱，他说重复做 针线活可以让人放松。</div>          <div class="fam"><span class="lbl">族</span>pioneering adj. 开创性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">peer</span>
+          <span class="ipa">/piəd(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">同龄人；同等的人；贵族v. 仔细看，端详</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>learned most of it from his peers</div>          <div class="mnem"><span class="lbl">记</span>该单词可拆分为pe(拍)十er (人)→一群人勾肩搭背地喝着酒，拍着彼此的 (116) 肩膀，说明你们是“同龄人；同等的人”啊！你敢 拍着你二舅的肩膀称兄道弟吗？</div>          <div class="root"><span class="lbl">根</span>联想：pe(拍) + er(人) → 能互相拍肩膀的人 → 同龄人</div>          <div class="zt"><span class="lbl">真题</span>Students prefer to rely on peers to relieve stress and anxiety. 学生更喜欢依靠同伴来缓解 压力和焦虑。(2020)</div>          <div class="fam"><span class="lbl">族</span>peer pressure 同辈压力 / peer review 同行评议</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">compatible</span>
+          <span class="ipa">/kəm&#x27;pætəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可共用的；可共存的；兼容的；(因志趣等相 投而)关系好的，和睦相处的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a team is compatible when each person does what he is good at</div>          <div class="mnem"><span class="lbl">记</span>该单词可以解释为所有（com) 人都轻拍(pat)他(t)，拍谁？老板。设想下，在 一个公司，所有员工见到老板，都可以拍他，称 兄道弟的，这种氛围多么融洽，和睦→关系好 的，和睦相处的。</div>          <div class="root"><span class="lbl">根</span>com(共同) + pati(忍受) + ble → 能一起待住 → 兼容的，合得来的</div>          <div class="zt"><span class="lbl">真题</span>Approach to allowance is compatible with that of writer Ron Lieber. 获得津贴的方 法与作家罗恩·利伯的方法是一致的。</div>          <div class="fam"><span class="lbl">族</span>compatibility n. 兼容性 / incompatible adj. 不相容的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">curriculum</span>
+          <span class="ipa">/kə&#x27;rıkjələm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">课程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>older than most of the curriculum</div>          <div class="mnem"><span class="lbl">记</span>单词的第一个音就是：课；第二 个音是：日(每天)。连在一起就是每天都要上 课→课程。</div>          <div class="root"><span class="lbl">根</span>curr(跑) + iculum → 要跑完的路线 → 课程</div>          <div class="zt"><span class="lbl">真题</span>The curriculum should be flexible enough so that they can use their individual talents to achieve the goals of the course. 课程 设置要有足够的灵活性，使他们能够发挥个人 的才能，实现课程的目标。(2016)</div>          <div class="fam"><span class="lbl">族</span>curricular adj. 课程的 / extracurricular adj. 课外的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">chemical</span>
+          <span class="ipa">/&#x27;kemıkl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">化学制品；化学品 adj.与化学有关的；用 化学方法制造的；化学作用的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He uses no chemical spray</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“开煤科”。把煤 打开研究里面是什么成分的科学？这是“与化 学有关的”事情。</div>          <div class="root"><span class="lbl">根</span>chem(化学) + ical → 化学的；化学品</div>          <div class="zt"><span class="lbl">真题</span>A third is certain basic chemicals such as carbon，oxygen and nitrogen. 第三种是某些基 本化学物质，如碳、氧和氮。</div>          <div class="fam"><span class="lbl">族</span>chemistry n. 化学 / chemist n. 化学家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">logic</span>
+          <span class="ipa">/&#x27;la:d31k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">思维方式；逻辑，逻辑学</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A junior is writing about logic</div>          <div class="mnem"><span class="lbl">记</span>单词的发音类似“逻辑”，这是 一个音译词，单词的发音就是它的意思。</div>          <div class="root"><span class="lbl">根</span>log(说、道理) + ic → 讲道理的方式 → 逻辑，逻辑学</div>          <div class="zt"><span class="lbl">真题</span>Statistics and logic are both challenging subjects. 统计学和逻辑学都是具有挑战性的学 科。(2011)</div>          <div class="fam"><span class="lbl">族</span>logical adj. 合逻辑的 / illogical adj. 不合逻辑的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">geometry</span>
+          <span class="ipa">/d3i&#x27;a:mətri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">几何(学);几何形状；几何图形；几何结构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drawing the garden with geometry</div>          <div class="mnem"><span class="lbl">记</span>该单词可拆分为：ge(哥哥)+o 画一个圆形→我们在研究“几何学”。</div>          <div class="root"><span class="lbl">根</span>geo(土地) + metry(测量) → 量土地 → 几何学</div>          <div class="fam"><span class="lbl">族</span>geometric adj. 几何的 / geometric 图形</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">sociology</span>
+          <span class="ipa">/isəusi&#x27;a:lədzi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">社会学</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One sophomore, Lin, is studying sociology</div>          <div class="root"><span class="lbl">根</span>soci(社会) + ology(学科) → 社会学</div>          <div class="zt"><span class="lbl">真题</span>After all, I don&#x27;t study sociology or political theory.毕竞，我不学习社会学或政治 理论。</div>          <div class="fam"><span class="lbl">族</span>society n. 社会 / sociologist n. 社会学家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">art</span>
+          <span class="ipa">/a:rt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">艺术；艺术作品；人文科学，文科(如语言、历 史、文学);技能；技巧</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it is a careful piece of art</div>          <div class="root"><span class="lbl">根</span>本义「技艺」→ 技艺做出的东西 → 艺术；文科；技巧</div>          <div class="zt"><span class="lbl">真题</span>They are favored as a form of art. 它们作 为一种艺术形式受到青睐。(2017) (117)</div>          <div class="fam"><span class="lbl">族</span>artist n. 艺术家 / artistic adj. 艺术的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">articulate</span>
+          <span class="ipa">/a:&#x27;tikjuleit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">明确表达；清楚说明 adj.善于表达的；口 齿清楚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He is articulate too</div>          <div class="mnem"><span class="lbl">记</span>art表示“艺术”，用艺术性的语 言把某事物表达出来，就是“善于表达的；口齿 清楚的”。</div>          <div class="root"><span class="lbl">根</span>articul(关节) + ate → 说话像关节一样灵活 → 清楚表达；口齿清楚的</div>          <div class="zt"><span class="lbl">真题</span>She is an articulate young woman. 她是 一个口才很好的年轻女子。</div>          <div class="fam"><span class="lbl">族</span>articulation n. 表达 / articulately adv. 清晰地</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5 · Day 30</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

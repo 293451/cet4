@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 15 · The Hives on Bell Island</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 15 · 10/27 · Unit 3 第 421-450 词</div>
+  <h1>The Hives on Bell Island<span class="cn">贝尔岛上的蜂箱</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-15.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3115"><p class="en"><span class="w" data-s="43" data-e="171">Her</span> <span class="w" data-s="213" data-e="555">grandparents</span> <span class="w" data-s="597" data-e="939">came</span> <span class="w" data-s="981" data-e="1152">from</span> <span class="w" data-s="1195" data-e="1280">the</span> <span class="w" data-s="1323" data-e="1408">south</span> <span class="w" data-s="1451" data-e="1877">to</span> <span class="w target" data-s="2005" data-e="2261" title="居住在；定居于 adj.(在某地)居住的 residence /&#x27;rezidəns/ n. 住所;住房；定居">reside</span> <span class="w" data-s="2304" data-e="2517">on</span> <span class="w" data-s="2560" data-e="2731">Bell</span> <span class="w" data-s="2773" data-e="3115">Island.</span></p><p class="zh">她的祖父母从南方来到这里，选择在贝尔岛定居。</p></div>
+<div class="pair" data-s0="3328" data-s1="8320"><p class="en"><span class="w" data-s="3328" data-e="3883">She</span> <span class="w" data-s="3925" data-e="4096">still</span> <span class="w target" data-s="4139" data-e="4608" title="">inhabits</span> <span class="w" data-s="4651" data-e="4736">the</span> <span class="w" data-s="4779" data-e="4907">white</span> <span class="w" data-s="4949" data-e="5120">house</span> <span class="w" data-s="5163" data-e="5376">on</span> <span class="w" data-s="5419" data-e="5461">the</span> <span class="w" data-s="5504" data-e="5632">hill,</span> <span class="w" data-s="5803" data-e="6016">and</span> <span class="w" data-s="6144" data-e="6613">wild</span> <span class="w" data-s="6656" data-e="7040">bees</span> <span class="w" data-s="7083" data-e="7253">have</span> <span class="w" data-s="7296" data-e="7467">their</span> <span class="w target" data-s="7509" data-e="7851" title="(动植物的)栖息地">habitat</span> <span class="w" data-s="7893" data-e="8107">there</span> <span class="w" data-s="8149" data-e="8320">too.</span></p><p class="zh">她至今还住在那座山上的白房子里，野蜂也在那里安家。</p></div>
+<div class="pair" data-s0="8704" data-s1="14165"><p class="en"><span class="w" data-s="8704" data-e="8832">It</span> <span class="w" data-s="8875" data-e="8960">is</span> <span class="w" data-s="9003" data-e="9088">the</span> <span class="w" data-s="9131" data-e="9301">only</span> <span class="w" data-s="9344" data-e="9557">place</span> <span class="w" data-s="9600" data-e="9856">where</span> <span class="w" data-s="9899" data-e="10027">that</span> <span class="w" data-s="10069" data-e="10368">rare</span> <span class="w" data-s="10411" data-e="10581">kind</span> <span class="w" data-s="10624" data-e="10965">still</span> <span class="w" data-s="11008" data-e="11264">lives;</span> <span class="w" data-s="11605" data-e="12117">three</span> <span class="w" data-s="12160" data-e="12587">villages</span> <span class="w" data-s="12629" data-e="12843">away</span> <span class="w" data-s="12885" data-e="13099">the</span> <span class="w" data-s="13141" data-e="13227">same</span> <span class="w" data-s="13269" data-e="13611">bee</span> <span class="w" data-s="13653" data-e="13696">is</span> <span class="w target" data-s="13739" data-e="14165" title="灭绝的，绝种的；消逝的">extinct.</span></p><p class="zh">那是这种稀有蜂种还活着的唯一地方；三个村子之外，同一种蜂已经灭绝了。</p></div>
+<div class="pair" data-s0="14899" data-s1="21256"><p class="en"><span class="w target" data-s="14899" data-e="15283" title="不顾一切地，不管怎样">Regardless</span> <span class="w" data-s="15326" data-e="15454">of</span> <span class="w" data-s="15496" data-e="15539">the</span> <span class="w" data-s="15582" data-e="15667">cold</span> <span class="w" data-s="15710" data-e="15966">wind,</span> <span class="w" data-s="16222" data-e="16520">she</span> <span class="w" data-s="16563" data-e="16862">walks</span> <span class="w" data-s="16904" data-e="17032">out</span> <span class="w" data-s="17075" data-e="17203">at</span> <span class="w" data-s="17246" data-e="17374">six</span> <span class="w" data-s="17416" data-e="17928">every</span> <span class="w" data-s="18014" data-e="18270">morning,</span> <span class="w" data-s="18526" data-e="19038">because</span> <span class="w" data-s="19080" data-e="19294">her</span> <span class="w" data-s="19336" data-e="19720">grandmother</span> <span class="w" data-s="19763" data-e="20062">taught</span> <span class="w" data-s="20104" data-e="20190">her</span> <span class="w" data-s="20232" data-e="20318">to</span> <span class="w" data-s="20360" data-e="20531">trust</span> <span class="w" data-s="20574" data-e="20744">her</span> <span class="w target" data-s="20787" data-e="21256" title="本能,直觉；天赋">instinct.</span></p><p class="zh">不管寒风多大，她每天早上六点都会出门，因为祖母教过她要相信自己的直觉。</p></div>
+<div class="pair" data-s0="21427" data-s1="25608"><p class="en"><span class="w" data-s="21427" data-e="22067">Last</span> <span class="w" data-s="22110" data-e="22323">spring</span> <span class="w" data-s="22366" data-e="22622">a</span> <span class="w" data-s="22664" data-e="23006">bee</span> <span class="w" data-s="23048" data-e="23262">stung</span> <span class="w" data-s="23304" data-e="23432">her</span> <span class="w" data-s="23475" data-e="23603">under</span> <span class="w" data-s="23646" data-e="23774">the</span> <span class="w" data-s="23816" data-e="23987">eye,</span> <span class="w" data-s="24200" data-e="24414">and</span> <span class="w" data-s="24499" data-e="24755">another</span> <span class="w target" data-s="24798" data-e="25224" title="">pierced</span> <span class="w" data-s="25267" data-e="25352">her</span> <span class="w" data-s="25395" data-e="25608">glove.</span></p><p class="zh">去年春天，一只蜂蜇了她的眼睛下面，另一只刺穿了她的手套。</p></div>
+<div class="pair" data-s0="25907" data-s1="29448"><p class="en"><span class="w" data-s="25907" data-e="25992">When</span> <span class="w" data-s="26035" data-e="26120">a</span> <span class="w" data-s="26163" data-e="26291">bee</span> <span class="w target" data-s="26334" data-e="26675" title="">thrusts</span> <span class="w" data-s="26718" data-e="26846">its</span> <span class="w target" data-s="26888" data-e="27059" title="刺；蜇n. 螫针,刺；痛苦 v. 刺穿，刺破，穿孔 v. 猛推；冲；操；挤；塞n.(论据、政策等的)要 点；驱动力；猛推；刺；戳；插">sting</span> <span class="w" data-s="27102" data-e="27230">into</span> <span class="w" data-s="27272" data-e="27443">your</span> <span class="w" data-s="27486" data-e="27656">skin,</span> <span class="w" data-s="27912" data-e="28083">you</span> <span class="w" data-s="28254" data-e="28424">must</span> <span class="w" data-s="28467" data-e="28680">stand</span> <span class="w" data-s="28723" data-e="28936">still</span> <span class="w" data-s="28979" data-e="29235">and</span> <span class="w" data-s="29278" data-e="29448">wait.</span></p><p class="zh">当蜜蜂把螫针扎进你的皮肤时，你必须站着别动，等它自己离开。</p></div>
+<div class="pair" data-s0="30319" data-s1="31940"><p class="en"><span class="w" data-s="30319" data-e="30447">A</span> <span class="w" data-s="30489" data-e="30617">young</span> <span class="w target" data-s="30660" data-e="31044" title="侦探；警探；私人侦探">detective</span> <span class="w" data-s="31087" data-e="31257">came</span> <span class="w" data-s="31300" data-e="31513">from</span> <span class="w" data-s="31556" data-e="31599">the</span> <span class="w" data-s="31641" data-e="31940">mainland.</span></p><p class="zh">一位年轻的侦探从大陆赶来了。</p></div>
+<div class="pair" data-s0="32239" data-s1="35097"><p class="en"><span class="w" data-s="32239" data-e="32708">He</span> <span class="w" data-s="32751" data-e="32921">had</span> <span class="w" data-s="32964" data-e="33092">to</span> <span class="w target" data-s="33135" data-e="33561" title="区分，辨别">distinguish</span> <span class="w" data-s="33604" data-e="33775">the</span> <span class="w" data-s="33817" data-e="33945">sick</span> <span class="w" data-s="33988" data-e="34372">hives</span> <span class="w" data-s="34415" data-e="34543">from</span> <span class="w" data-s="34585" data-e="34671">the</span> <span class="w" data-s="34713" data-e="34799">healthy</span> <span class="w" data-s="34841" data-e="35097">ones.</span></p><p class="zh">他得把生病的蜂箱和健康的蜂箱区分开。</p></div>
+<div class="pair" data-s0="35353" data-s1="40687"><p class="en"><span class="w" data-s="35353" data-e="36207">Each</span> <span class="w" data-s="36249" data-e="36505">bee,</span> <span class="w" data-s="36633" data-e="37103">Rosa</span> <span class="w" data-s="37145" data-e="37316">said,</span> <span class="w" data-s="37487" data-e="37657">has</span> <span class="w" data-s="37828" data-e="37956">a</span> <span class="w target" data-s="37999" data-e="38383" title="有区别的；明确的；显著的">distinct</span> <span class="w" data-s="38425" data-e="38596">pattern</span> <span class="w" data-s="38639" data-e="38895">on</span> <span class="w" data-s="38937" data-e="38980">its</span> <span class="w" data-s="39023" data-e="39151">back</span> <span class="w" data-s="39193" data-e="39449">and</span> <span class="w" data-s="39492" data-e="39833">a</span> <span class="w target" data-s="39876" data-e="40260" title="独特的；特别的；有特色的">distinctive</span> <span class="w" data-s="40303" data-e="40687">smell.</span></p><p class="zh">罗莎说，每只蜂背上都有独特的花纹，也各有独特的气味。</p></div>
+<div class="pair" data-s0="41297" data-s1="42961"><p class="en"><span class="w" data-s="41297" data-e="41425">She</span> <span class="w" data-s="41468" data-e="41596">let</span> <span class="w" data-s="41639" data-e="41767">him</span> <span class="w target" data-s="41809" data-e="42108" title="观察；遵守；评论，评说">observe</span> <span class="w" data-s="42151" data-e="42364">a</span> <span class="w" data-s="42407" data-e="42535">frame</span> <span class="w" data-s="42577" data-e="42791">of</span> <span class="w" data-s="42833" data-e="42961">comb.</span></p><p class="zh">她让他观察一格蜂巢。</p></div>
+<div class="pair" data-s0="43260" data-s1="48167"><p class="en"><span class="w" data-s="43260" data-e="43559">The</span> <span class="w" data-s="44028" data-e="44199">deep</span> <span class="w target" data-s="44241" data-e="44839" title="水库;蓄水池；(大量的)储备">reservoir</span> <span class="w" data-s="44881" data-e="45009">behind</span> <span class="w" data-s="45052" data-e="45265">the</span> <span class="w" data-s="45308" data-e="45521">shed</span> <span class="w" data-s="45564" data-e="46161">holds</span> <span class="w" data-s="46204" data-e="46332">the</span> <span class="w" data-s="46375" data-e="46503">water</span> <span class="w" data-s="46545" data-e="46801">she</span> <span class="w target" data-s="46844" data-e="47185" title="保存，保留；预订 η. 储备(量)；保护区">reserves</span> <span class="w" data-s="47228" data-e="47441">for</span> <span class="w" data-s="47484" data-e="47569">the</span> <span class="w" data-s="47612" data-e="47911">driest</span> <span class="w" data-s="47953" data-e="48167">weeks.</span></p><p class="zh">棚子后面那一大池水库，存着她留给最干旱几周的水。</p></div>
+<div class="pair" data-s0="48465" data-s1="53585"><p class="en"><span class="w" data-s="48465" data-e="49233">Four</span> <span class="w" data-s="49276" data-e="49745">generations</span> <span class="w" data-s="49788" data-e="50044">of</span> <span class="w" data-s="50087" data-e="50172">her</span> <span class="w" data-s="50215" data-e="50385">family</span> <span class="w" data-s="50428" data-e="50684">have</span> <span class="w" data-s="50727" data-e="50855">tried</span> <span class="w" data-s="50897" data-e="51068">to</span> <span class="w target" data-s="51111" data-e="51367" title="保护，保存，保藏">conserve</span> <span class="w" data-s="51409" data-e="51623">this</span> <span class="w" data-s="51665" data-e="51836">land,</span> <span class="w" data-s="52092" data-e="52263">and</span> <span class="w" data-s="52391" data-e="52519">she</span> <span class="w" data-s="52561" data-e="52732">means</span> <span class="w" data-s="52775" data-e="53073">to</span> <span class="w target" data-s="53116" data-e="53457" title="保护；保留；保存n.专属领域；独有活动； 动物保护区">preserve</span> <span class="w" data-s="53500" data-e="53585">it.</span></p><p class="zh">她家四代人都在努力保护这片土地，她也打算把它保住。</p></div>
+<div class="pair" data-s0="54110" data-s1="57182"><p class="en"><span class="w" data-s="54110" data-e="54366">People</span> <span class="w" data-s="54409" data-e="54537">say</span> <span class="w" data-s="54579" data-e="54793">she</span> <span class="w target" data-s="54835" data-e="55091" title="值得；应受，应得">deserves</span> <span class="w" data-s="55134" data-e="55262">a</span> <span class="w" data-s="55305" data-e="55561">medal,</span> <span class="w" data-s="55646" data-e="55817">but</span> <span class="w" data-s="56073" data-e="56201">she</span> <span class="w" data-s="56243" data-e="56414">wants</span> <span class="w" data-s="56457" data-e="56670">the</span> <span class="w" data-s="56713" data-e="56883">bees</span> <span class="w" data-s="56926" data-e="57011">to</span> <span class="w" data-s="57054" data-e="57182">stay.</span></p><p class="zh">人们说她该得一枚奖章，可她只想要蜜蜂留下来。</p></div>
+<div class="pair" data-s0="57395" data-s1="59913"><p class="en"><span class="w" data-s="57395" data-e="57609">The</span> <span class="w" data-s="57950" data-e="58121">real</span> <span class="w" data-s="58163" data-e="58377">problem</span> <span class="w" data-s="58419" data-e="58761">came</span> <span class="w" data-s="58889" data-e="59145">from</span> <span class="w" data-s="59187" data-e="59230">the</span> <span class="w" data-s="59273" data-e="59401">field</span> <span class="w" data-s="59443" data-e="59699">next</span> <span class="w" data-s="59742" data-e="59913">door.</span></p><p class="zh">真正的麻烦来自隔壁那块田。</p></div>
+<div class="pair" data-s0="60523" data-s1="64704"><p class="en"><span class="w" data-s="60523" data-e="60651">Its</span> <span class="w" data-s="60693" data-e="60949">owner</span> <span class="w" data-s="60992" data-e="61120">wanted</span> <span class="w" data-s="61163" data-e="61333">to</span> <span class="w target" data-s="61376" data-e="61504" title="保护；防护；防守">protect</span> <span class="w" data-s="61547" data-e="61760">his</span> <span class="w" data-s="61803" data-e="62101">crop,</span> <span class="w" data-s="62272" data-e="62613">so</span> <span class="w" data-s="62699" data-e="62869">he</span> <span class="w" data-s="62912" data-e="62997">used</span> <span class="w" data-s="63040" data-e="63211">a</span> <span class="w" data-s="63253" data-e="63509">chemical</span> <span class="w target" data-s="63552" data-e="63851" title="盾，防护物v. 保护，保卫">shield</span> <span class="w" data-s="63893" data-e="64107">against</span> <span class="w" data-s="64149" data-e="64704">insects.</span></p><p class="zh">田主想保住自己的庄稼，就往田里用了一道化学挡箭牌。</p></div>
+<div class="pair" data-s0="64789" data-s1="66752"><p class="en"><span class="w" data-s="64789" data-e="65600">Rosa</span> <span class="w" data-s="65643" data-e="65771">could</span> <span class="w target" data-s="65813" data-e="66027" title="发现；查明；侦察出">detect</span> <span class="w" data-s="66069" data-e="66197">the</span> <span class="w" data-s="66240" data-e="66411">spray</span> <span class="w" data-s="66453" data-e="66624">at</span> <span class="w" data-s="66667" data-e="66752">once.</span></p><p class="zh">罗莎立刻就察觉到了空气里的药雾。</p></div>
+<div class="pair" data-s0="67008" data-s1="69056"><p class="en"><span class="w" data-s="67008" data-e="67691">Nothing</span> <span class="w" data-s="67733" data-e="67861">could</span> <span class="w target" data-s="67904" data-e="68075" title="阻止;妨碍">prevent</span> <span class="w" data-s="68117" data-e="68331">the</span> <span class="w" data-s="68373" data-e="68544">bees</span> <span class="w" data-s="68587" data-e="68672">from</span> <span class="w" data-s="68715" data-e="69056">dying.</span></p><p class="zh">什么也阻止不了蜜蜂一批批死去。</p></div>
+<div class="pair" data-s0="69574" data-s1="72475"><p class="en"><span class="w" data-s="69574" data-e="69659">The</span> <span class="w" data-s="69702" data-e="70001">island</span> <span class="w" data-s="70043" data-e="70385">council</span> <span class="w" data-s="70427" data-e="70769">voted</span> <span class="w" data-s="70811" data-e="70897">to</span> <span class="w target" data-s="70939" data-e="71195" title="禁止，不准，不许">forbid</span> <span class="w" data-s="71238" data-e="71451">the</span> <span class="w" data-s="71494" data-e="71707">spray</span> <span class="w" data-s="71750" data-e="71963">near</span> <span class="w" data-s="72006" data-e="72091">the</span> <span class="w" data-s="72134" data-e="72475">flowers.</span></p><p class="zh">岛上的议会投票决定禁止在花丛附近喷洒这种药。</p></div>
+<div class="pair" data-s0="72646" data-s1="78278"><p class="en"><span class="w" data-s="72646" data-e="73542">The</span> <span class="w" data-s="73585" data-e="73841">county</span> <span class="w" data-s="73883" data-e="74139">chose</span> <span class="w" data-s="74182" data-e="74310">to</span> <span class="w target" data-s="74353" data-e="74438" title="">ban</span> <span class="w" data-s="74481" data-e="74694">it,</span> <span class="w" data-s="74822" data-e="74993">and</span> <span class="w" data-s="75291" data-e="75462">last</span> <span class="w" data-s="75505" data-e="75761">month</span> <span class="w" data-s="75803" data-e="76230">the</span> <span class="w" data-s="76486" data-e="76699">state</span> <span class="w" data-s="76742" data-e="77041">decided</span> <span class="w" data-s="77083" data-e="77382">to</span> <span class="w target" data-s="77425" data-e="77809" title="禁止；阻止">prohibit</span> <span class="w" data-s="77851" data-e="77937">it</span> <span class="w" data-s="77979" data-e="78107">for</span> <span class="w" data-s="78150" data-e="78278">good.</span></p><p class="zh">县里接着决定禁用它，上个月州里又决定永久禁止。</p></div>
+<div class="pair" data-s0="78974" data-s1="82771"><p class="en"><span class="w" data-s="78974" data-e="79102">The</span> <span class="w" data-s="79144" data-e="79272">air</span> <span class="w" data-s="79315" data-e="79571">near</span> <span class="w" data-s="79614" data-e="79742">the</span> <span class="w" data-s="79784" data-e="80126">hives</span> <span class="w" data-s="80168" data-e="80296">was</span> <span class="w target" data-s="80339" data-e="80808" title="香的，芳香的">fragrant,</span> <span class="w" data-s="80979" data-e="81107">like</span> <span class="w" data-s="81448" data-e="81619">the</span> <span class="w target" data-s="81662" data-e="82046" title="香水；芳香；香料">perfume</span> <span class="w" data-s="82088" data-e="82259">her</span> <span class="w" data-s="82302" data-e="82430">mother</span> <span class="w" data-s="82472" data-e="82771">wore.</span></p><p class="zh">蜂箱边的空气原本是香的，就像她母亲用的香水。</p></div>
+<div class="pair" data-s0="82899" data-s1="87635"><p class="en"><span class="w" data-s="82899" data-e="83112">The</span> <span class="w target" data-s="83496" data-e="83752" title="香味；(人的)气味，气息；(动物留下的)臭迹； 察觉v.嗅出；察觉出，预感到">scent</span> <span class="w" data-s="83795" data-e="83880">of</span> <span class="w" data-s="83923" data-e="84136">honey</span> <span class="w" data-s="84179" data-e="84435">hung</span> <span class="w" data-s="84478" data-e="84520">over</span> <span class="w" data-s="84563" data-e="84691">the</span> <span class="w" data-s="84734" data-e="84862">hill;</span> <span class="w" data-s="85160" data-e="85630">now</span> <span class="w" data-s="85672" data-e="85886">the</span> <span class="w" data-s="85928" data-e="86014">wind</span> <span class="w" data-s="86056" data-e="86526">carried</span> <span class="w" data-s="86568" data-e="86696">the</span> <span class="w" data-s="86739" data-e="86910">smell</span> <span class="w" data-s="86952" data-e="87080">of</span> <span class="w target" data-s="87123" data-e="87379" title="">poison</span> <span class="w" data-s="87422" data-e="87635">instead.</span></p><p class="zh">蜂蜜的香气过去飘满整座山坡；而如今，风里带的却是毒药的味道。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">regardless</span>
+          <span class="ipa">/rr&#x27;ga:rdləs/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">不顾一切地，不管怎样</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Regardless of the cold wind</div>          <div class="root"><span class="lbl">根</span>regard(注意) + less(不) → 不加注意 → 无论如何</div>          <div class="zt"><span class="lbl">真题</span>Skills are highly valued regardless of age. 无论年龄大小，技能都受到高度重视。</div>          <div class="fam"><span class="lbl">族</span>regard v. 注意 / regarding prep. 关于</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">inhabit</span>
+          <span class="ipa">/ın&#x27;hæbit/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She still inhabits the white house on the hill</div>          <div class="mnem"><span class="lbl">记</span>在里面（in）养成了习惯 (habit)。在哪儿呢？在家里，在“居住”的地方 啊→居住于。 第三单元</div>          <div class="root"><span class="lbl">根</span>in(在里面) + habit(习惯) → 住惯了的地方 → 居住于</div>          <div class="zt"><span class="lbl">真题</span>Blocks of flats built in the past in Britain were mostly inhabited by people who did not earn much. 英国过去建造的公寓楼大多居住着 收入不高的人。</div>          <div class="fam"><span class="lbl">族</span>inhabitant n. 居民 / habitat n. 栖息地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">habitat</span>
+          <span class="ipa">/&#x27;hæbitæt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(动植物的)栖息地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wild bees have their habitat there too</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆成两部分，habit 的意思是“习惯”，at是“在”，那我们一般在哪儿 比较习惯？在家里啊，“栖息地”啊。</div>          <div class="root"><span class="lbl">根</span>habit(习惯) + at(在) → 待惯了的地方 → 栖息地</div>          <div class="zt"><span class="lbl">真题</span>The bear would do better in its natural habitat and the agency would step in if its condition deteriorated.这只熊在它的自然栖息 地会生活得更好，如果它的状况恶化，该机构将 介入。(2017)</div>          <div class="fam"><span class="lbl">族</span>inhabit v. 居住于 / habitable adj. 可居住的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">reside</span>
+          <span class="ipa">/rı&#x27;zaıd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">居住在；定居于 adj.(在某地)居住的 residence /&#x27;rezidəns/ n. 住所;住房；定居</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>came from the south to reside on Bell Island</div>          <div class="mnem"><span class="lbl">记</span>我住在街的一面，阿姨(re)住在 街的另一面(side)→居住在;定居于。</div>          <div class="root"><span class="lbl">根</span>re(一再) + sid(坐) → 坐下来不走 → 定居</div>          <div class="zt"><span class="lbl">真题</span>They reside in our minds. 它们存在于我 们的头脑中。</div>          <div class="fam"><span class="lbl">族</span>residence n. 住所 / resident n. 居民</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">extinct</span>
+          <span class="ipa">/ık&#x27;stınkt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">灭绝的，绝种的；消逝的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>three villages away the same bee is extinct</div>          <div class="root"><span class="lbl">根</span>ex(出) + stinct(扑灭) → 火彻底灭掉 → 灭绝的</div>          <div class="fam"><span class="lbl">族</span>extinction n. 灭绝 / extinct adj. 绝种的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">instinct</span>
+          <span class="ipa">/&#x27;ınstınkt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">本能,直觉；天赋</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>taught her to trust her instinct</div>          <div class="mnem"><span class="lbl">记</span>内心(in)死盯(stin)着的东西， 不就是“本能”的东西吗？</div>          <div class="root"><span class="lbl">根</span>in(内) + stinct(刺) → 内心里的冲动 → 本能</div>          <div class="zt"><span class="lbl">真题</span>Compared with other mammals, our numerical instincts are not as remarkable as (057) many assume. 与其他哺乳动物相比，我们对数 字的直觉并不像许多人认为的那样卓越。 (2021)</div>          <div class="fam"><span class="lbl">族</span>instinctive adj. 本能的 / instinctively adv. 本能地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">sting</span>
+          <span class="ipa">/stip/</span>
+          <span class="pos">v.</span>
+          <span class="cn">刺；蜇n. 螫针,刺；痛苦 v. 刺穿，刺破，穿孔 v. 猛推；冲；操；挤；塞n.(论据、政策等的)要 点；驱动力；猛推；刺；戳；插</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>thrusts its sting into your skin</div>          <div class="mnem"><span class="lbl">记</span>该单词和trust(信任)很像，如 果人与人之间没了信任，生活早晚得给你“刺” 一刀。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a bee sting 被蜂蜇一下 → 刺</div>          <div class="zt"><span class="lbl">真题</span>She was pierced by a chicken bone. 她被 一块鸡骨头刺穿了。</div>          <div class="fam"><span class="lbl">族</span>sting v. 蜇 / stung (sting 的过去式)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">pierce</span>
+          <span class="ipa">/pirs/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>another pierced her glove</div>          <div class="root"><span class="lbl">根</span>谐音「劈死」→ 一下子刺穿</div>          <div class="fam"><span class="lbl">族</span>piercing adj. 刺骨的；尖锐的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">thrust</span>
+          <span class="ipa">/θrast/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a bee thrusts its sting</div>          <div class="root"><span class="lbl">根</span>靠搭配记：thrust a knife into 猛地把刀插进去</div>          <div class="fam"><span class="lbl">族</span>thrust n. 猛推；要旨</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">distinguish</span>
+          <span class="ipa">/dr&#x27;stıngwıʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">区分，辨别</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to distinguish the sick hives from the healthy ones</div>          <div class="root"><span class="lbl">根</span>dis(分开) + stingu(刺、标记) → 分开做记号 → 区分</div>          <div class="zt"><span class="lbl">真题</span>What distinguishes children from adults is their strong ability to derive joy from what they are doing. 儿童与成人的区别在于他们从 所做的事情中获得快乐的能力很强。(2015) 似乎在努力地听老师讲故事，试图“辨别”出故 事里谁好谁坏。</div>          <div class="fam"><span class="lbl">族</span>distinction n. 区别 / distinct adj. 明显的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">distinct</span>
+          <span class="ipa">/dr&#x27;stınkt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有区别的；明确的；显著的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>has a distinct pattern on its back</div>          <div class="root"><span class="lbl">根</span>dis(分开) + stinct(刺) → 彼此分开的 → 有区别的</div>          <div class="zt"><span class="lbl">真题</span>Start-up investors are a distinct type of rich people. 创业投资者是一类独特的富人。 (2015)</div>          <div class="fam"><span class="lbl">族</span>distinctly adv. 明显地 / distinction n. 差别</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">distinctive</span>
+          <span class="ipa">/dı&#x27;stıgktıv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">独特的；特别的；有特色的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a distinctive smell</div>          <div class="root"><span class="lbl">根</span>distinct(有区别的) + ive → 有自己特点的</div>          <div class="zt"><span class="lbl">真题</span>They have a distinctive style of handwriting. 他们的书写风格很独特。</div>          <div class="fam"><span class="lbl">族</span>distinction n. 特色 / distinctively adv. 独特地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">reserve</span>
+          <span class="ipa">/rı&#x27;z3:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保存，保留；预订 η. 储备(量)；保护区</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the water she reserves for the driest weeks</div>          <div class="mnem"><span class="lbl">记</span>re 表示重复，serve表示服务，</div>          <div class="root"><span class="lbl">根</span>re(再) + serve(保存) → 再留起来 → 保留；预订</div>          <div class="zt"><span class="lbl">真题</span>They use their money reserves to back up consumption.他们用他们的货币储备来支持消 费。(2016)</div>          <div class="fam"><span class="lbl">族</span>reservation n. 预订 / reserved adj. 保留的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">reservoir</span>
+          <span class="ipa">/&#x27;rezərvwa:r/</span>
+          <span class="pos">n.</span>
+          <span class="cn">水库;蓄水池；(大量的)储备</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The deep reservoir behind the shed</div>          <div class="mnem"><span class="lbl">记</span>发音类似：弟似听故事→弟弟 想法和见解。</div>          <div class="root"><span class="lbl">根</span>reserve(保存) + oir(地方) → 存水的地方</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s often people like Steve Jobs who can draw from a deep reservoir of diverse experiences that often generate breakthrough ideas and insights. 通常像史蒂夫·乔布斯这样的人能够 从丰富的经验中汲取灵感，从而产生突破性的</div>          <div class="fam"><span class="lbl">族</span>reserve v. 保存 / n. 储备</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">observe</span>
+          <span class="ipa">/əb&#x27;z3:rv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">观察；遵守；评论，评说</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>let him observe a frame of comb</div>          <div class="mnem"><span class="lbl">记</span>ob表示方向，你要为我服务 (serve)，你当然要朝着我的方向，遵守我的要 求。该单词的意思是“观察；遵守”。</div>          <div class="root"><span class="lbl">根</span>ob(朝着) + serve(看守) → 朝着看 → 观察</div>          <div class="zt"><span class="lbl">真题</span>He observed that people living in green (058 spaces were less stressed, and less stressed people made more sensible decisions and communicated better.他观察到，生活在绿色空 间的人压力较小，压力较小的人会做出更明智 的决定，也能更好地沟通。(2018)</div>          <div class="fam"><span class="lbl">族</span>observation n. 观察 / observer n. 观察者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">deserve</span>
+          <span class="ipa">/dı&#x27;z3:rv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">值得；应受，应得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she deserves a medal</div>          <div class="mnem"><span class="lbl">记</span>de发音类似“弟弟”，弟弟为你 服务(serve)，你是什么感觉？理所应当的啊。 所以该单词的意思是“应受，应得”。</div>          <div class="root"><span class="lbl">根</span>de(加强) + serve(服务) → 服务到位 → 应得</div>          <div class="zt"><span class="lbl">真题</span>Any product that promises to protect your home deserves careful examination. 任何 承诺保护您家的产品都值得仔细检查。(2016)</div>          <div class="fam"><span class="lbl">族</span>deserving adj. 值得的 / deservedly adv. 应得地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">conserve</span>
+          <span class="ipa">/kən&#x27;sə:rv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保护，保存，保藏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>have tried to conserve this land</div>          <div class="mnem"><span class="lbl">记</span>con前缀表示“所有的”，你们所 有人都去我家做客，我要为你们所有人服务 (serve)，所以我要提前“保存，保藏”些食物。</div>          <div class="root"><span class="lbl">根</span>con(共同) + serve(保存) → 一起保住 → 保护</div>          <div class="zt"><span class="lbl">真题</span>The indoor environment was dirty long before energy conservation came along. 早在节 能措施出现之前，室内环境就已经很脏了。 (059 第三单元</div>          <div class="fam"><span class="lbl">族</span>conservation n. 保护；节约</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">preserve</span>
+          <span class="ipa">/prı&#x27;zərv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保护；保留；保存n.专属领域；独有活动； 动物保护区</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she means to preserve it</div>          <div class="mnem"><span class="lbl">记</span>pre前缀表示“提前”，serve表 示“服务”，即“提前服务”，因为要为你们所有人 服务，所以我要提前“保存”些食物。</div>          <div class="root"><span class="lbl">根</span>pre(提前) + serve(保存) → 提前保住 → 保存</div>          <div class="zt"><span class="lbl">真题</span>Hyphenating names allows the bride to preserve her own identity while respecting tradition.用连字符连接的名字可以让新娘在尊 重传统的同时保留自己的身份。(2023)</div>          <div class="fam"><span class="lbl">族</span>preservation n. 保存 / preservative n. 防腐剂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">protect</span>
+          <span class="ipa">/prə&#x27;tekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">保护；防护；防守</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wanted to protect his crop</div>          <div class="mnem"><span class="lbl">记</span>提前（pro）探个它（tect的谐 音），提前把路探好，以防出事，就是“保护；防 守”。</div>          <div class="root"><span class="lbl">根</span>pro(在前) + tect(遮盖) → 在前面遮住 → 保护</div>          <div class="zt"><span class="lbl">真题</span>The chief duty of every government is to protect persons and property. 每一个政府的首 要职责都是保护人民和财产。(2016)</div>          <div class="fam"><span class="lbl">族</span>protection n. 保护 / protective adj. 有保护作用的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">shield</span>
+          <span class="ipa">/Si:ld/</span>
+          <span class="pos">n.</span>
+          <span class="cn">盾，防护物v. 保护，保卫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a chemical shield against insects</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：她（shi发音 类似 she)老了(eld)，就不能“保护”你了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a shield against 挡……的盾</div>          <div class="zt"><span class="lbl">真题</span>You can&#x27;t shield her from the truth forever.你不可能永远瞒着她，不让她知道事实 真相。</div>          <div class="fam"><span class="lbl">族</span>shield v. 保护，保卫</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">detect</span>
+          <span class="ipa">/dı&#x27;tekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发现；查明；侦察出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa could detect the spray at once</div>          <div class="mnem"><span class="lbl">记</span>往下(de)探(te的谐音)个它(ct 的谐音)，钻探工人就是往下钻井，为了“查明” 地下是不是有石油层。</div>          <div class="root"><span class="lbl">根</span>de(去掉) + tect(遮盖) → 揭开盖子 → 发现</div>          <div class="zt"><span class="lbl">真题</span>The tests are designed to detect changes in mental function. 这些测试旨在检测心理功 能的变化。(2016)</div>          <div class="fam"><span class="lbl">族</span>detection n. 察觉 / detective n. 侦探</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">detective</span>
+          <span class="ipa">/dı&#x27;tektiv/</span>
+          <span class="pos"></span>
+          <span class="cn">侦探；警探；私人侦探</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A young detective came from the mainland</div>          <div class="root"><span class="lbl">根</span>detect(发现) + ive(人) → 专门查案的人</div>          <div class="zt"><span class="lbl">真题</span>It helps the police narrow down possibilities in detective work. 它有助于警方缩小侦探工作 的可能性。</div>          <div class="fam"><span class="lbl">族</span>detect v. 发现 / detection n. 侦察</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">scent</span>
+          <span class="ipa">/sent/</span>
+          <span class="pos"></span>
+          <span class="cn">香味；(人的)气味，气息；(动物留下的)臭迹； 察觉v.嗅出；察觉出，预感到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The scent of honey hung over the hill</div>          <div class="mnem"><span class="lbl">记</span>《闻香识女人》的英文就是 Scent Of A Woman。发音类似 sent(送出)， “香味”都送出去了。</div>          <div class="root"><span class="lbl">根</span>联想：《闻香识女人》Scent of a Woman</div>          <div class="fam"><span class="lbl">族</span>scented adj. 有香味的 / scentless adj. 无味的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">fragrant</span>
+          <span class="ipa">/&#x27;freigrənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">香的，芳香的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The air near the hives was fragrant</div>          <div class="mnem"><span class="lbl">记</span>fr(芙蓉)十ag(阿哥)+r(想成 花)十ant(蚂蚁)，连在一起就是：芙蓉和阿哥把 “香的”花给了蚂蚁。</div>          <div class="root"><span class="lbl">根</span>与 fragrance(香味) 同源 → 香的</div>          <div class="zt"><span class="lbl">真题</span>The air was fragrant with scents from the sea and the hills. 空气中荡漾着山和海的芬 芳的气息。</div>          <div class="fam"><span class="lbl">族</span>fragrance n. 香味 / fragrantly adv. 芬芳地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">perfume</span>
+          <span class="ipa">/&#x27;pə:fju:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">香水；芳香；香料</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>like the perfume her mother wore</div>          <div class="mnem"><span class="lbl">记</span>每一个（per）服（fu）我（me）的 人，都给一瓶“香水”。</div>          <div class="root"><span class="lbl">根</span>per(穿过) + fume(烟气) → 飘过来的香气 → 香水</div>          <div class="zt"><span class="lbl">真题</span>She always puts a bit of perfume behind her ears in the morning. 早上，她总是朝耳后搽 点香水。</div>          <div class="fam"><span class="lbl">族</span>fragrant adj. 香的 / perfumed adj. 洒了香水的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">poison</span>
+          <span class="ipa">/&#x27;pəizn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the smell of poison instead</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“跑人”。前面 有“毒药”，赶紧跑人。</div>          <div class="root"><span class="lbl">根</span>谐音「跑人」→ 前面有毒药，赶紧跑人</div>          <div class="zt"><span class="lbl">真题</span>What people eat can be medicine or poison.人们吃的东西可能是药，也可能是毒 药。(2018)</div>          <div class="fam"><span class="lbl">族</span>poisonous adj. 有毒的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">prevent</span>
+          <span class="ipa">/prı&#x27;vent/</span>
+          <span class="pos">v.</span>
+          <span class="cn">阻止;妨碍</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nothing could prevent the bees from dying</div>          <div class="mnem"><span class="lbl">记</span>pre(在前面)十vent(很像 went 走)，那就是在你前面走。总在你前面走，不让 你超过他，他在干嘛？“阻止”你啊。</div>          <div class="root"><span class="lbl">根</span>pre(在前) + vent(走) → 走在前面挡住 → 阻止</div>          <div class="zt"><span class="lbl">真题</span>It may prevent your business and career from advancing. 它可能会阻碍你的事业和职业 的发展。(2015)</div>          <div class="fam"><span class="lbl">族</span>prevention n. 预防 / preventable adj. 可预防的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">forbid</span>
+          <span class="ipa">/fər&#x27;bıd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">禁止，不准，不许</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>voted to forbid the spray near the flowers</div>          <div class="mnem"><span class="lbl">记</span>forbid发音类似“封闭的”。封 闭的地方就是禁止入内的→禁止，不许。the Forbidden City 紫禁城，“禁止”普通人随便进入 的城。</div>          <div class="root"><span class="lbl">根</span>for(禁止) + bid(命令) → 下令不许 → 禁止</div>          <div class="zt"><span class="lbl">真题</span>Children are forbidden to visit terminally ill patients. 儿童被禁止去探望绝症患者。</div>          <div class="fam"><span class="lbl">族</span>forbidden adj. 被禁止的 / the Forbidden City 紫禁城</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">ban</span>
+          <span class="ipa">/bæn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>chose to ban it</div>          <div class="mnem"><span class="lbl">记</span>ban发音类似“扳(倒）”。一个 贪污的官员一旦被扳倒，就被“禁止”出现在历 史的舞台上了。</div>          <div class="root"><span class="lbl">根</span>谐音「扳」→ 被扳倒就禁止再上台</div>          <div class="zt"><span class="lbl">真题</span>That&#x27;s because he plans to ban tipping in favor of paying his servers an actual living wage.那是因为他计划禁止给服务员小费，而给 他们支付实际生活工资。(2016)</div>          <div class="fam"><span class="lbl">族</span>ban n. 禁令 / banned adj. 被禁的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">prohibit</span>
+          <span class="ipa">/prə&#x27;hıbıt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">禁止；阻止</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>decided to prohibit it for good</div>          <div class="mnem"><span class="lbl">记</span>站在Hebe(赫柏，希腊神话中 的女神，发音和 hibi相似)的前面(pro)，“阻止” 她(t)前进啊。</div>          <div class="root"><span class="lbl">根</span>pro(在前) + hibit(拿住) → 挡在前面拦住 → 禁止</div>          <div class="zt"><span class="lbl">真题</span>Record&#x27;s suggestion is to prohibit agents from hiring models with a BMI below 18. 勒科 (060 尔的建议是禁止经纪公司雇用体重指数低于18 的模特。(2016)</div>          <div class="fam"><span class="lbl">族</span>prohibition n. 禁令 / prohibitive adj. 贵得吓人的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 15</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,696 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 27 · The Man Who Quit His Phone</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 27 · 11/8 · Unit 4 第 781-810 词</div>
+  <h1>The Man Who Quit His Phone<span class="cn">戒掉手机的那个人</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-27.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2603"><p class="en"><span class="w" data-s="43" data-e="341">Liu</span> <span class="w" data-s="384" data-e="555">Wei</span> <span class="w" data-s="597" data-e="725">worked</span> <span class="w" data-s="768" data-e="939">in</span> <span class="w" data-s="981" data-e="1067">a</span> <span class="w" data-s="1109" data-e="1451">factory</span> <span class="w" data-s="1493" data-e="1664">that</span> <span class="w target" data-s="1707" data-e="2304" title="(用机器)大量生产，成批制造 η. 大量制 造；批量生产 adj.完美的；完全的;最佳的 v. 使完善；使完 美；使完备">manufactured</span> <span class="w" data-s="2347" data-e="2603">locks.</span></p><p class="zh">刘伟在一家制造锁具的工厂上班。</p></div>
+<div class="pair" data-s0="2859" data-s1="8363"><p class="en"><span class="w" data-s="2859" data-e="3712">Its</span> <span class="w" data-s="3755" data-e="3840">old</span> <span class="w" data-s="3883" data-e="4096">machine</span> <span class="w" data-s="4139" data-e="4395">had</span> <span class="w" data-s="4437" data-e="4523">a</span> <span class="w target" data-s="4565" data-e="4864" title="缺点，缺陷">defect,</span> <span class="w" data-s="5077" data-e="5333">but</span> <span class="w" data-s="5461" data-e="5717">nobody</span> <span class="w" data-s="5760" data-e="6272">repaired</span> <span class="w" data-s="6315" data-e="6443">it.</span> <span class="w" data-s="6613" data-e="7083">The</span> <span class="w target" data-s="7211" data-e="7595" title="">payroll</span> <span class="w" data-s="7637" data-e="7808">had</span> <span class="w" data-s="7851" data-e="7979">not</span> <span class="w" data-s="8021" data-e="8363">risen</span></p><p class="zh">厂里那台老机器有个缺陷，工资单上的数字也两年没涨了。</p></div>
+<div class="pair" data-s0="8405" data-s1="12979"><p class="en"><span class="w" data-s="8405" data-e="8576">for</span> <span class="w" data-s="8619" data-e="8789">two</span> <span class="w" data-s="8832" data-e="9003">years.</span> <span class="w" data-s="9907" data-e="10077">Every</span> <span class="w" data-s="10120" data-e="10376">night</span> <span class="w" data-s="10419" data-e="11016">Liu</span> <span class="w" data-s="11059" data-e="11187">Wei</span> <span class="w" data-s="11229" data-e="11400">would</span> <span class="w target" data-s="11443" data-e="11869" title="使沉溺于，纵容">indulge</span> <span class="w" data-s="11912" data-e="12040">in</span> <span class="w" data-s="12083" data-e="12168">short</span> <span class="w" data-s="12211" data-e="12467">videos</span> <span class="w" data-s="12509" data-e="12979">until</span></p><p class="zh">每天晚上，他都沉溺在短视频里，看到凌晨两点。</p></div>
+<div class="pair" data-s0="13021" data-s1="16392"><p class="en"><span class="w" data-s="13021" data-e="13235">two</span> <span class="w" data-s="13277" data-e="13448">in</span> <span class="w" data-s="13491" data-e="13533">the</span> <span class="w" data-s="13576" data-e="13704">morning.</span> <span class="w" data-s="13960" data-e="14429">He</span> <span class="w" data-s="14557" data-e="14685">was</span> <span class="w target" data-s="14728" data-e="15027" title="使成瘾，使入迷n. 入迷的人，成瘾的人">addicted</span> <span class="w" data-s="15069" data-e="15155">to</span> <span class="w" data-s="15197" data-e="15325">his</span> <span class="w" data-s="15368" data-e="15496">phone,</span> <span class="w" data-s="15795" data-e="16008">and</span> <span class="w" data-s="16221" data-e="16392">his</span></p><p class="zh">他对手机上瘾，白天心思总是飘走。</p></div>
+<div class="pair" data-s0="16435" data-s1="19638"><p class="en"><span class="w" data-s="16435" data-e="16563">mind</span> <span class="w" data-s="16605" data-e="16819">would</span> <span class="w target" data-s="16861" data-e="17160" title="漫游，闲逛；思想开小差">wander</span> <span class="w" data-s="17203" data-e="17416">all</span> <span class="w" data-s="17459" data-e="17715">day.</span> <span class="w" data-s="18401" data-e="18529">He</span> <span class="w" data-s="18571" data-e="18699">could</span> <span class="w" data-s="18742" data-e="18827">not</span> <span class="w target" data-s="18870" data-e="19467" title="集中，专心于 η. 浓缩物">concentrate</span> <span class="w" data-s="19510" data-e="19638">at</span></p><p class="zh">他集中不了精神，妻子为此常跟他抬杠。</p></div>
+<div class="pair" data-s0="19681" data-s1="21942"><p class="en"><span class="w" data-s="19681" data-e="19766">work,</span> <span class="w" data-s="20022" data-e="20235">and</span> <span class="w" data-s="20491" data-e="20662">his</span> <span class="w" data-s="20705" data-e="20833">wife</span> <span class="w" data-s="20875" data-e="21131">would</span> <span class="w target" data-s="21174" data-e="21601" title="反驳;否认 (104)">contradict</span> <span class="w" data-s="21643" data-e="21814">him</span> <span class="w" data-s="21857" data-e="21942">about</span></p><p class="zh">他没法否认她说得对。</p></div>
+<div class="pair" data-s0="21985" data-s1="26721"><p class="en"><span class="w" data-s="21985" data-e="22198">it.</span> <span class="w" data-s="22326" data-e="22539">He</span> <span class="w" data-s="22710" data-e="22838">could</span> <span class="w" data-s="22881" data-e="23009">not</span> <span class="w target" data-s="23051" data-e="23307" title="否认；拒绝">deny</span> <span class="w" data-s="23350" data-e="23606">that</span> <span class="w" data-s="23649" data-e="23734">she</span> <span class="w" data-s="23777" data-e="23905">was</span> <span class="w" data-s="23947" data-e="24075">right.</span> <span class="w" data-s="24289" data-e="24502">His</span> <span class="w" data-s="24886" data-e="25057">eyes</span> <span class="w" data-s="25099" data-e="25398">hurt,</span> <span class="w" data-s="25569" data-e="25910">and</span> <span class="w" data-s="26123" data-e="26251">the</span> <span class="w" data-s="26294" data-e="26379">doctor</span> <span class="w" data-s="26422" data-e="26721">said</span></p><p class="zh">他的眼睛开始疼，医生说这样滥用睡眠会影响他的心脏。</p></div>
+<div class="pair" data-s0="26763" data-s1="32033"><p class="en"><span class="w" data-s="26763" data-e="27019">that</span> <span class="w" data-s="27062" data-e="27147">the</span> <span class="w target" data-s="27190" data-e="27403" title="滥用，妄用；虐待；辱骂；诋毁">abuse</span> <span class="w" data-s="27446" data-e="27574">of</span> <span class="w" data-s="27617" data-e="27745">his</span> <span class="w" data-s="27787" data-e="27915">sleep</span> <span class="w" data-s="27958" data-e="28214">would</span> <span class="w" data-s="28257" data-e="28427">soon</span> <span class="w target" data-s="28470" data-e="28726" title="影响；侵袭；感染">affect</span> <span class="w" data-s="28769" data-e="28982">his</span> <span class="w" data-s="29025" data-e="29195">heart.</span> <span class="w" data-s="29815" data-e="29900">The</span> <span class="w target" data-s="29943" data-e="30071" title="效果，影响">effect</span> <span class="w" data-s="30113" data-e="30327">was</span> <span class="w" data-s="30369" data-e="30497">easy</span> <span class="w" data-s="30540" data-e="30753">to</span> <span class="w target" data-s="30796" data-e="31009" title="预言；预告">predict:</span> <span class="w" data-s="31265" data-e="31777">he</span> <span class="w" data-s="31820" data-e="32033">fell</span></p><p class="zh">后果不难预言：他趴在桌上睡着了，工资条上写明了一笔罚款。</p></div>
+<div class="pair" data-s0="32076" data-s1="36812"><p class="en"><span class="w" data-s="32076" data-e="32375">asleep</span> <span class="w" data-s="32417" data-e="32503">at</span> <span class="w" data-s="32545" data-e="32588">his</span> <span class="w" data-s="32631" data-e="32929">desk,</span> <span class="w" data-s="33143" data-e="33313">and</span> <span class="w" data-s="33569" data-e="33783">his</span> <span class="w" data-s="33825" data-e="33911">pay</span> <span class="w" data-s="33953" data-e="34209">slip</span> <span class="w target" data-s="34252" data-e="34636" title="暗示；表明">indicated</span> <span class="w" data-s="34679" data-e="34849">a</span> <span class="w" data-s="34892" data-e="35020">fine.</span> <span class="w" data-s="35319" data-e="35489">He</span> <span class="w" data-s="35959" data-e="36172">showed</span> <span class="w" data-s="36215" data-e="36428">less</span> <span class="w" data-s="36471" data-e="36684">and</span> <span class="w" data-s="36727" data-e="36812">less</span></p><p class="zh">他在家里表现出的感情越来越少，而这样的坏习惯会传染一整个家庭。</p></div>
+<div class="pair" data-s0="36855" data-s1="40524"><p class="en"><span class="w target" data-s="36855" data-e="37239" title="感情；影响；喜爱，钟爱；爱情">affection</span> <span class="w" data-s="37281" data-e="37452">at</span> <span class="w" data-s="37495" data-e="37580">home,</span> <span class="w" data-s="37836" data-e="38135">and</span> <span class="w" data-s="38177" data-e="38391">a</span> <span class="w" data-s="38433" data-e="38519">habit</span> <span class="w" data-s="38561" data-e="38775">like</span> <span class="w" data-s="38817" data-e="38988">that</span> <span class="w" data-s="39031" data-e="39372">can</span> <span class="w target" data-s="39628" data-e="39841" title="传染；使感染；使携带病菌">infect</span> <span class="w" data-s="39884" data-e="40097">a</span> <span class="w" data-s="40140" data-e="40225">whole</span> <span class="w" data-s="40268" data-e="40524">family.</span></p><p class="zh">他的一个朋友就是因为同样的原因离了婚。</p></div>
+<div class="pair" data-s0="41258" data-s1="42154"><p class="en"><span class="w" data-s="41258" data-e="41386">One</span> <span class="w" data-s="41428" data-e="41514">of</span> <span class="w" data-s="41556" data-e="41599">his</span> <span class="w" data-s="41642" data-e="41812">friends</span> <span class="w" data-s="41855" data-e="42154">had</span></p><p class="zh">后来，妻子怀孕了。</p></div>
+<div class="pair" data-s0="42196" data-s1="44756"><p class="en"><span class="w" data-s="42196" data-e="42367">gone</span> <span class="w" data-s="42410" data-e="42580">through</span> <span class="w" data-s="42623" data-e="42708">a</span> <span class="w target" data-s="42751" data-e="43050" title="&amp; v. 离婚；分离">divorce</span> <span class="w" data-s="43092" data-e="43263">for</span> <span class="w" data-s="43306" data-e="43391">the</span> <span class="w" data-s="43434" data-e="43519">same</span> <span class="w" data-s="43562" data-e="43732">reason.</span> <span class="w" data-s="44031" data-e="44756">Then</span></p><p class="zh">一个星期一，他走进了滨河社区中心。</p></div>
+<div class="pair" data-s0="44799" data-s1="47743"><p class="en"><span class="w" data-s="44799" data-e="44970">his</span> <span class="w" data-s="45012" data-e="45140">wife</span> <span class="w" data-s="45183" data-e="45439">became</span> <span class="w target" data-s="45482" data-e="45908" title="怀孕的，妊娠的；意义重大的">pregnant.</span> <span class="w" data-s="46079" data-e="46506">One</span> <span class="w" data-s="46548" data-e="46890">Monday</span> <span class="w" data-s="46932" data-e="47146">he</span> <span class="w" data-s="47188" data-e="47316">walked</span> <span class="w" data-s="47359" data-e="47572">into</span> <span class="w" data-s="47615" data-e="47743">the</span></p><p class="zh">一位接待员请他在前台登记。</p></div>
+<div class="pair" data-s0="47786" data-s1="52308"><p class="en"><span class="w" data-s="47786" data-e="48084">Riverside</span> <span class="w" data-s="48127" data-e="48554">Community</span> <span class="w" data-s="48596" data-e="48980">Centre.</span> <span class="w" data-s="49108" data-e="49407">A</span> <span class="w target" data-s="49450" data-e="50303" title="">receptionist</span> <span class="w" data-s="50346" data-e="50516">asked</span> <span class="w" data-s="50559" data-e="50730">him</span> <span class="w" data-s="50772" data-e="50815">to</span> <span class="w target" data-s="50858" data-e="51156" title="登记；注册；注意到η. 登记表，注册簿">register</span> <span class="w" data-s="51199" data-e="51370">at</span> <span class="w" data-s="51412" data-e="51455">the</span> <span class="w" data-s="51498" data-e="51583">front</span> <span class="w" data-s="51626" data-e="51924">desk.</span> <span class="w" data-s="52223" data-e="52308">He</span></p><p class="zh">他把名字写进登记簿，她递给他一张收据。</p></div>
+<div class="pair" data-s0="52351" data-s1="54186"><p class="en"><span class="w" data-s="52351" data-e="52522">wrote</span> <span class="w" data-s="52564" data-e="52692">his</span> <span class="w" data-s="52735" data-e="52820">name</span> <span class="w" data-s="52863" data-e="53034">in</span> <span class="w" data-s="53076" data-e="53119">the</span> <span class="w target" data-s="53162" data-e="53332" title="">entry</span> <span class="w" data-s="53375" data-e="53546">book,</span> <span class="w" data-s="53716" data-e="53844">and</span> <span class="w" data-s="54015" data-e="54186">she</span></p><p class="zh">他是新会员卡的第一位领取者。</p></div>
+<div class="pair" data-s0="54228" data-s1="58504"><p class="en"><span class="w" data-s="54228" data-e="54484">handed</span> <span class="w" data-s="54527" data-e="54570">him</span> <span class="w" data-s="54612" data-e="54698">a</span> <span class="w target" data-s="54740" data-e="55082" title="">receipt.</span> <span class="w" data-s="55210" data-e="55551">He</span> <span class="w" data-s="55594" data-e="55722">was</span> <span class="w" data-s="55764" data-e="55807">the</span> <span class="w" data-s="55850" data-e="55978">first</span> <span class="w target" data-s="56020" data-e="56490" title="">recipient</span> <span class="w" data-s="56532" data-e="56703">of</span> <span class="w" data-s="56746" data-e="56874">the</span> <span class="w" data-s="56916" data-e="56959">new</span> <span class="w" data-s="57002" data-e="57172">member</span> <span class="w" data-s="57215" data-e="57428">card.</span> <span class="w" data-s="58291" data-e="58376">The</span> <span class="w" data-s="58419" data-e="58504">card</span></p><p class="zh">这张卡让他有权免费喝三杯茶，还能和医生谈一次。</p></div>
+<div class="pair" data-s0="58547" data-s1="61320"><p class="en"><span class="w target" data-s="58547" data-e="59059" title="给……权利或资格">entitled</span> <span class="w" data-s="59101" data-e="59187">him</span> <span class="w" data-s="59229" data-e="59400">to</span> <span class="w" data-s="59443" data-e="59613">three</span> <span class="w" data-s="59656" data-e="59912">free</span> <span class="w" data-s="59955" data-e="60253">cups</span> <span class="w" data-s="60296" data-e="60381">of</span> <span class="w" data-s="60424" data-e="60595">tea</span> <span class="w" data-s="60637" data-e="60893">and</span> <span class="w" data-s="61064" data-e="61320">one</span></p><p class="zh">中心正在为秋季班招募新成员。</p></div>
+<div class="pair" data-s0="61363" data-s1="64349"><p class="en"><span class="w" data-s="61363" data-e="61619">free</span> <span class="w" data-s="61661" data-e="61832">talk</span> <span class="w" data-s="61875" data-e="62088">with</span> <span class="w" data-s="62131" data-e="62216">a</span> <span class="w" data-s="62259" data-e="62344">doctor.</span> <span class="w" data-s="62643" data-e="62899">The</span> <span class="w" data-s="63283" data-e="63624">centre</span> <span class="w" data-s="63667" data-e="63752">was</span> <span class="w target" data-s="63795" data-e="64221" title="吸收(新成员);劝说 n7. 新成员">recruiting</span> <span class="w" data-s="64264" data-e="64349">new</span></p><p class="zh">课程质量不错，费用也低。</p></div>
+<div class="pair" data-s0="64392" data-s1="67251"><p class="en"><span class="w" data-s="64392" data-e="64563">members</span> <span class="w" data-s="64605" data-e="64904">for</span> <span class="w" data-s="64947" data-e="65032">the</span> <span class="w" data-s="65075" data-e="65373">autumn</span> <span class="w" data-s="65416" data-e="65501">term.</span> <span class="w" data-s="65757" data-e="66227">The</span> <span class="w target" data-s="66269" data-e="66440" title="">quality</span> <span class="w" data-s="66483" data-e="66781">of</span> <span class="w" data-s="66824" data-e="66909">the</span> <span class="w" data-s="66952" data-e="67037">course</span> <span class="w" data-s="67080" data-e="67251">was</span></p><p class="zh">这里的设施有一间安静的房间和一条长长的花园小径。</p></div>
+<div class="pair" data-s0="67293" data-s1="70464"><p class="en"><span class="w" data-s="67293" data-e="67507">good,</span> <span class="w" data-s="67677" data-e="67891">and</span> <span class="w" data-s="68061" data-e="68189">the</span> <span class="w" data-s="68232" data-e="68360">fee</span> <span class="w" data-s="68403" data-e="68531">was</span> <span class="w" data-s="68573" data-e="68744">low.</span> <span class="w" data-s="69397" data-e="69568">The</span> <span class="w target" data-s="69610" data-e="69909" title="">facility</span> <span class="w" data-s="69952" data-e="70165">had</span> <span class="w" data-s="70208" data-e="70293">a</span> <span class="w" data-s="70336" data-e="70464">quiet</span></p><p class="zh">他付了第一个月的钱，当天晚上就报了名。</p></div>
+<div class="pair" data-s0="70506" data-s1="76437"><p class="en"><span class="w" data-s="70506" data-e="70805">room,</span> <span class="w" data-s="71018" data-e="71317">a</span> <span class="w" data-s="71360" data-e="71658">small</span> <span class="w" data-s="71701" data-e="72213">library</span> <span class="w" data-s="72256" data-e="72554">and</span> <span class="w" data-s="72682" data-e="72768">a</span> <span class="w" data-s="72810" data-e="72896">long</span> <span class="w" data-s="72938" data-e="73365">garden</span> <span class="w" data-s="73408" data-e="73493">path.</span> <span class="w" data-s="73834" data-e="74261">He</span> <span class="w" data-s="74304" data-e="74560">paid</span> <span class="w" data-s="74602" data-e="74773">for</span> <span class="w" data-s="74816" data-e="74858">the</span> <span class="w" data-s="74901" data-e="74986">first</span> <span class="w" data-s="75029" data-e="75285">month</span> <span class="w" data-s="75328" data-e="75712">and</span> <span class="w target" data-s="75840" data-e="76138" title="招生；吸收成员;注册课程">enrolled</span> <span class="w" data-s="76181" data-e="76309">the</span> <span class="w" data-s="76352" data-e="76437">same</span></p><p class="zh">第一个早晨，他沿着河边散了会儿步，没走出中心太远。</p></div>
+<div class="pair" data-s0="76480" data-s1="79552"><p class="en"><span class="w" data-s="76480" data-e="76650">evening.</span> <span class="w" data-s="76949" data-e="77461">On</span> <span class="w" data-s="77504" data-e="77589">his</span> <span class="w" data-s="77632" data-e="77760">first</span> <span class="w" data-s="77802" data-e="78016">morning</span> <span class="w" data-s="78058" data-e="78314">he</span> <span class="w" data-s="78357" data-e="78485">took</span> <span class="w" data-s="78528" data-e="78613">a</span> <span class="w target" data-s="78656" data-e="78869" title="散步，漫步，闲逛">stroll</span> <span class="w" data-s="78912" data-e="79125">along</span> <span class="w" data-s="79168" data-e="79381">the</span> <span class="w" data-s="79424" data-e="79552">river.</span></p><p class="zh">十点钟，一辆手推车沿着走廊推过来，上面是茶和饼干。</p></div>
+<div class="pair" data-s0="80248" data-s1="89720"><p class="en"><span class="w" data-s="80248" data-e="80376">He</span> <span class="w" data-s="80418" data-e="80546">did</span> <span class="w" data-s="80589" data-e="80674">not</span> <span class="w" data-s="80717" data-e="80845">let</span> <span class="w" data-s="80888" data-e="81016">his</span> <span class="w" data-s="81058" data-e="81186">feet</span> <span class="w target" data-s="81229" data-e="81570" title="漫游，闲逛；思想开小差">wander</span> <span class="w" data-s="81613" data-e="81741">far</span> <span class="w" data-s="81784" data-e="81997">from</span> <span class="w" data-s="82040" data-e="82125">the</span> <span class="w" data-s="82168" data-e="82424">centre.</span> <span class="w" data-s="82552" data-e="82722">A</span> <span class="w target" data-s="83192" data-e="83533" title="手推车；手拉车">trolley</span> <span class="w" data-s="83576" data-e="83704">came</span> <span class="w" data-s="83746" data-e="83960">down</span> <span class="w" data-s="84002" data-e="84130">the</span> <span class="w" data-s="84173" data-e="84514">corridor</span> <span class="w" data-s="84557" data-e="84685">at</span> <span class="w" data-s="84728" data-e="84813">ten,</span> <span class="w" data-s="85026" data-e="85240">with</span> <span class="w" data-s="85496" data-e="85794">tea</span> <span class="w" data-s="85837" data-e="85965">and</span> <span class="w" data-s="86008" data-e="86349">biscuits.</span> <span class="w" data-s="86947" data-e="87075">By</span> <span class="w" data-s="87117" data-e="87245">the</span> <span class="w" data-s="87288" data-e="87373">third</span> <span class="w" data-s="87416" data-e="87672">week</span> <span class="w" data-s="87715" data-e="88013">he</span> <span class="w" data-s="88099" data-e="88227">could</span> <span class="w" data-s="88269" data-e="88397">sit</span> <span class="w" data-s="88440" data-e="88611">for</span> <span class="w" data-s="88653" data-e="88781">an</span> <span class="w" data-s="88824" data-e="88909">hour</span> <span class="w" data-s="88952" data-e="89336">without</span> <span class="w" data-s="89379" data-e="89549">his</span> <span class="w" data-s="89592" data-e="89720">phone.</span></p><p class="zh">到第三周，他已经能一个小时不碰手机了。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">abuse</span>
+          <span class="ipa">/ə&#x27;bju:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">滥用，妄用；虐待；辱骂；诋毁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the abuse of his sleep would affect his heart</div>          <div class="mnem"><span class="lbl">记</span>ab前缀表否定，那这个单词 是：不正常的使用(use)，就是“滥用”。</div>          <div class="root"><span class="lbl">根</span>ab(偏离) + use(使用) → 不正常地用 → 滥用；虐待</div>          <div class="zt"><span class="lbl">真题</span>That may lead to nursing home abuse and age discrimination. 那可能会导致养老院虐 待和年龄歧视。</div>          <div class="fam"><span class="lbl">族</span>abusive adj. 辱骂的，虐待的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">wander</span>
+          <span class="ipa">/&#x27;wpndə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">漫游，闲逛；思想开小差</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his mind wandered all day</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“万达(广场)”。 周末没事，去万达“闲逛”。</div>          <div class="root"><span class="lbl">根</span>谐音「万达」→ 周末没事去万达闲逛 → 漫游；走神</div>          <div class="zt"><span class="lbl">真题</span>No longer have we the inclination to let ourselves wander through fields of knowledges, ready to be surprised. 我们不再倾向于让自己在 知识的领域中漫游，准备好接受惊喜。(2017)</div>          <div class="fam"><span class="lbl">族</span>wanderer n. 漫游者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">stroll</span>
+          <span class="ipa">/strəul/</span>
+          <span class="pos">v.</span>
+          <span class="cn">散步，漫步，闲逛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he took a stroll along the river</div>          <div class="mnem"><span class="lbl">记</span>在街上(st 想成 street)滚(roll) 一圈→散步，漫步。</div>          <div class="root"><span class="lbl">根</span>联想：st(街) + roll(滚) → 在街上慢悠悠地转 → 散步</div>          <div class="zt"><span class="lbl">真题</span>You can stroll along the beach if you live in the hotel. 如果你住在这家旅馆里，你可以沿 着海滩散步。</div>          <div class="fam"><span class="lbl">族</span>stroll n. 散步，漫步</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">enroll</span>
+          <span class="ipa">/ın&#x27;rəul/</span>
+          <span class="pos">v.</span>
+          <span class="cn">招生；吸收成员;注册课程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>enrolled the same evening</div>          <div class="mnem"><span class="lbl">记</span>使(en)滚进来(roll 滚，rock and roll摇滚），使你滚进我们的机构或组织，就是 “吸收成员”。</div>          <div class="root"><span class="lbl">根</span>en(使进入) + roll(名单) → 把名字写进名单 → 注册</div>          <div class="zt"><span class="lbl">真题</span>But after being enrolled in an online course last fall semester, I came to realize online classes were merely a means to fulfil course requirements. 但在去年秋季学期注册了 一门网络课程后，我意识到网络课程只是满足 课程要求的一种手段。(2021)</div>          <div class="fam"><span class="lbl">族</span>enrollment n. 注册，招生</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">payroll</span>
+          <span class="ipa">/&#x27;peireul/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The payroll had not risen for two years</div>          <div class="root"><span class="lbl">根</span>pay(工资) + roll(名单) → 发工资的名单 → 工资总额</div>          <div class="zt"><span class="lbl">真题</span>The only industries swelling their payrolls are health care, utilities and the federal government.只有医疗保健、公用事业 和联邦政府这几个行业的工资在增加。</div>          <div class="fam"><span class="lbl">族</span>pay v. 支付 / payment n. 付款</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">trolley</span>
+          <span class="ipa">/&#x27;tra:li/</span>
+          <span class="pos">n.</span>
+          <span class="cn">手推车；手拉车</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At ten a trolley came down the corridor</div>          <div class="mnem"><span class="lbl">记</span>t想成“他”，roll 滚动，ey名词 后缀。联想成：他推着超市的“手推车”，轮子在 滚动。</div>          <div class="root"><span class="lbl">根</span>联想：t(他) + roll(滚) + ey → 他推着轮子滚动的小车</div>          <div class="fam"><span class="lbl">族</span>trolleybus n. 无轨电车</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">recruit</span>
+          <span class="ipa">/rı&#x27;kruit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">吸收(新成员);劝说 n7. 新成员</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The centre was recruiting new members for the autumn term</div>          <div class="mnem"><span class="lbl">记</span>re(重新，又一次)+cruit(发音 类似 crude，粗糙的)；又一批粗糙的成员(需要 打磨），就是那些“新成员”，“吸收”新兵。</div>          <div class="root"><span class="lbl">根</span>re(再) + cruit(生长) → 让队伍再长起来 → 招募</div>          <div class="zt"><span class="lbl">真题</span>New teachers and staff have to be recruited. 必须招聘新的教师和工作人员。(2022)</div>          <div class="fam"><span class="lbl">族</span>recruitment n. 招募 / recruiter n. 招聘者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">entitle</span>
+          <span class="ipa">/ın&#x27;taitl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">给……权利或资格</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The card entitled him to three free cups of tea</div>          <div class="mnem"><span class="lbl">记</span>title n. 标题(我们开发票时，老 板问抬头开什么？抬头就是“标题”)；en(使)十 title(标题)→使……有标题。使你有个标题(行 头)就可以做事了，所以这个单词的意思就是 “给……权利或资格”。 第四单元</div>          <div class="root"><span class="lbl">根</span>en(使) + title(名分) → 使有名分 → 给……权利或资格</div>          <div class="zt"><span class="lbl">真题</span>Students read and discussed an article entitled &quot;You Can Grow Your Brain&quot;.学生们 阅读并讨论了一篇题为“你可以发展你的大脑” 的文章。(2016)</div>          <div class="fam"><span class="lbl">族</span>entitlement n. 权利，资格</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">quality</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The course quality was good</div>          <div class="root"><span class="lbl">根</span>qual(什么样的) + ity(名词) → 是什么样 → 品质，质量</div>          <div class="fam"><span class="lbl">族</span>qualify v. 使合格 / qualitative adj. 定性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">receipt</span>
+          <span class="ipa">/r&#x27;si:t/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she handed him a receipt</div>          <div class="mnem"><span class="lbl">记</span>它的动词形式我们很熟悉， receive 意为“接收”，那 receipt的意思就很简单 了→收据。</div>          <div class="root"><span class="lbl">根</span>re(回) + ceipt(=ceive 拿) → 拿到手的凭据 → 收据</div>          <div class="zt"><span class="lbl">真题</span>You may have to pay all you medical expenses and then later submit your receipts to the insurance company. 你可能需要支付所有 的医疗费用，然后提交收据给保险公司。</div>          <div class="fam"><span class="lbl">族</span>receive v. 收到 / receiver n. 接收器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">recipient</span>
+          <span class="ipa">/r&#x27;sipiənt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was the first recipient of the new card</div>          <div class="mnem"><span class="lbl">记</span>该单词来自receive（接收）， recipient 是它的名词形式→受方；接受者。</div>          <div class="root"><span class="lbl">根</span>re(回) + cip(拿) + ient(人) → 拿到东西的人 → 接受者</div>          <div class="zt"><span class="lbl">真题</span>Americans routinely overestimate the share of black recipients of public assistance programs. 美国人经常高估公共援助计划中黑 人受益者的比例。</div>          <div class="fam"><span class="lbl">族</span>receive v. 收到 / receipt n. 收据</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">receptionist</span>
+          <span class="ipa">/rı&#x27;sep∫ənist/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A receptionist asked him to register at the front desk</div>          <div class="mnem"><span class="lbl">记</span>reception 源于 receive(接受)， (103) ist表示人，那这个单词就是：接收你的人→接 待员。</div>          <div class="root"><span class="lbl">根</span>reception(接待) + ist(人) → 负责接待的人 → 接待员</div>          <div class="zt"><span class="lbl">真题</span>It is important that the hotel receptionist make sure that guests are registered correctly. 酒店接待员确保客人登记正确是很重要的。</div>          <div class="fam"><span class="lbl">族</span>reception n. 接待处 / receive v. 接收</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">register</span>
+          <span class="ipa">/&#x27;red3istər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">登记；注册；注意到η. 登记表，注册簿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked him to register at the front desk</div>          <div class="mnem"><span class="lbl">记</span>重复的(re)哥哥（g)姐姐(ister 费和( 婚了，后来又“登记”复婚了。</div>          <div class="root"><span class="lbl">根</span>re(再) + gister(记录) → 再记一遍 → 登记，注册</div>          <div class="zt"><span class="lbl">真题</span>Activities like knitting and crocheting make it harder for the brain to register pain signals. 像编织和钩针编织这样的活动使大脑 更难注意到疼痛信号。(2017)</div>          <div class="fam"><span class="lbl">族</span>registration n. 登记 / registered adj. 已注册的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">entry</span>
+          <span class="ipa">/&#x27;entri/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He wrote his name in the entry book</div>          <div class="mnem"><span class="lbl">记</span>这个单词的动词是 enter(进 入），我们很熟悉。那名词 entry就是“人口处； 进人”的意思。</div>          <div class="root"><span class="lbl">根</span>enter(进入) 的名词 → 进入；入口；登记的一笔</div>          <div class="zt"><span class="lbl">真题</span>The wide majority of the rest were illegal, unforced entries that resulted from something like a· window being left open. 其余 的绝大多数都是非法的、非强制的进入，这是由 于窗户被打开之类的原因造成的。(2016)</div>          <div class="fam"><span class="lbl">族</span>enter v. 进入 / entrance n. 入口</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">pregnant</span>
+          <span class="ipa">/&#x27;pregnənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">怀孕的，妊娠的；意义重大的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then his wife became pregnant</div>          <div class="root"><span class="lbl">根</span>pre(之前) + gn(生) + ant → 生产之前的 → 怀孕的</div>          <div class="zt"><span class="lbl">真题</span>Pregnant employees struggled to keep up. 怀孕的员工努力跟上进度。</div>          <div class="fam"><span class="lbl">族</span>pregnancy n. 怀孕</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">divorce</span>
+          <span class="ipa">/dr&#x27;vəirs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 离婚；分离</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had gone through a divorce for the same reason</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似：敌我死。 当夫妻俩过着敌死我活的生活时，他们就要“离 婚”了。</div>          <div class="root"><span class="lbl">根</span>di(分开) + vorce(转) → 两人各自转向 → 离婚</div>          <div class="zt"><span class="lbl">真题</span>The divorce rate in the county has been on a steady rise. 这个县的离婚率一直在稳步上 升。(2023)</div>          <div class="fam"><span class="lbl">族</span>divorced adj. 离了婚的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">concentrate</span>
+          <span class="ipa">/&#x27;kpnsntreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">集中，专心于 η. 浓缩物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could not concentrate</div>          <div class="mnem"><span class="lbl">记</span>所有人(con)以……为中心（把 centra 想成 centre，中心)，ate 是动词后缀，那就 是所有人都以一个东西为中心，比如以大雁为 中心，那就是大家都在“专心于”大雁。</div>          <div class="root"><span class="lbl">根</span>con(共同) + centr(中心) + ate → 都聚到一个中心 → 集中</div>          <div class="zt"><span class="lbl">真题</span>When the author was a college student, she found that knitting helped her concentrate. 当作者还是一名大学生时，她发现编织有助于 自己集中注意力。(2017)</div>          <div class="fam"><span class="lbl">族</span>concentration n. 专注 / concentrated adj. 浓缩的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">indulge</span>
+          <span class="ipa">/ın&#x27;dald3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使沉溺于，纵容</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would indulge in short videos until two in the morning</div>          <div class="mnem"><span class="lbl">记</span>in表示“里面”，dul 发音类似 “读了”，ge发音类似“哥”，连在一起就是：哥哥 在家里每天读书。这不就是哥哥每天“沉溺于” 读书吗？</div>          <div class="root"><span class="lbl">根</span>联想：in(里) + dul(读) + ge(哥) → 哥哥在家天天读书，沉溺其中</div>          <div class="fam"><span class="lbl">族</span>indulgence n. 放纵 / indulgent adj. 纵容的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">addict</span>
+          <span class="ipa">/&#x27;ædıkt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使成瘾，使入迷n. 入迷的人，成瘾的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was addicted to his phone</div>          <div class="mnem"><span class="lbl">记</span>dict= dic(= say)，表示“说话， 断言”；一再地(ad)说(dict)。祥林嫂一再地说 她的阿毛死了，已经入迷了啊→使入迷。</div>          <div class="root"><span class="lbl">根</span>ad(一再) + dict(说) → 一再念叨停不下来 → 使成瘾</div>          <div class="zt"><span class="lbl">真题</span>You can&#x27;t be addicted to the environment. 你不能沉迷于这个环境。(2010)</div>          <div class="fam"><span class="lbl">族</span>addiction n. 瘾 / addictive adj. 使人上瘾的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">contradict</span>
+          <span class="ipa">/ikpntrə&#x27;dıkt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">反驳;否认 (104)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his wife would contradict him</div>          <div class="mnem"><span class="lbl">记</span>contradict(反驳)十ory(形容词 后缀)→对立的。</div>          <div class="root"><span class="lbl">根</span>contra(相反) + dict(说) → 说反话 → 反驳，否认</div>          <div class="fam"><span class="lbl">族</span>contradiction n. 矛盾 / contradictory adj. 对立的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">deny</span>
+          <span class="ipa">/dı&#x27;nai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">否认；拒绝</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could not deny that she was right</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：抵赖。抵赖 不就是“否认”吗？</div>          <div class="root"><span class="lbl">根</span>谐音「抵赖」→ 抵赖就是否认 → 否认；拒绝</div>          <div class="zt"><span class="lbl">真题</span>There is no denying that mobile phones have brought much convenience. 不可否认，手 机带来了很多便利。</div>          <div class="fam"><span class="lbl">族</span>denial n. 否认</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">predict</span>
+          <span class="ipa">/prı&#x27;dıkt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">预言；预告</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The effect was easy to predict</div>          <div class="mnem"><span class="lbl">记</span>pre(在前的)十dict(说)→预先 说→预言。</div>          <div class="root"><span class="lbl">根</span>pre(在前) + dict(说) → 预先说 → 预言，预测</div>          <div class="zt"><span class="lbl">真题</span>In other words, when it comes to cities— or anything else—it is hard to predict the future.换句话说，当提到城市或其他任何事物 时，很难预测未来。(2019)</div>          <div class="fam"><span class="lbl">族</span>prediction n. 预测 / predictable adj. 可预测的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">indicate</span>
+          <span class="ipa">/&#x27;Indıkeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">暗示；表明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his pay slip indicated a fine</div>          <div class="mnem"><span class="lbl">记</span>in(进入)十 dic(说)十ate(动词 后级)→在里面说，没有明示→暗示；表明。 (105) 第四单元</div>          <div class="root"><span class="lbl">根</span>in(向) + dic(说) + ate → 用迹象说话 → 表明，暗示</div>          <div class="zt"><span class="lbl">真题</span>The saying indicates the importance of lifelong learning, which we have been lectured over and over again. 这句话表明了终身学习的 重要性，这一点我们已经被说教过很多次了。</div>          <div class="fam"><span class="lbl">族</span>indication n. 迹象 / indicator n. 指示器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">facility</span>
+          <span class="ipa">/fə&#x27;sıləti/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The facility had a quiet room</div>          <div class="mnem"><span class="lbl">记</span>词根 fac等同于 fact，表示 “做”。fact的意思是“实际上”，什么是实际的？ 嘴上“说”不算实际的，“做”才是实际的，可以让 我们“做”(fac)东西或事情的就是“设施，设备”。</div>          <div class="root"><span class="lbl">根</span>fac(做) + ility → 供人做事的条件 → 设施，设备</div>          <div class="zt"><span class="lbl">真题</span>What kind of care facility old people live in may be less important than we think. 老年 人住在什么样的护理机构可能没有我们想象的 那么重要。(2016)</div>          <div class="fam"><span class="lbl">族</span>facilitate v. 促进 / facilities n. 设施(复数)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">defect</span>
+          <span class="ipa">/&#x27;di:fekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">缺点，缺陷</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its old machine had a defect</div>          <div class="mnem"><span class="lbl">记</span>de看成弟弟，fect 词根等同于 fact，表示“做”，弟弟做事，做得好吗？不好啊， 那么该单词就是“缺点，缺陷”的意思。</div>          <div class="root"><span class="lbl">根</span>de(向下、不好) + fect(做) → 没做好 → 缺点，缺陷</div>          <div class="fam"><span class="lbl">族</span>defective adj. 有缺陷的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">effect</span>
+          <span class="ipa">/ı&#x27;fekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">效果，影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The effect was easy to predict</div>          <div class="root"><span class="lbl">根</span>ef(=ex 出) + fect(做) → 做出来的结果 → 效果，影响</div>          <div class="zt"><span class="lbl">真题</span>Such personality characteristics as self- discipline have no effect on longevity. 自律等这 些人格特征对长寿没有影响。(2016)</div>          <div class="fam"><span class="lbl">族</span>effective adj. 有效的 / effectively adv. 有效地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">affect</span>
+          <span class="ipa">/ə&#x27;fekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">影响；侵袭；感染</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would affect his heart</div>          <div class="root"><span class="lbl">根</span>af(=ad 去) + fect(做) → 对……动了手脚 → 影响</div>          <div class="zt"><span class="lbl">真题</span>Mothers&#x27; negative personality characteristics may affect their children&#x27;s lifespans. 母亲的消极 人格特征可能会影响孩子的寿命。(2016)</div>          <div class="fam"><span class="lbl">族</span>affection n. 感情 / affected adj. 受影响的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">affection</span>
+          <span class="ipa">/ə&#x27;fek∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">感情；影响；喜爱，钟爱；爱情</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He showed less affection at home</div>          <div class="mnem"><span class="lbl">记</span>affect影响，ion是名词后缀。 别人的行为或语言最容易对你产生什么影响？ →感情；喜爱；钟爱。</div>          <div class="root"><span class="lbl">根</span>affect(影响) + ion(名词) → 能打动心里的东西 → 感情</div>          <div class="zt"><span class="lbl">真题</span>People of different ages and genders show affection in different ways. 不同年龄、不 同性别的人以不同的方式表达感情。</div>          <div class="fam"><span class="lbl">族</span>affectionate adj. 深情的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">infect</span>
+          <span class="ipa">/ın&#x27;fekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">传染；使感染；使携带病菌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>can infect a whole family</div>          <div class="root"><span class="lbl">根</span>in(进入) + fect(做) → 病菌进来作乱 → 传染，感染</div>          <div class="zt"><span class="lbl">真题</span>Two million bees were infected with disease. 200万只蜜蜂感染了疾病。</div>          <div class="fam"><span class="lbl">族</span>infection n. 感染 / infectious adj. 传染性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">manufacture</span>
+          <span class="ipa">/imænju&#x27;fækt∫ər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用机器)大量生产，成批制造 η. 大量制 造；批量生产 adj.完美的；完全的;最佳的 v. 使完善；使完 美；使完备</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a factory that manufactured locks</div>          <div class="mnem"><span class="lbl">记</span>manufacture 前面部分是 man 人，fact做(做的才是实际的)。工业革命以前 生产的东西都是手工的啊，所以该单词就是人 做，那就是“生产，制造”。</div>          <div class="root"><span class="lbl">根</span>manu(手) + fact(做) + ure → 用手做 → 制造，生产</div>          <div class="zt"><span class="lbl">真题</span>Great achievement only belongs to those who can do small things perfectly. 伟大的成就 只属于那些能把小事做到完美的人。</div>          <div class="fam"><span class="lbl">族</span>manufacturer n. 制造商</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4 · Day 27</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

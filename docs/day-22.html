@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 22 · The Council of Green County</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 22 · 11/3 · Unit 4 第 631-660 词</div>
+  <h1>The Council of Green County<span class="cn">格林县议会的一次表决</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-22.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3925"><p class="en"><span class="w" data-s="43" data-e="171">The</span> <span class="w" data-s="213" data-e="469">council</span> <span class="w" data-s="512" data-e="640">of</span> <span class="w" data-s="683" data-e="853">Green</span> <span class="w target" data-s="896" data-e="1195" title="英国的郡，美国的县">County</span> <span class="w" data-s="1237" data-e="1323">met</span> <span class="w" data-s="1365" data-e="1493">on</span> <span class="w" data-s="1536" data-e="1621">a</span> <span class="w" data-s="1664" data-e="1877">rainy</span> <span class="w" data-s="1920" data-e="2219">Tuesday</span> <span class="w" data-s="2261" data-e="2432">to</span> <span class="w target" data-s="2475" data-e="2731" title="建议；计划；求婚">propose</span> <span class="w" data-s="2773" data-e="2944">a</span> <span class="w" data-s="2987" data-e="3029">new</span> <span class="w" data-s="3072" data-e="3243">plan</span> <span class="w" data-s="3285" data-e="3456">for</span> <span class="w" data-s="3499" data-e="3584">the</span> <span class="w" data-s="3627" data-e="3925">railway.</span></p><p class="zh">一个下雨的周二，格林县议会开会，要提一份关于铁路的新方案。</p></div>
+<div class="pair" data-s0="4096" data-s1="8917"><p class="en"><span class="w" data-s="4096" data-e="4352">The</span> <span class="w" data-s="4736" data-e="4992">mayor</span> <span class="w" data-s="5035" data-e="5120">stood</span> <span class="w" data-s="5163" data-e="5333">up</span> <span class="w" data-s="5376" data-e="5504">and</span> <span class="w target" data-s="5547" data-e="5717" title="">imposed</span> <span class="w" data-s="5760" data-e="5973">her</span> <span class="w target" data-s="6016" data-e="6101" title="意图；目的;重要意义">purpose</span> <span class="w" data-s="6144" data-e="6400">on</span> <span class="w" data-s="6443" data-e="6528">the</span> <span class="w" data-s="6571" data-e="6656">room:</span> <span class="w" data-s="6869" data-e="7381">bring</span> <span class="w" data-s="7424" data-e="7595">the</span> <span class="w" data-s="7637" data-e="7765">city</span> <span class="w" data-s="7808" data-e="7979">train</span> <span class="w" data-s="8021" data-e="8320">into</span> <span class="w" data-s="8363" data-e="8491">the</span> <span class="w target" data-s="8533" data-e="8917" title="国家，国土；农村">countryside.</span></p><p class="zh">县长站起来，把自己的目的强加到整个会场：让城里的火车开进乡村。</p></div>
+<div class="pair" data-s0="9570" data-s1="14007"><p class="en"><span class="w" data-s="9570" data-e="9741">She</span> <span class="w target" data-s="9783" data-e="10125" title="建议；计划；求婚">proposed</span> <span class="w" data-s="10167" data-e="10423">that</span> <span class="w" data-s="10466" data-e="10551">the</span> <span class="w target" data-s="10594" data-e="10850" title="英国的郡，美国的县">county</span> <span class="w target" data-s="10893" data-e="11191" title="订金；存款；沉积物 v. 放下；寄放">deposit</span> <span class="w" data-s="11234" data-e="11490">a</span> <span class="w" data-s="11533" data-e="11618">large</span> <span class="w" data-s="11661" data-e="11959">sum</span> <span class="w" data-s="12002" data-e="12343">and</span> <span class="w target" data-s="12557" data-e="12898" title="组成，构成；作曲；撰写">compose</span> <span class="w" data-s="12941" data-e="13111">a</span> <span class="w" data-s="13154" data-e="13538">transport</span> <span class="w" data-s="13581" data-e="14007">committee.</span></p><p class="zh">她提议由县里存下一大笔钱，再组建一个交通委员会。</p></div>
+<div class="pair" data-s0="14178" data-s1="18615"><p class="en"><span class="w" data-s="14178" data-e="14775">Every</span> <span class="w target" data-s="14818" data-e="15287" title="组成部分，成分，部件">component</span> <span class="w" data-s="15330" data-e="15415">of</span> <span class="w" data-s="15458" data-e="15501">the</span> <span class="w" data-s="15543" data-e="15629">plan</span> <span class="w" data-s="15671" data-e="15927">was</span> <span class="w" data-s="15970" data-e="16098">written</span> <span class="w target" data-s="16141" data-e="16311" title="往或在城市的商业区(或中心区、闹市区) n. 城市的商业区，中心区，闹市区 adj.城市的商业区的，中心区的，闹市区的">down,</span> <span class="w" data-s="16567" data-e="16738">and</span> <span class="w" data-s="16951" data-e="17122">the</span> <span class="w target" data-s="17165" data-e="17506" title="作品，作文；作曲">composition</span> <span class="w" data-s="17549" data-e="17847">ran</span> <span class="w" data-s="17890" data-e="18061">to</span> <span class="w" data-s="18103" data-e="18189">ten</span> <span class="w" data-s="18231" data-e="18615">pages.</span></p><p class="zh">方案的每一个组成部分都写了下来，整篇稿子足足有十页。</p></div>
+<div class="pair" data-s0="18871" data-s1="21261"><p class="en"><span class="w" data-s="18871" data-e="19298">Mr.</span> <span class="w" data-s="19767" data-e="19981">Hale</span> <span class="w" data-s="20023" data-e="20237">was</span> <span class="w" data-s="20279" data-e="20365">her</span> <span class="w" data-s="20407" data-e="20834">strongest</span> <span class="w target" data-s="20877" data-e="21261" title="对手，竞争者；反对者">opponent.</span></p><p class="zh">黑尔先生是她最强劲的对手。</p></div>
+<div class="pair" data-s0="21907" data-s1="25875"><p class="en"><span class="w" data-s="21907" data-e="21992">He</span> <span class="w" data-s="22035" data-e="22206">took</span> <span class="w" data-s="22248" data-e="22376">the</span> <span class="w target" data-s="22419" data-e="22803" title="完全相反的，不同的，对面的">opposite</span> <span class="w target" data-s="22846" data-e="23016" title="位置 v. 使处于">position</span> <span class="w" data-s="23059" data-e="23315">at</span> <span class="w" data-s="23358" data-e="23486">once</span> <span class="w" data-s="23528" data-e="23870">and</span> <span class="w" data-s="24211" data-e="24339">said</span> <span class="w" data-s="24382" data-e="24552">he</span> <span class="w" data-s="24595" data-e="24680">would</span> <span class="w target" data-s="24723" data-e="24894" title="">oppose</span> <span class="w" data-s="24936" data-e="25150">the</span> <span class="w" data-s="25192" data-e="25320">plan</span> <span class="w" data-s="25363" data-e="25576">to</span> <span class="w" data-s="25619" data-e="25747">the</span> <span class="w" data-s="25790" data-e="25875">end.</span></p><p class="zh">他立刻站到了相反的立场上，说他会反对这个方案到底。</p></div>
+<div class="pair" data-s0="26088" data-s1="29160"><p class="en"><span class="w" data-s="26088" data-e="26472">He</span> <span class="w" data-s="26643" data-e="26814">even</span> <span class="w" data-s="26856" data-e="27027">asked</span> <span class="w" data-s="27070" data-e="27240">the</span> <span class="w" data-s="27283" data-e="27582">council</span> <span class="w" data-s="27624" data-e="27795">to</span> <span class="w target" data-s="27838" data-e="28051" title="废黜，罢免">depose</span> <span class="w" data-s="28094" data-e="28307">the</span> <span class="w" data-s="28350" data-e="28563">mayor</span> <span class="w" data-s="28606" data-e="28776">before</span> <span class="w" data-s="28819" data-e="28990">the</span> <span class="w" data-s="29032" data-e="29160">vote.</span></p><p class="zh">他甚至要求议会在表决前罢免县长。</p></div>
+<div class="pair" data-s0="29779" data-s1="31741"><p class="en"><span class="w" data-s="29779" data-e="29864">A</span> <span class="w" data-s="29907" data-e="30120">retired</span> <span class="w" data-s="30163" data-e="30504">teacher</span> <span class="w" data-s="30547" data-e="30675">was</span> <span class="w" data-s="30717" data-e="30888">asked</span> <span class="w" data-s="30931" data-e="31059">to</span> <span class="w target" data-s="31101" data-e="31315" title="提供专业咨询 n. (尤指年长者或专家的) 劝告，忠告；建议，商议，讨论">counsel</span> <span class="w" data-s="31357" data-e="31485">both</span> <span class="w" data-s="31528" data-e="31741">sides.</span></p><p class="zh">大家请了一位退休教师来为双方提供咨询。</p></div>
+<div class="pair" data-s0="32083" data-s1="37203"><p class="en"><span class="w" data-s="32083" data-e="32467">She</span> <span class="w" data-s="32723" data-e="32893">said</span> <span class="w" data-s="32936" data-e="33064">the</span> <span class="w" data-s="33107" data-e="33320">council</span> <span class="w" data-s="33363" data-e="33491">should</span> <span class="w" data-s="33533" data-e="33661">not</span> <span class="w target" data-s="33704" data-e="34045" title="处置；布置;排列；安排；使易于">dispose</span> <span class="w" data-s="34088" data-e="34259">of</span> <span class="w" data-s="34301" data-e="34387">such</span> <span class="w" data-s="34429" data-e="34557">a</span> <span class="w" data-s="34600" data-e="34685">plan</span> <span class="w" data-s="34728" data-e="34899">so</span> <span class="w" data-s="34941" data-e="35155">quickly,</span> <span class="w" data-s="35453" data-e="35667">and</span> <span class="w" data-s="35837" data-e="36008">her</span> <span class="w" data-s="36051" data-e="36179">words</span> <span class="w" data-s="36221" data-e="36520">made</span> <span class="w" data-s="36563" data-e="36691">the</span> <span class="w" data-s="36733" data-e="36947">mood</span> <span class="w target" data-s="36989" data-e="37203" title="">positive.</span></p><p class="zh">她说，议会不该这么快就把这样一个方案丢掉，她的话让气氛变得积极起来。</p></div>
+<div class="pair" data-s0="37544" data-s1="39293"><p class="en"><span class="w" data-s="37544" data-e="38099">The</span> <span class="w" data-s="38141" data-e="38312">question</span> <span class="w" data-s="38355" data-e="38867">underneath</span> <span class="w" data-s="38909" data-e="39080">was</span> <span class="w" data-s="39123" data-e="39293">simple.</span></p><p class="zh">底下的问题其实很简单。</p></div>
+<div class="pair" data-s0="39945" data-s1="44041"><p class="en"><span class="w" data-s="39945" data-e="40158">Green</span> <span class="w target" data-s="40201" data-e="40457" title="英国的郡，美国的县">County</span> <span class="w" data-s="40499" data-e="40585">was</span> <span class="w target" data-s="40627" data-e="40926" title="乡村的,农村的">rural:</span> <span class="w" data-s="41139" data-e="42035">fields,</span> <span class="w" data-s="42163" data-e="42547">small</span> <span class="w" data-s="42590" data-e="42974">roads</span> <span class="w" data-s="43017" data-e="43187">and</span> <span class="w" data-s="43230" data-e="43529">a</span> <span class="w" data-s="43571" data-e="43657">few</span> <span class="w" data-s="43699" data-e="44041">farms.</span></p><p class="zh">格林县是乡村：田野、小路，还有几个农场。</p></div>
+<div class="pair" data-s0="44211" data-s1="47283"><p class="en"><span class="w" data-s="44211" data-e="45065">The</span> <span class="w" data-s="45107" data-e="45406">nearest</span> <span class="w target" data-s="45449" data-e="45747" title="城市的，市内的">urban</span> <span class="w" data-s="45790" data-e="45918">area</span> <span class="w" data-s="45961" data-e="46387">was</span> <span class="w" data-s="46473" data-e="46771">forty</span> <span class="w" data-s="46814" data-e="46985">miles</span> <span class="w" data-s="47027" data-e="47283">away.</span></p><p class="zh">最近的城区在四十英里之外。</p></div>
+<div class="pair" data-s0="47539" data-s1="50526"><p class="en"><span class="w" data-s="47539" data-e="48563">Families</span> <span class="w" data-s="48606" data-e="48691">in</span> <span class="w" data-s="48734" data-e="48777">the</span> <span class="w target" data-s="48819" data-e="49161" title="市郊，郊区">suburb</span> <span class="w" data-s="49203" data-e="49502">drove</span> <span class="w target" data-s="49545" data-e="49886" title="往或在城市的商业区(或中心区、闹市区) n. 城市的商业区，中心区，闹市区 adj.城市的商业区的，中心区的，闹市区的">downtown</span> <span class="w" data-s="49929" data-e="50227">every</span> <span class="w" data-s="50270" data-e="50526">morning.</span></p><p class="zh">郊区的人家每天早上开车进市区。</p></div>
+<div class="pair" data-s0="51132" data-s1="54247"><p class="en"><span class="w" data-s="51132" data-e="51217">The</span> <span class="w target" data-s="51260" data-e="51857" title="大都市的">metropolitan</span> <span class="w" data-s="51900" data-e="52028">train</span> <span class="w" data-s="52071" data-e="52455">stopped</span> <span class="w" data-s="52497" data-e="52753">at</span> <span class="w" data-s="52796" data-e="52839">the</span> <span class="w target" data-s="52881" data-e="53095" title="英国的郡，美国的县">county</span> <span class="w" data-s="53137" data-e="53265">line</span> <span class="w" data-s="53308" data-e="53607">and</span> <span class="w" data-s="53649" data-e="53777">went</span> <span class="w" data-s="53820" data-e="54033">no</span> <span class="w" data-s="54076" data-e="54247">further.</span></p><p class="zh">大都市的火车停在县界，再不肯往前开。</p></div>
+<div class="pair" data-s0="54588" data-s1="59153"><p class="en"><span class="w" data-s="54588" data-e="55313">Its</span> <span class="w target" data-s="55356" data-e="55655" title="公民；市民，居民">citizens</span> <span class="w" data-s="55697" data-e="55911">wanted</span> <span class="w" data-s="55953" data-e="56252">modern</span> <span class="w target" data-s="56295" data-e="56977" title="文明，文化；开化">civilization,</span> <span class="w" data-s="57191" data-e="57404">and</span> <span class="w" data-s="57532" data-e="57831">they</span> <span class="w" data-s="57873" data-e="58001">felt</span> <span class="w" data-s="58044" data-e="58215">a</span> <span class="w target" data-s="58257" data-e="58513" title="公民的；民用的;文明的，有礼貌的">civil</span> <span class="w" data-s="58556" data-e="58641">right</span> <span class="w" data-s="58684" data-e="58897">to</span> <span class="w" data-s="58940" data-e="59153">travel.</span></p><p class="zh">这里的公民想要现代文明，觉得自己有坐车的公民权利。</p></div>
+<div class="pair" data-s0="59839" data-s1="62527"><p class="en"><span class="w" data-s="59839" data-e="59967">The</span> <span class="w target" data-s="60009" data-e="60180" title="国家，国土；农村">country,</span> <span class="w" data-s="60436" data-e="60564">they</span> <span class="w" data-s="60607" data-e="60991">argued,</span> <span class="w" data-s="61161" data-e="61460">should</span> <span class="w" data-s="61503" data-e="61631">not</span> <span class="w" data-s="61673" data-e="61887">forget</span> <span class="w" data-s="61929" data-e="62228">small</span> <span class="w" data-s="62271" data-e="62527">places.</span></p><p class="zh">他们说，这个国家不该忘记小地方。</p></div>
+<div class="pair" data-s0="62868" data-s1="67817"><p class="en"><span class="w" data-s="62868" data-e="63679">On</span> <span class="w" data-s="63721" data-e="63849">the</span> <span class="w target" data-s="63892" data-e="64020" title="表面 v. 升到表面">surface</span> <span class="w" data-s="64063" data-e="64489">the</span> <span class="w" data-s="64532" data-e="64745">plan</span> <span class="w" data-s="64788" data-e="65001">looked</span> <span class="w" data-s="65044" data-e="65471">expensive,</span> <span class="w" data-s="65769" data-e="66068">and</span> <span class="w" data-s="66111" data-e="66452">the</span> <span class="w target" data-s="66495" data-e="66793" title="序言，前言，引语">preface</span> <span class="w" data-s="66836" data-e="66964">of</span> <span class="w" data-s="67007" data-e="67049">the</span> <span class="w" data-s="67092" data-e="67220">report</span> <span class="w" data-s="67263" data-e="67561">said</span> <span class="w" data-s="67604" data-e="67817">so.</span></p><p class="zh">从表面上看，这个方案很贵，报告的前言也是这么写的。</p></div>
+<div class="pair" data-s0="68507" data-s1="73328"><p class="en"><span class="w" data-s="68507" data-e="68592">But</span> <span class="w" data-s="68635" data-e="68720">the</span> <span class="w" data-s="68763" data-e="68976">mayor</span> <span class="w" data-s="69019" data-e="69232">believed</span> <span class="w" data-s="69275" data-e="69403">the</span> <span class="w" data-s="69445" data-e="69531">line</span> <span class="w" data-s="69573" data-e="69829">would</span> <span class="w target" data-s="69872" data-e="70085" title="">surpass</span> <span class="w" data-s="70128" data-e="70469">every</span> <span class="w" data-s="70512" data-e="70768">old</span> <span class="w" data-s="70811" data-e="71024">record,</span> <span class="w" data-s="71280" data-e="71493">and</span> <span class="w" data-s="71707" data-e="71792">she</span> <span class="w" data-s="71835" data-e="71963">was</span> <span class="w" data-s="72005" data-e="72091">ready</span> <span class="w" data-s="72133" data-e="72304">to</span> <span class="w" data-s="72347" data-e="72560">sail</span> <span class="w" data-s="72603" data-e="72859">without</span> <span class="w" data-s="72901" data-e="73029">a</span> <span class="w target" data-s="73072" data-e="73328" title="指南针；圆规；界限，范围">compass.</span></p><p class="zh">但县长相信这条线路会超过以往任何记录，她准备不靠指南针就扬帆出海。</p></div>
+<div class="pair" data-s0="73499" data-s1="77680"><p class="en"><span class="w" data-s="73499" data-e="74053">When</span> <span class="w" data-s="74096" data-e="74224">the</span> <span class="w" data-s="74267" data-e="74309">vote</span> <span class="w" data-s="74352" data-e="74565">came,</span> <span class="w" data-s="74779" data-e="75163">there</span> <span class="w" data-s="75205" data-e="75291">was</span> <span class="w" data-s="75333" data-e="75419">a</span> <span class="w target" data-s="75461" data-e="75675" title="突然增加 v. 使强烈地感到；突然增加">surge</span> <span class="w" data-s="75717" data-e="75803">of</span> <span class="w" data-s="75845" data-e="75931">hands</span> <span class="w" data-s="75973" data-e="76229">in</span> <span class="w" data-s="76272" data-e="76357">the</span> <span class="w" data-s="76400" data-e="76485">air:</span> <span class="w" data-s="76741" data-e="77125">twenty</span> <span class="w" data-s="77168" data-e="77467">to</span> <span class="w" data-s="77509" data-e="77680">seven.</span></p><p class="zh">表决时，一片手臂刷地举了起来：二十票对七票。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">depose</span>
+          <span class="ipa">/dr&#x27;pəuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">废黜，罢免</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked the council to depose the mayor</div>          <div class="mnem"><span class="lbl">记</span>de(往下)十pose(放，放置)，连 在一起就是“往下放”→罢免，废黜。</div>          <div class="root"><span class="lbl">根</span>de(向下) + pose(放) → 往下放 → 罢免</div>          <div class="fam"><span class="lbl">族</span>deposition n. 罢免；证词</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">dispose</span>
+          <span class="ipa">/dı&#x27;spəuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">处置；布置;排列；安排；使易于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the council should not dispose of such a plan so quickly</div>          <div class="mnem"><span class="lbl">记</span>dis(表示否定，不要了)十 pose (放，放置)，连在一起就是“不要放了”→处置。</div>          <div class="root"><span class="lbl">根</span>dis(分开) + pose(放) → 分开摆放 → 处置、布置</div>          <div class="fam"><span class="lbl">族</span>disposal n. 处理 / disposable adj. 一次性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">positive</span>
+          <span class="ipa">/&#x27;pa:zətıv/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her words made the mood positive</div>          <div class="mnem"><span class="lbl">记</span>pose 姿势、姿态，那 positive的 字面意思是：有姿态的。有做一件事情的姿态， 就是“积极的”。</div>          <div class="root"><span class="lbl">根</span>posit(放定) + ive(……的) → 立场放定了 → 积极的</div>          <div class="zt"><span class="lbl">真题</span>Its negative effects more than cancel out its positive effects. 它的负面影响不仅仅抵消了 它的正面影响。(2016)</div>          <div class="fam"><span class="lbl">族</span>positively adv. 积极地 / positivity n. 积极性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">deposit</span>
+          <span class="ipa">/dı&#x27;ppzit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">订金；存款；沉积物 v. 放下；寄放</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the county deposit a large sum</div>          <div class="mnem"><span class="lbl">记</span>往下(de)放(pos)它(it)，水流 过之后就要放下来一些“沉积物”；你家里父母 挣的钱每个月都要放下一些“存款”；所以该单 词的意思就是“存款，沉积物”。</div>          <div class="root"><span class="lbl">根</span>de(向下) + posit(放) → 往下放 → 存下；沉积物</div>          <div class="zt"><span class="lbl">真题</span>In 1993, New York State ordered stores to charge a deposit on beverage containers. 1993年，纽约州要求商店对饮料容器收取押金。</div>          <div class="fam"><span class="lbl">族</span>depositor n. 储户</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">compose</span>
+          <span class="ipa">/kəm&#x27;pəuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">组成，构成；作曲；撰写</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and compose a transport committee</div>          <div class="mnem"><span class="lbl">记</span>com(都)十pose(放，放置)，东 西都放在一起→构成，组成→作曲(作曲就是把 好多音符放在一起)。</div>          <div class="root"><span class="lbl">根</span>com(一起) + pose(放) → 放到一起 → 组成、作曲</div>          <div class="zt"><span class="lbl">真题</span>The earth is composed of several layers. 地球由几层组成。</div>          <div class="fam"><span class="lbl">族</span>composer n. 作曲家 / composition n. 构成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">component</span>
+          <span class="ipa">/kəm&#x27;pəunənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">组成部分，成分，部件</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every component of the plan was written down</div>          <div class="root"><span class="lbl">根</span>com(一起) + pon(放) + ent(物) → 放在一起的东西</div>          <div class="zt"><span class="lbl">真题</span>The emotional component of the prizes is at work.奖励的情感因素在起作用。(2016)</div>          <div class="fam"><span class="lbl">族</span>compose v. 组成 / composition n. 构成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">composition</span>
+          <span class="ipa">/ika:mpə&#x27;zı∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">作品，作文；作曲</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the composition ran to ten pages</div>          <div class="root"><span class="lbl">根</span>compose(组成) + ition(名词后缀) → 组成的东西 → 作品</div>          <div class="zt"><span class="lbl">真题</span>Next he pulls up a music composition textbook, complete with playable demos. 接下 来，他拿出了一本作曲教材，里面有可播放的小样。</div>          <div class="fam"><span class="lbl">族</span>compose v. 组成 / composer n. 作曲家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">impose</span>
+          <span class="ipa">/im&#x27;pəuz/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>imposed her purpose on the room</div>          <div class="mnem"><span class="lbl">记</span>im里面，强制把我的观点放 (pose)到你头脑里面→将……强加于。</div>          <div class="root"><span class="lbl">根</span>im(往里) + pose(放) → 硬放进你脑子里 → 强加</div>          <div class="zt"><span class="lbl">真题</span>Two and a half centuries on, most countries impose some sort of tax on alcohol and tobacco. 两个半世纪过去了，大多数国家都 对烟酒征某种税。</div>          <div class="fam"><span class="lbl">族</span>imposition n. 强加</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">oppose</span>
+          <span class="ipa">/ə&#x27;pez/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would oppose the plan to the end</div>          <div class="mnem"><span class="lbl">记</span>op 表示对立面，pose放，朝着 对立面放一个东西，就是“反对”。</div>          <div class="root"><span class="lbl">根</span>op(对立) + pose(放) → 放到对面去 → 反对</div>          <div class="zt"><span class="lbl">真题</span>The food industry has, in general, been firmly opposed to such direct government 议；求婚”。 action. 总的来说，食品行业一直坚决反对政府 采取这种直接行动。(2016)</div>          <div class="fam"><span class="lbl">族</span>opposition n. 反对 / opposed adj. 反对的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">opponent</span>
+          <span class="ipa">/ə&#x27;pəunənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">对手，竞争者；反对者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mr. Hale was her strongest opponent.</div>          <div class="root"><span class="lbl">根</span>op(对立) + pon(放) + ent(人) → 站对面的人 → 对手</div>          <div class="zt"><span class="lbl">真题</span>Once you have worthy opponents, set some ground rules so everyone understands responsibilities and boundaries.一旦你有了值 得尊敬的对手，就制定一些基本规则，这样每个 人都明白自己的责任和界限。(2015)</div>          <div class="fam"><span class="lbl">族</span>oppose v. 反对 / opposition n. 反对</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">opposite</span>
+          <span class="ipa">/&#x27;a:pəzit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">完全相反的，不同的，对面的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He took the opposite position at once</div>          <div class="root"><span class="lbl">根</span>op(对立) + posit(放) + e → 放在对面的 → 相反的</div>          <div class="zt"><span class="lbl">真题</span>They are actually in opposite directions. 它们实际上是相反的方向。(2013)</div>          <div class="fam"><span class="lbl">族</span>opposition n. 对立</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">position</span>
+          <span class="ipa">/pə&#x27;zı∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">位置 v. 使处于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He took the opposite position at once</div>          <div class="mnem"><span class="lbl">记</span>posit(摆放)十ion(名词后缀) →把一个东西摆放在哪儿？无论是哪儿，都是 个“位置”啊。</div>          <div class="root"><span class="lbl">根</span>posit(摆放) + ion(名词后缀) → 摆放的地方 → 位置</div>          <div class="zt"><span class="lbl">真题</span>Mail companies are logistics companies, which puts them in a special position to help (085) 第四单元 when disaster strikes.邮政公司是物流公司，这 使他们在灾难发生时处于能提供服务的特殊的 地位。(2019)</div>          <div class="fam"><span class="lbl">族</span>pose v. 摆姿势 / positional adj. 位置的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">propose</span>
+          <span class="ipa">/prə&#x27;pəz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">建议；计划；求婚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>met on a rainy Tuesday to propose a new plan for the railway</div>          <div class="mnem"><span class="lbl">记</span>pro提前，做一件事情之前先需 要别人为你做什么？提些建议啊。结婚前要先 做一件什么事？求婚。所以该单词意思是“建</div>          <div class="root"><span class="lbl">根</span>pro(向前) + pose(放) → 把事情放到前面 → 提议</div>          <div class="zt"><span class="lbl">真题</span>Some people propose laws be made to stop McDonald&#x27;s from attaching toys to its food specials for children. 一些人建议制定法律来阻止 麦当劳将玩具捆绑到针对儿童的特价食品。(2015)</div>          <div class="fam"><span class="lbl">族</span>proposal n. 提议 / proposition n. 主张</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">counsel</span>
+          <span class="ipa">/&#x27;kaunsl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提供专业咨询 n. (尤指年长者或专家的) 劝告，忠告；建议，商议，讨论</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was asked to counsel both sides</div>          <div class="mnem"><span class="lbl">记</span>所有的(co)都要卖了(sel 发音 类似sell，卖)，我有10套房子，都要卖了，不得 一家人在一起“商议，讨论”一下吗？</div>          <div class="root"><span class="lbl">根</span>coun(一起) + sel(商量) → 一起商量 → 劝告、咨询</div>          <div class="zt"><span class="lbl">真题</span>They are under too much stress counselling needy students. 他们为有需要的学 生提供辅导时承受着太大的压力。</div>          <div class="fam"><span class="lbl">族</span>counsellor n. 顾问</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">purpose</span>
+          <span class="ipa">/&#x27;pçrpəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">意图；目的;重要意义</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>imposed her purpose on the room</div>          <div class="root"><span class="lbl">根</span>pur(向前) + pose(放) → 放在前面的目标 → 目的</div>          <div class="zt"><span class="lbl">真题</span>They choose purpose over happiness— having a clear sense of purpose even reduces the risk of Alzheimer&#x27;s disease. 他们选择目标 而不是快乐—拥有明确的目标感甚至可以降 低患阿尔茨海默病的风险。(2017)</div>          <div class="fam"><span class="lbl">族</span>purposeful adj. 有目的的 / purposely adv. 故意地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">rural</span>
+          <span class="ipa">/&#x27;rurəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">乡村的,农村的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Green County was rural</div>          <div class="mnem"><span class="lbl">记</span>该单词发音特别像“孺弱”。现 在农村人中的年轻人、壮年人都去城里打工了， 留守在“农村的”一般都是那些老人、孩子，就是 妇孺弱小的人啊。</div>          <div class="root"><span class="lbl">根</span>rur(乡村，拉丁 rus) + al(……的) → 乡村的</div>          <div class="zt"><span class="lbl">真题</span>Rural kids used to walk a long way to school in the old days. 过去农村的孩子们常常 走很长的路去上学。</div>          <div class="fam"><span class="lbl">族</span>ruralize v. 使农村化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">urban</span>
+          <span class="ipa">/&#x27;3:bəen/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">城市的，市内的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The nearest urban area was forty miles away.</div>          <div class="mnem"><span class="lbl">记</span>鹅(ur)禁止(ban)，就是禁止养 鹅，在哪儿禁止养鹅？→市区→市内的。</div>          <div class="root"><span class="lbl">根</span>urb(城市，拉丁 urbs) + an(……的) → 城市的</div>          <div class="zt"><span class="lbl">真题</span>According to an urban design professor, it is difficult for city designers to foresee what happen in the future. 根据一位城市设计教授的 说法，城市设计师很难预见未来会发生什么。 (2019)</div>          <div class="fam"><span class="lbl">族</span>urbanize v. 使城市化 / urbanism n. 城市生活</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">suburb</span>
+          <span class="ipa">/&#x27;sab3:b/</span>
+          <span class="pos">n.</span>
+          <span class="cn">市郊，郊区</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Families in the suburb drove downtown every morning.</div>          <div class="mnem"><span class="lbl">记</span>sub(下面)十urb(城市)→城市 的下面(下一级)→郊区。</div>          <div class="root"><span class="lbl">根</span>sub(下面) + urb(城市) → 城市的下一级 → 郊区</div>          <div class="zt"><span class="lbl">真题</span>While there were neighborhood schools in cities and suburbs, one-room schoolhouses were common in rural areas. 虽然在城市和郊 区都有社区学校，但在农村地区，只有一间教室 的校舍很常见。</div>          <div class="fam"><span class="lbl">族</span>suburban adj. 郊区的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">downtown</span>
+          <span class="ipa">/&#x27;dauntaun/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">往或在城市的商业区(或中心区、闹市区) n. 城市的商业区，中心区，闹市区 adj.城市的商业区的，中心区的，闹市区的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drove downtown every morning</div>          <div class="root"><span class="lbl">根</span>down(往下) + town(镇) → 镇子下头那片闹市 → 市中心</div>          <div class="zt"><span class="lbl">真题</span>He lives downtown and it is really noisy. 他住在市区，真的很嘈杂。</div>          <div class="fam"><span class="lbl">族</span>downtown adj. 市中心的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">metropolitan</span>
+          <span class="ipa">/imetrə&#x27;pplitən/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">大都市的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The metropolitan train stopped at the county line</div>          <div class="mnem"><span class="lbl">记</span>metro(地铁，大都市)十politan (类似 politics,政治)→大都市的政治中心→大 都市的。</div>          <div class="root"><span class="lbl">根</span>metro(大都市、地铁) + politan(城市) → 大都市的</div>          <div class="fam"><span class="lbl">族</span>metropolis n. 大都市</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">civil</span>
+          <span class="ipa">/&#x27;sivl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">公民的；民用的;文明的，有礼貌的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they felt a civil right to travel</div>          <div class="root"><span class="lbl">根</span>civ(公民，拉丁 civis) + il(……的) → 公民的</div>          <div class="zt"><span class="lbl">真题</span>People would be driving in a more civilized way. 人们将会以一种更文明的方式 驾驶。</div>          <div class="fam"><span class="lbl">族</span>civilize v. 使文明 / civility n. 礼貌</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">civilization</span>
+          <span class="ipa">/isivələ&#x27;zei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">文明，文化；开化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its citizens wanted modern civilization</div>          <div class="root"><span class="lbl">根</span>civil(公民的) + ization(名词后缀) → 公民社会 → 文明</div>          <div class="zt"><span class="lbl">真题</span>Meeting these goals may be necessary to prevent the collapse of our civilization. 实现这 些目标可能是防止我们文明崩溃的必要条件。 (2016)</div>          <div class="fam"><span class="lbl">族</span>civil adj. 公民的 / civilized adj. 文明的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">citizen</span>
+          <span class="ipa">/&#x27;sitizn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">公民；市民，居民</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its citizens wanted modern civilization</div>          <div class="mnem"><span class="lbl">记</span>city 是城市，zen 发音类 似 “人”，城市里的人就是“市民”。</div>          <div class="root"><span class="lbl">根</span>cit(城市) + izen(人) → 城里的人 → 公民、市民</div>          <div class="zt"><span class="lbl">真题</span>Doing so will send an important message to the nation&#x27;s youngest citizens: Whatever your race or ethnicity，you matter. 这样做将向 这个国家最年轻的公民传递一个重要信息：无 论你是什么种族，你都很重要。(2020)</div>          <div class="fam"><span class="lbl">族</span>citizenship n. 公民身份</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">country</span>
+          <span class="ipa">/&#x27;kantri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">国家，国土；农村</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The country, they argued, should not forget small places.</div>          <div class="root"><span class="lbl">根</span>counter(对面) + y → 对面那片土地 → 国家、农村</div>          <div class="zt"><span class="lbl">真题</span>Across the country, 285 emergency management teams are devoted to crisis control. 全国有 285 个应急管理小组致力于危 机控制。（2019）</div>          <div class="fam"><span class="lbl">族</span>countryside n. 乡下</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">county</span>
+          <span class="ipa">/&#x27;kaunti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">英国的郡，美国的县</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The council of Green County met on a rainy Tuesday</div>          <div class="root"><span class="lbl">根</span>count(伯爵) + y → 伯爵管的地 → 郡、县</div>          <div class="zt"><span class="lbl">真题</span>It sets a new bar for similar initiatives across the county. 它为全县的类似举措设定了 一个新的标准。</div>          <div class="fam"><span class="lbl">族</span>countywide adj. 全县的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">surface</span>
+          <span class="ipa">/&#x27;s3:rfis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">表面 v. 升到表面</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On the surface the plan looked expensive</div>          <div class="mnem"><span class="lbl">记</span>上面的（sur)脸（face），最外面 的那张脸，就是“表面”。</div>          <div class="root"><span class="lbl">根</span>sur(上面) + face(脸) → 最外面那张脸 → 表面</div>          <div class="zt"><span class="lbl">真题</span>Eggs provide a unique surface to paint on. 鸡蛋为绘画提供了一个独特的表面。 (2017)</div>          <div class="fam"><span class="lbl">族</span>surf v. 冲浪 / superficial adj. 表面的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">preface</span>
+          <span class="ipa">/&#x27;prefəs/</span>
+          <span class="pos"></span>
+          <span class="cn">序言，前言，引语</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the preface of the report said so</div>          <div class="mnem"><span class="lbl">记</span>前面的(pre)脸(face)，就是“序 言，前言”。</div>          <div class="root"><span class="lbl">根</span>pre(前面) + face(脸) → 书前面那张脸 → 前言</div>          <div class="fam"><span class="lbl">族</span>prefatory adj. 序言的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">surpass</span>
+          <span class="ipa">/sə&#x27;pa:s/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the line would surpass every old record</div>          <div class="root"><span class="lbl">根</span>sur(超过) + pass(通过) → 越过别人 → 超过</div>          <div class="zt"><span class="lbl">真题</span>It will be hard to surpass this very high score. 要超过这个高分是很难的。</div>          <div class="fam"><span class="lbl">族</span>surpassing adj. 卓越的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">compass</span>
+          <span class="ipa">/&#x27;kampəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">指南针；圆规；界限，范围</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she was ready to sail without a compass</div>          <div class="mnem"><span class="lbl">记</span>来(com 想成 come)通过(pass)， 要穿过一座山或森林，很容易迷路的，需要“指 南针”。</div>          <div class="root"><span class="lbl">根</span>com(一起) + pass(走) → 陪你走遍四周的 → 指南针</div>          <div class="fam"><span class="lbl">族</span>compasses n. 圆规</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">surge</span>
+          <span class="ipa">/s3:rd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">突然增加 v. 使强烈地感到；突然增加</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was a surge of hands in the air</div>          <div class="mnem"><span class="lbl">记</span>sur 表示上面，比如 surface表 面；ge想成哥哥。当你成功的时候，你莫名其妙 就多了很多哥哥、姐姐、大舅、二姨父。也就是 当你成功时，上面的哥哥就“突然增加”了。</div>          <div class="root"><span class="lbl">根</span>sur(向上) + ge → 向上涨 → 突然增加</div>          <div class="zt"><span class="lbl">真题</span>With surging obesity levels putting increasing strain on public health systems, (087) 第四单元 governments around the world have begun to toy with the idea of taxing sugar as well. 随着 肥胖水平的飙升给公共卫生系统带来越来越大 的压力，世界各国政府开始考虑对糖征税的想 法。(2016)</div>          <div class="fam"><span class="lbl">族</span>surging adj. 猛增的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 4 · Day 22</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

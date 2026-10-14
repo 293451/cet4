@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 31 · The Architect and the Old Theatre</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 31 · 11/12 · Unit 5 第 901-930 词</div>
+  <h1>The Architect and the Old Theatre<span class="cn">建筑师与老剧院</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-31.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4608"><p class="en"><span class="w" data-s="43" data-e="256">Old</span> <span class="w" data-s="299" data-e="427">Mr.</span> <span class="w" data-s="555" data-e="768">Hale</span> <span class="w" data-s="811" data-e="981">was</span> <span class="w" data-s="1024" data-e="1109">an</span> <span class="w target" data-s="1152" data-e="1536" title="建筑师；设计师；缔造者，创造者">architect,</span> <span class="w" data-s="1707" data-e="2005">and</span> <span class="w" data-s="2091" data-e="2389">he</span> <span class="w" data-s="2432" data-e="2603">loved</span> <span class="w" data-s="2645" data-e="2859">the</span> <span class="w target" data-s="2901" data-e="3413" title="建筑学；建筑设计；建筑风格，结构">architecture</span> <span class="w" data-s="3456" data-e="3584">of</span> <span class="w" data-s="3627" data-e="3669">the</span> <span class="w" data-s="3712" data-e="3797">little</span> <span class="w" data-s="3840" data-e="4053">town</span> <span class="w" data-s="4096" data-e="4309">by</span> <span class="w" data-s="4352" data-e="4480">the</span> <span class="w" data-s="4523" data-e="4608">river.</span></p><p class="zh">老黑尔先生是位建筑师，他深爱着河边那座小镇的建筑。</p></div>
+<div class="pair" data-s0="4821" data-s1="11563"><p class="en"><span class="w" data-s="4821" data-e="5632">For</span> <span class="w" data-s="5675" data-e="6101">forty</span> <span class="w" data-s="6144" data-e="6229">years</span> <span class="w" data-s="6272" data-e="6571">he</span> <span class="w" data-s="6613" data-e="6741">had</span> <span class="w" data-s="6784" data-e="6869">watched</span> <span class="w" data-s="6912" data-e="7339">workers</span> <span class="w target" data-s="7381" data-e="7723" title="建筑；修建；建造；组成；创建；(按照数学规 则)编制，绘制">construct</span> <span class="w" data-s="7765" data-e="8235">bridges,</span> <span class="w target" data-s="8363" data-e="8875" title="建造；建立；创立；搭建；竖立">erect</span> <span class="w" data-s="8917" data-e="9429">towers,</span> <span class="w" data-s="9600" data-e="9771">and</span> <span class="w" data-s="10069" data-e="10283">pour</span> <span class="w" data-s="10325" data-e="10453">the</span> <span class="w target" data-s="10496" data-e="10581" title="基础；根据；底座，基地v.以……为据点 (或总部等);把(总部等)设在">base</span> <span class="w" data-s="10624" data-e="10880">of</span> <span class="w" data-s="10923" data-e="11093">every</span> <span class="w" data-s="11136" data-e="11392">new</span> <span class="w" data-s="11435" data-e="11563">building.</span></p><p class="zh">四十年来，他看着工人们造桥、竖塔，为每一栋新楼打地基。</p></div>
+<div class="pair" data-s0="12345" data-s1="17593"><p class="en"><span class="w" data-s="12345" data-e="12430">He</span> <span class="w" data-s="12473" data-e="12686">always</span> <span class="w" data-s="12729" data-e="12985">said</span> <span class="w" data-s="13027" data-e="13326">that</span> <span class="w" data-s="13369" data-e="13454">a</span> <span class="w" data-s="13497" data-e="13582">town</span> <span class="w" data-s="13625" data-e="13881">is</span> <span class="w" data-s="13923" data-e="14051">only</span> <span class="w" data-s="14094" data-e="14265">as</span> <span class="w" data-s="14307" data-e="14478">strong</span> <span class="w" data-s="14521" data-e="14734">as</span> <span class="w" data-s="14777" data-e="14862">its</span> <span class="w target" data-s="14905" data-e="15545" title="(国家或机构的)基础设施，基础建设">infrastructure,</span> <span class="w" data-s="15715" data-e="15886">and</span> <span class="w" data-s="16014" data-e="16313">that</span> <span class="w target" data-s="16355" data-e="16654" title="基本的;初级的；必需的">basic</span> <span class="w" data-s="16697" data-e="16867">things</span> <span class="w" data-s="16910" data-e="17294">matter</span> <span class="w" data-s="17337" data-e="17593">most.</span></p><p class="zh">他总说，一座小镇的强弱全看它的基础设施，而基本的东西最重要。</p></div>
+<div class="pair" data-s0="17891" data-s1="21902"><p class="en"><span class="w" data-s="17891" data-e="18489">That</span> <span class="w" data-s="18531" data-e="18787">spring</span> <span class="w" data-s="18830" data-e="19171">the</span> <span class="w" data-s="19214" data-e="19385">town</span> <span class="w" data-s="19427" data-e="19641">asked</span> <span class="w" data-s="19683" data-e="19854">him</span> <span class="w" data-s="19897" data-e="19982">to</span> <span class="w target" data-s="20025" data-e="20451" title="详细说明；变得复杂；详细制订；详尽阐述 adj. 复杂的;详尽的">elaborate</span> <span class="w" data-s="20494" data-e="20622">on</span> <span class="w" data-s="20665" data-e="20750">a</span> <span class="w" data-s="20793" data-e="20878">plan</span> <span class="w" data-s="20921" data-e="21177">for</span> <span class="w" data-s="21219" data-e="21305">the</span> <span class="w" data-s="21347" data-e="21433">old</span> <span class="w" data-s="21475" data-e="21902">theatre.</span></p><p class="zh">那年春天，镇里请他为老剧院详细制订一份方案。</p></div>
+<div class="pair" data-s0="22471" data-s1="26865"><p class="en"><span class="w" data-s="22471" data-e="22599">On</span> <span class="w" data-s="22641" data-e="22727">the</span> <span class="w" data-s="22769" data-e="22855">stage</span> <span class="w" data-s="22897" data-e="23068">of</span> <span class="w" data-s="23111" data-e="23196">that</span> <span class="w" data-s="23239" data-e="23623">theatre,</span> <span class="w" data-s="23751" data-e="23879">every</span> <span class="w target" data-s="24135" data-e="24647" title="戏剧；戏剧性情节；激动；兴奋；刺激">drama</span> <span class="w" data-s="24689" data-e="24945">and</span> <span class="w" data-s="25159" data-e="25329">every</span> <span class="w target" data-s="25372" data-e="25841" title="喜剧；搞笑的东西">comedy</span> <span class="w" data-s="25884" data-e="25969">of</span> <span class="w" data-s="26012" data-e="26055">the</span> <span class="w" data-s="26097" data-e="26183">town</span> <span class="w" data-s="26225" data-e="26481">had</span> <span class="w" data-s="26524" data-e="26652">been</span> <span class="w" data-s="26695" data-e="26865">played.</span></p><p class="zh">在那座剧院的舞台上，镇上的每一出戏剧和每一场喜剧都上演过。</p></div>
+<div class="pair" data-s0="27719" data-s1="29084"><p class="en"><span class="w" data-s="27719" data-e="27889">&quot;The</span> <span class="w" data-s="27932" data-e="28060">plan</span> <span class="w" data-s="28103" data-e="28273">is</span> <span class="w" data-s="28316" data-e="28487">simple,&quot;</span> <span class="w" data-s="28913" data-e="28956">he</span> <span class="w" data-s="28999" data-e="29084">said.</span></p><p class="zh">“方案很简单，”他说。</p></div>
+<div class="pair" data-s0="29511" data-s1="33436"><p class="en"><span class="w" data-s="29511" data-e="29553">&quot;This</span> <span class="w" data-s="29980" data-e="30193">is</span> <span class="w" data-s="30236" data-e="30364">not</span> <span class="w" data-s="30407" data-e="30535">a</span> <span class="w target" data-s="30577" data-e="31047" title="悲剧，灾难">tragedy,</span> <span class="w" data-s="31132" data-e="31303">and</span> <span class="w" data-s="31516" data-e="31687">it</span> <span class="w" data-s="31729" data-e="31772">is</span> <span class="w" data-s="31815" data-e="31900">not</span> <span class="w" data-s="31943" data-e="32071">a</span> <span class="w target" data-s="32113" data-e="32583" title="可笑的，荒谬的">ridiculous</span> <span class="w" data-s="32625" data-e="32796">or</span> <span class="w target" data-s="32839" data-e="33223" title="荒谬的，怪诞不经的">absurd</span> <span class="w" data-s="33265" data-e="33436">idea.&quot;</span></p><p class="zh">“这不是悲剧，也不是什么可笑或荒谬的想法。”</p></div>
+<div class="pair" data-s0="34076" data-s1="38129"><p class="en"><span class="w" data-s="34076" data-e="34545">He</span> <span class="w" data-s="34588" data-e="34759">opened</span> <span class="w" data-s="34801" data-e="35015">the</span> <span class="w target" data-s="35057" data-e="35356" title="索引；(物价和工资等的)指数；标志；指标 v.为……编索引；将……编入索引；使指数化">index</span> <span class="w" data-s="35399" data-e="35569">of</span> <span class="w" data-s="35612" data-e="35697">his</span> <span class="w" data-s="35740" data-e="36124">notebook</span> <span class="w" data-s="36167" data-e="36380">and</span> <span class="w" data-s="36423" data-e="36849">read</span> <span class="w" data-s="36892" data-e="37020">out</span> <span class="w" data-s="37063" data-e="37191">the</span> <span class="w target" data-s="37233" data-e="37617" title="成分；(尤指烹饪)原料；(成功的)因素，要素">ingredients</span> <span class="w" data-s="37660" data-e="37831">of</span> <span class="w" data-s="37873" data-e="37959">his</span> <span class="w" data-s="38001" data-e="38129">plan.</span></p><p class="zh">他翻开笔记本的索引，把方案的各项要素念了出来。</p></div>
+<div class="pair" data-s0="39161" data-s1="42532"><p class="en"><span class="w" data-s="39161" data-e="39289">Every</span> <span class="w target" data-s="39332" data-e="39716" title="要素；少量；(学科的)基本原理，基础，纲要">element</span> <span class="w" data-s="39759" data-e="39887">was</span> <span class="w" data-s="39929" data-e="40228">listed</span> <span class="w" data-s="40271" data-e="40399">there,</span> <span class="w" data-s="40612" data-e="40740">and</span> <span class="w" data-s="40996" data-e="41337">not</span> <span class="w" data-s="41380" data-e="41551">one</span> <span class="w target" data-s="41593" data-e="42020" title="因素；要素">factor</span> <span class="w" data-s="42063" data-e="42191">was</span> <span class="w" data-s="42233" data-e="42532">forgotten.</span></p><p class="zh">每一个要素都列在上面，没有一个因素被漏掉。</p></div>
+<div class="pair" data-s0="42788" data-s1="48036"><p class="en"><span class="w" data-s="42788" data-e="43087">His</span> <span class="w" data-s="43300" data-e="43556">lunch</span> <span class="w" data-s="43599" data-e="43727">was</span> <span class="w" data-s="43769" data-e="43897">a</span> <span class="w target" data-s="43940" data-e="44111" title="">paste</span> <span class="w" data-s="44153" data-e="44239">of</span> <span class="w" data-s="44281" data-e="44537">beans</span> <span class="w" data-s="44580" data-e="44793">and</span> <span class="w" data-s="44836" data-e="45263">a</span> <span class="w target" data-s="45305" data-e="45561" title="复合物；混合物；化合物；复合词 adlj.复合的 v. 使加重；使恶化">compound</span> <span class="w" data-s="45604" data-e="45775">of</span> <span class="w" data-s="45817" data-e="46116">nuts,</span> <span class="w" data-s="46201" data-e="46671">kept</span> <span class="w" data-s="46713" data-e="46927">in</span> <span class="w" data-s="46969" data-e="47055">a</span> <span class="w" data-s="47097" data-e="47183">small</span> <span class="w target" data-s="47225" data-e="47737" title="便携式的；手提的；轻便的">portable</span> <span class="w" data-s="47780" data-e="48036">box.</span></p><p class="zh">他的午餐是豆泥和坚果混合物，装在一个轻便的小盒子里。</p></div>
+<div class="pair" data-s0="48377" data-s1="53412"><p class="en"><span class="w" data-s="48377" data-e="48676">Beside</span> <span class="w" data-s="48719" data-e="48889">the</span> <span class="w" data-s="48932" data-e="49231">theatre</span> <span class="w" data-s="49273" data-e="49359">there</span> <span class="w" data-s="49401" data-e="49487">was</span> <span class="w" data-s="49529" data-e="49657">a</span> <span class="w target" data-s="49700" data-e="49871" title="池塘(尤指人工的)">pond,</span> <span class="w" data-s="50127" data-e="50255">and</span> <span class="w" data-s="50596" data-e="50809">behind</span> <span class="w" data-s="50852" data-e="51108">the</span> <span class="w target" data-s="51151" data-e="51364" title="池塘(尤指人工的)">pond</span> <span class="w" data-s="51407" data-e="51663">stood</span> <span class="w" data-s="51705" data-e="51833">a</span> <span class="w target" data-s="51876" data-e="52217" title="建筑群；情结 adj. 复杂的；复合的">complex</span> <span class="w" data-s="52260" data-e="52431">of</span> <span class="w" data-s="52473" data-e="52601">three</span> <span class="w" data-s="52644" data-e="52943">old</span> <span class="w" data-s="52985" data-e="53412">houses.</span></p><p class="zh">剧院旁边有个池塘，池塘后面立着三栋老房子组成的建筑群。</p></div>
+<div class="pair" data-s0="54367" data-s1="56287"><p class="en"><span class="w" data-s="54367" data-e="54452">The</span> <span class="w" data-s="54495" data-e="54793">drawings</span> <span class="w" data-s="54836" data-e="54964">seemed</span> <span class="w" data-s="55007" data-e="55177">to</span> <span class="w target" data-s="55220" data-e="55561" title="迷惑；使困惑">perplex</span> <span class="w" data-s="55604" data-e="55732">the</span> <span class="w" data-s="55775" data-e="55903">young</span> <span class="w" data-s="55945" data-e="56287">mayor.</span></p><p class="zh">那些图纸似乎让年轻的镇长困惑不解。</p></div>
+<div class="pair" data-s0="57140" data-s1="59529"><p class="en"><span class="w" data-s="57140" data-e="57225">&quot;You</span> <span class="w" data-s="57268" data-e="57396">make</span> <span class="w" data-s="57439" data-e="57524">a</span> <span class="w" data-s="57567" data-e="57695">simple</span> <span class="w" data-s="57737" data-e="57951">thing</span> <span class="w target" data-s="57993" data-e="58505" title="建筑群；情结 adj. 复杂的；复合的">complex,&quot;</span> <span class="w" data-s="58975" data-e="59103">the</span> <span class="w" data-s="59145" data-e="59401">mayor</span> <span class="w" data-s="59444" data-e="59529">said.</span></p><p class="zh">“你把简单的事弄复杂了，”镇长说。</p></div>
+<div class="pair" data-s0="59871" data-s1="62431"><p class="en"><span class="w target" data-s="59871" data-e="60724" title="使复杂化">&quot;Complicate</span> <span class="w" data-s="60767" data-e="60895">it</span> <span class="w" data-s="60937" data-e="61023">more</span> <span class="w" data-s="61065" data-e="61279">and</span> <span class="w" data-s="61321" data-e="61577">the</span> <span class="w" data-s="61620" data-e="61791">roof</span> <span class="w" data-s="61833" data-e="61919">will</span> <span class="w target" data-s="61961" data-e="62431" title="(突然)倒塌，坍塌，倒下">collapse.&quot;</span></p><p class="zh">“再复杂化下去，屋顶就要塌了。”</p></div>
+<div class="pair" data-s0="62815" data-s1="64820"><p class="en"><span class="w" data-s="62815" data-e="63412">Those</span> <span class="w" data-s="63455" data-e="63583">words</span> <span class="w" data-s="63625" data-e="63924">did</span> <span class="w target" data-s="63967" data-e="64351" title="激起；引发;挑衅；激怒">provoke</span> <span class="w" data-s="64393" data-e="64479">the</span> <span class="w" data-s="64521" data-e="64649">old</span> <span class="w" data-s="64692" data-e="64820">man.</span></p><p class="zh">这话确实激怒了老人。</p></div>
+<div class="pair" data-s0="65469" data-s1="70376"><p class="en"><span class="w" data-s="65469" data-e="65554">&quot;I</span> <span class="w target" data-s="65597" data-e="65981" title="拥护者；支持者；辩护律师v. 拥护；支持； 提倡">advocate</span> <span class="w" data-s="66024" data-e="66365">repair,</span> <span class="w" data-s="66578" data-e="66877">not</span> <span class="w" data-s="67090" data-e="67602">replacement,&quot;</span> <span class="w" data-s="67986" data-e="68114">he</span> <span class="w" data-s="68157" data-e="68328">said,</span> <span class="w" data-s="68541" data-e="68626">and</span> <span class="w" data-s="69010" data-e="69138">he</span> <span class="w" data-s="69181" data-e="69394">struck</span> <span class="w" data-s="69437" data-e="69522">the</span> <span class="w" data-s="69565" data-e="69693">table</span> <span class="w" data-s="69736" data-e="69949">with</span> <span class="w" data-s="69992" data-e="70120">his</span> <span class="w target" data-s="70162" data-e="70376" title="鞭子 v. 鞭策；鞭答；鞭打">whip.</span></p><p class="zh">“我拥护修缮，而不是拆掉重建，”他说着，用鞭子敲了敲桌子。</p></div>
+<div class="pair" data-s0="70589" data-s1="73917"><p class="en"><span class="w" data-s="70589" data-e="71656">&quot;Sorry,</span> <span class="w" data-s="71741" data-e="71869">I</span> <span class="w" data-s="72125" data-e="72381">do</span> <span class="w" data-s="72424" data-e="72509">not</span> <span class="w" data-s="72552" data-e="72637">mean</span> <span class="w" data-s="72680" data-e="72808">to</span> <span class="w target" data-s="72850" data-e="73064" title="">confuse</span> <span class="w" data-s="73106" data-e="73320">you,&quot;</span> <span class="w" data-s="73533" data-e="73661">he</span> <span class="w" data-s="73704" data-e="73917">added.</span></p><p class="zh">“抱歉，我不是想让你迷惑，”他又说。</p></div>
+<div class="pair" data-s0="74173" data-s1="75752"><p class="en"><span class="w" data-s="74173" data-e="74216">&quot;But</span> <span class="w" data-s="74258" data-e="74344">I</span> <span class="w" data-s="74386" data-e="74514">will</span> <span class="w" data-s="74557" data-e="74642">not</span> <span class="w" data-s="74685" data-e="74856">be</span> <span class="w target" data-s="74898" data-e="75112" title="不锋利的，钝的；率直的，直言不讳的">blunt</span> <span class="w" data-s="75154" data-e="75325">about</span> <span class="w" data-s="75368" data-e="75538">bad</span> <span class="w" data-s="75581" data-e="75752">work.&quot;</span></p><p class="zh">“但面对拙劣的工程，我不会说话含糊。”</p></div>
+<div class="pair" data-s0="76221" data-s1="77885"><p class="en"><span class="w" data-s="76221" data-e="76690">The</span> <span class="w" data-s="76904" data-e="77117">mayor</span> <span class="w" data-s="77160" data-e="77416">laughed</span> <span class="w" data-s="77458" data-e="77544">and</span> <span class="w" data-s="77586" data-e="77885">signed.</span></p><p class="zh">镇长笑了，签了字。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">elaborate</span>
+          <span class="ipa">/ı&#x27;læbərət, i&#x27;læbəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">详细说明；变得复杂；详细制订；详尽阐述 adj. 复杂的;详尽的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked him to elaborate on a plan</div>          <div class="mnem"><span class="lbl">记</span>e(出去),labor(劳动),ate 是动 词后缀，连在一起就是：把你劳动的过程“详细 描述”出来。你考上研究生以后，把你劳动的过 程给学弟学妹“详细说明”一遍。</div>          <div class="root"><span class="lbl">根</span>e(向外) + labor(劳动) + ate → 把劳动过程讲出来</div>          <div class="zt"><span class="lbl">真题</span>When I talk about cooking, I&#x27;m not talking about creating elaborate dinner parties or three-day science projects. 当我谈论烹饪时， 我不是在谈论精心制作的晚宴或为期三天的科 学项目。(2020)</div>          <div class="fam"><span class="lbl">族</span>elaboration n. 详细阐述</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">architecture</span>
+          <span class="ipa">/&#x27;a:rkitekt∫ər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">建筑学；建筑设计；建筑风格，结构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he loved the architecture of the little town</div>          <div class="mnem"><span class="lbl">记</span>arch(拱形)十i(爱，喜爱)十 tecture(特别像 structure 结构)→喜欢拱形的 结构→建筑；建筑学。</div>          <div class="root"><span class="lbl">根</span>archi(拱形) + tect(建造) + ure → 造拱的手艺</div>          <div class="zt"><span class="lbl">真题</span>The architecture of these buildings is in the Greek style. 这些楼房的建筑结构是希腊风格的。</div>          <div class="fam"><span class="lbl">族</span>architect n. 建筑师 / architectural adj. 建筑的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">architect</span>
+          <span class="ipa">/&#x27;a:rkitekt/</span>
+          <span class="pos"></span>
+          <span class="cn">建筑师；设计师；缔造者，创造者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mr. Hale was an architect</div>          <div class="root"><span class="lbl">根</span>archi(拱形) + tect(建造者) → 造拱的人</div>          <div class="zt"><span class="lbl">真题</span>Many new houses built along South Carolina&#x27;s shoreline were poorly constructed according to architect Ray Huff. 根据建筑师雷· 赫夫所说，沿着南卡罗莱纳海岸线建造的许多 新房子都很差劲。</div>          <div class="fam"><span class="lbl">族</span>architecture n. 建筑学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">construct</span>
+          <span class="ipa">/kən&#x27;strakt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">建筑；修建；建造；组成；创建；(按照数学规 则)编制，绘制</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>watched workers construct bridges</div>          <div class="mnem"><span class="lbl">记</span>con（所有的）十 struct（想 成 structure“结构”)→所有的结构都是“建造；修 建”的啊。</div>          <div class="root"><span class="lbl">根</span>con(一起) + struct(堆建) → 一起堆起来</div>          <div class="zt"><span class="lbl">真题</span>The problem appears to be more troublesome in newly constructed homes rather than old ones. 这个问题在新建住宅中比 在旧住宅中似乎更棘手。</div>          <div class="fam"><span class="lbl">族</span>construction n. 建造 / constructive adj. 建设性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">erect</span>
+          <span class="ipa">/i&#x27;rekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">建造；建立；创立；搭建；竖立</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>erect towers</div>          <div class="mnem"><span class="lbl">记</span>该单词和 correct(正确的)后部 分很像，很多城市建立了很多路啊，桥啊，“建 造”之初都认为是正确的。</div>          <div class="root"><span class="lbl">根</span>e(向上) + rect(直) → 直直地立起来</div>          <div class="zt"><span class="lbl">真题</span>Angry owners have called on the Government to erect sea defenses to protect their homes. 愤怒的业主们呼吁政府建立海防 设施来保护他们的家园。</div>          <div class="fam"><span class="lbl">族</span>erection n. 竖立</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">infrastructure</span>
+          <span class="ipa">/&#x27;ınfrəstrakt∫ər/</span>
+          <span class="pos"></span>
+          <span class="cn">(国家或机构的)基础设施，基础建设</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>only as strong as its infrastructure</div>          <div class="mnem"><span class="lbl">记</span>in里面的；structure 建设。装修 房子我们都知道，里面的建设就是“基础建设”。</div>          <div class="root"><span class="lbl">根</span>infra(下部) + structure(结构) → 下层结构</div>          <div class="zt"><span class="lbl">真题</span>It will force cities to transform their infrastructure. 它将迫使城市改造其基础设施。 (2021) (118)</div>          <div class="fam"><span class="lbl">族</span>structural adj. 结构的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">base</span>
+          <span class="ipa">/beis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">基础；根据；底座，基地v.以……为据点 (或总部等);把(总部等)设在</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>pour the base of every new building</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音特别像“贝斯” (一种乐器)，贝斯是乐队中必不可少的一个乐 器→基础。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：the base of the wall 墙的底座</div>          <div class="zt"><span class="lbl">真题</span>Then students select adviser based on shared academic interests. 然后学生根据共同 的学术兴趣选择导师。(2016)</div>          <div class="fam"><span class="lbl">族</span>basic adj. 基本的 / basis n. 基础</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">basic</span>
+          <span class="ipa">/&#x27;beisık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">基本的;初级的；必需的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>basic things matter most</div>          <div class="root"><span class="lbl">根</span>base(基础) + ic → 属于基础的</div>          <div class="zt"><span class="lbl">真题</span>The diving suit and a set of basic tools needed for skin-diving can be bought for 20 dollars. 潜水所需的潜水衣和一套基本工具只 需20 美元。</div>          <div class="fam"><span class="lbl">族</span>basically adv. 基本上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">drama</span>
+          <span class="ipa">/&#x27;dra:mə/</span>
+          <span class="pos">n.</span>
+          <span class="cn">戏剧；戏剧性情节；激动；兴奋；刺激</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every drama and every comedy</div>          <div class="mnem"><span class="lbl">记</span>该单词谐音“抓（dra）妈妈 (ma)”。怎么连自己的妈妈也抓起来了？太 “戏剧性”了吧！</div>          <div class="root"><span class="lbl">根</span>源自希腊 dran(做、演) → 演出来的戏</div>          <div class="zt"><span class="lbl">真题</span>Our risk of cancer rises dramatically as we age. 随着年龄的增长，患癌症的风险急剧上升。</div>          <div class="fam"><span class="lbl">族</span>dramatic adj. 戏剧性的 / dramatically adv. 急剧地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">tragedy</span>
+          <span class="ipa">/&#x27;trædzədı/</span>
+          <span class="pos">n.</span>
+          <span class="cn">悲剧，灾难</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>This is not a tragedy</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“端着弟”。兄弟 俩一块玩儿，弟弟把哥哥惹急了，哥哥踹了弟弟 一脚，真是“悲剧”啊！</div>          <div class="root"><span class="lbl">根</span>trag(山羊) + edy(歌) → 古希腊山羊歌 → 悲剧</div>          <div class="zt"><span class="lbl">真题</span>Carême&#x27;s childhood was one part tragedy, equal part mystery. 卡莱姆的童年一半是悲剧，表明，体重指数与工资和收入有关。(2020) 第五单元 一半是神秘。(2018)</div>          <div class="fam"><span class="lbl">族</span>tragic adj. 悲剧的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">comedy</span>
+          <span class="ipa">/&#x27;kpmədi/</span>
+          <span class="pos"></span>
+          <span class="cn">喜剧；搞笑的东西</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every comedy of the town</div>          <div class="mnem"><span class="lbl">记</span>来（come)，弟弟（dy发音似 “弟”)。好久不见的弟弟来了，我很高兴→ 喜剧。</div>          <div class="root"><span class="lbl">根</span>谐音联想：come(来) + dy(弟) → 弟弟来了就逗乐</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s a charity comedy night with lots of different acts. 这是一个慈善喜剧之夜，有很多 不同的表演。(2018)</div>          <div class="fam"><span class="lbl">族</span>comic adj. 喜剧的 / comedian n. 喜剧演员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">ridiculous</span>
+          <span class="ipa">/rı&#x27;dıkjələs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可笑的，荒谬的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not a ridiculous or absurd idea</div>          <div class="mnem"><span class="lbl">记</span>该单词的发音类似“瑞迪可乐 死”。那就是瑞迪这个人很“可笑”啊。</div>          <div class="root"><span class="lbl">根</span>rid(笑) + iculous → 让人笑的</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s a tough decision: the small size may not last you through the whole movie, but $ 5.50 for some sugary drink seems ridiculous. 它是一个艰难的决定：小杯的饮料可能不会让 你坚持看完整部电影，但5.50美元的含糖饮料 似乎很荒谬。(2020)</div>          <div class="fam"><span class="lbl">族</span>ridicule v./n. 嘲笑</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">absurd</span>
+          <span class="ipa">/əb&#x27;s3:d/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">荒谬的，怪诞不经的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>or absurd idea</div>          <div class="mnem"><span class="lbl">记</span>一再地(ab)笑(surd 发音似“笑 的”)→可笑的→荒谬的。</div>          <div class="root"><span class="lbl">根</span>ab(离开) + surd(声音) → 不合调的声音</div>          <div class="zt"><span class="lbl">真题</span>Rumsfeld&#x27;s idea, Leslie writes, wasn&#x27;t absurd—it was smart. 莱斯利写道，拉姆斯菲尔 德的想法并不荒谬，而是很明智。(2017)</div>          <div class="fam"><span class="lbl">族</span>absurdity n. 荒谬</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">index</span>
+          <span class="ipa">/&#x27;ındeks/</span>
+          <span class="pos">n.</span>
+          <span class="cn">索引；(物价和工资等的)指数；标志；指标 v.为……编索引；将……编入索引；使指数化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>opened the index of his notebook</div>          <div class="root"><span class="lbl">根</span>in(向里) + dex(指出) → 指出内容在哪</div>          <div class="zt"><span class="lbl">真题</span>Researchers have shown that body mass index is related to wages and income. 研究人员 (119)</div>          <div class="fam"><span class="lbl">族</span>indexes/indices n. 索引（复数）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">ingredient</span>
+          <span class="ipa">/ın&#x27;gri:diənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">成分；(尤指烹饪)原料；(成功的)因素，要素</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>read out the ingredients of his plan</div>          <div class="mnem"><span class="lbl">记</span>里面(in)搁点(gredi的谐音)进 去(ent 想成 enter)，做饭时里面放点“原料”。</div>          <div class="root"><span class="lbl">根</span>in(进入) + gred(走) + ient → 走进去的东西</div>          <div class="zt"><span class="lbl">真题</span>But innovation, broadly defined, is the crucial ingredient in all economic progress. 但 广义上说，创新是所有经济进步的关键因素。</div>          <div class="fam"><span class="lbl">族</span>靠搭配记：the ingredients of success 成功的要素</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">element</span>
+          <span class="ipa">/&#x27;elimənt/</span>
+          <span class="pos"></span>
+          <span class="cn">要素；少量；(学科的)基本原理，基础，纲要</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every element was listed there</div>          <div class="mnem"><span class="lbl">记</span>单词的发音类似：爱了门特。 但是只有爱情，你们两个不一定能走到一起，还 需要很多“要素”和“基础”的。</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠 elementary(初级的) 记 → 基本要素</div>          <div class="zt"><span class="lbl">真题</span>Credit cards and loans will be a central element. 信用卡和贷款将是核心要素。</div>          <div class="fam"><span class="lbl">族</span>elementary adj. 基本的 / elemental adj. 基本的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">factor</span>
+          <span class="ipa">/&#x27;fæktər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">因素；要素</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not one factor was forgotten</div>          <div class="root"><span class="lbl">根</span>fact(做) + or → 起作用的东西</div>          <div class="zt"><span class="lbl">真题</span>It is a chief factor affecting students&#x27; learning. 它是影响学生学习的主要因素。(2016)</div>          <div class="fam"><span class="lbl">族</span>factor n. 因素 / factory n. 工厂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">paste</span>
+          <span class="ipa">/peist/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a paste of beans</div>          <div class="mnem"><span class="lbl">记</span>toothpaste 牙膏。</div>          <div class="root"><span class="lbl">根</span>联想 toothpaste 牙膏 → 糊状物</div>          <div class="zt"><span class="lbl">真题</span>Nigeria is dependent on $1 billion worth of tomato-paste imports every year. 尼日利亚 每年依赖价值10亿美元的番茄酱进口。</div>          <div class="fam"><span class="lbl">族</span>toothpaste n. 牙膏</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">portable</span>
+          <span class="ipa">/&#x27;po:rtəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">便携式的；手提的；轻便的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small portable box</div>          <div class="mnem"><span class="lbl">记</span>可以（able表示“可以…… 的”；)冲泡的(port发音类似“泡”)，见过减肥时 期吃的可以冲泡的代餐吗？都是独立包装，“便 携式的”。</div>          <div class="root"><span class="lbl">根</span>port(搬) + able(能) → 能搬着走的</div>          <div class="zt"><span class="lbl">真题</span>The device is said to be the world&#x27;s first portable transistor.据说这种装置是世界上第 一个便携式晶体管。</div>          <div class="fam"><span class="lbl">族</span>port v. 搬运 / transport v. 运输</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">compound</span>
+          <span class="ipa">/&#x27;ka:mpaund/</span>
+          <span class="pos"></span>
+          <span class="cn">复合物；混合物；化合物；复合词 adlj.复合的 v. 使加重；使恶化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a compound of nuts</div>          <div class="mnem"><span class="lbl">记</span>所有的(com)都是泡的(pound 的谐音)。我们早晨泡牛奶坚果麦片，把一堆 “混合物”在一起泡着吃，才健康。</div>          <div class="root"><span class="lbl">根</span>com(一起) + pound(放) → 放在一起的东西</div>          <div class="zt"><span class="lbl">真题</span>The nation&#x27;s leading pediatricians(儿科 医生) say this miracle compound exists. 全国 顶尖儿科医生表示，这种神奇的化合物确实 存在。</div>          <div class="fam"><span class="lbl">族</span>compound n. 化合物 / compose v. 组成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">pond</span>
+          <span class="ipa">/pa:nd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">池塘(尤指人工的)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Beside the theatre there was a pond</div>          <div class="mnem"><span class="lbl">记</span>发音类似：泡的。在哪泡？→ 池塘。</div>          <div class="root"><span class="lbl">根</span>谐音联想：泡(pond)在水里的就是池塘</div>          <div class="zt"><span class="lbl">真题</span>The “wrong&quot;name is not random but is invariably fished out from the same relationship pond.“错误”的名字不是随机的，而是总是从同 一个关系池中找到的。</div>          <div class="fam"><span class="lbl">族</span>pond n. 池塘</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">complex</span>
+          <span class="ipa">/kəm&#x27;pleks/</span>
+          <span class="pos">n.</span>
+          <span class="cn">建筑群；情结 adj. 复杂的；复合的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood a complex of three old houses</div>          <div class="root"><span class="lbl">根</span>com(一起) + plex(编织) → 编织在一起</div>          <div class="zt"><span class="lbl">真题</span>It helps people to understand complex issues and to separate fact from fiction. 它帮助 人们理解复杂的问题，并将事实与虚构区分开 来。(2021)</div>          <div class="fam"><span class="lbl">族</span>complexity n. 复杂性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">perplex</span>
+          <span class="ipa">/pə&#x27;pleks/</span>
+          <span class="pos">v.</span>
+          <span class="cn">迷惑；使困惑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>seemed to perplex the young mayor</div>          <div class="mnem"><span class="lbl">记</span>每一个(per)都复杂(plex 想成 complex)，即“使困惑”。</div>          <div class="root"><span class="lbl">根</span>per(彻底) + plex(编织) → 缠得人绕不出来</div>          <div class="fam"><span class="lbl">族</span>perplexing adj. 令人费解的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">collapse</span>
+          <span class="ipa">/kə&#x27;læps/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(突然)倒塌，坍塌，倒下</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the roof will collapse</div>          <div class="mnem"><span class="lbl">记</span>都(col)来扑(lap 的谐音)撒(se 的谐音，重庆人说话的尾音)。都扑向一张床或 一张桌子，它就“坍塌”了。</div>          <div class="root"><span class="lbl">根</span>col(一起) + laps(滑落) → 一起滑下去</div>          <div class="zt"><span class="lbl">真题</span>A man was pulled to safety after a building collapse. 一幢建筑物倒塌后，一名男子 被拉到安全地带。(2018) (120)</div>          <div class="fam"><span class="lbl">族</span>collapse n. 倒塌</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">complicate</span>
+          <span class="ipa">/&#x27;kpmplıkeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使复杂化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Complicate it more</div>          <div class="mnem"><span class="lbl">记</span>所有（com)人都扑来（pli的谐 音)尅他(cate的谐音)。一群人不分青红皂白 就扑过来打人，是不是使事情更加“复杂化”？</div>          <div class="root"><span class="lbl">根</span>com(一起) + plic(折叠) + ate → 叠在一起</div>          <div class="zt"><span class="lbl">真题</span>For centuries, Ukrainians have been drawing complicated patterns on eggs. 几 个 世纪以来，乌克兰人一直在鸡蛋上绘制复杂的 图案。(2017)</div>          <div class="fam"><span class="lbl">族</span>complicated adj. 复杂的 / complication n. 复杂化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">provoke</span>
+          <span class="ipa">/prə&#x27;vəuk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">激起；引发;挑衅；激怒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Those words did provoke the old man</div>          <div class="mnem"><span class="lbl">记</span>提前(pro 表示前面)我剋(voke 的谐音)他。拳击比赛还没进行，你就把人家打 了一顿，当然会“激起；引发”对手的暴怒和 生气。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + voke(喊) → 冲着人喊 → 激怒</div>          <div class="zt"><span class="lbl">真题</span>One explanation for this finding is that possible awards may be more emotionally provoking than certainty awards. 对这一发现 的一种解释是，可能的奖项可能比确定性奖项 更能激发情感。(2016)</div>          <div class="fam"><span class="lbl">族</span>provocative adj. 挑衅的 / provocation n. 挑衅</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">advocate</span>
+          <span class="ipa">/&#x27;ædvəkət, &#x27;ædvəkeit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">拥护者；支持者；辩护律师v. 拥护；支持； 提倡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I advocate repair</div>          <div class="mnem"><span class="lbl">记</span>该单词可以记忆为：一再地 第五单元 (ad)说(voc)，ate为动词后缀。一再地说，即 “拥护；提倡”。</div>          <div class="root"><span class="lbl">根</span>ad(向) + voc(说) + ate → 向别人说 → 提倡</div>          <div class="zt"><span class="lbl">真题</span>It is evident that the writer advocates the idea of returning to nature. 很明显，作者提倡 回归自然的思想。</div>          <div class="fam"><span class="lbl">族</span>advocacy n. 拥护</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">whip</span>
+          <span class="ipa">/wıp/</span>
+          <span class="pos">n.</span>
+          <span class="cn">鞭子 v. 鞭策；鞭答；鞭打</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>struck the table with his whip</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：我们(whi的 发音类似 we)扑(p)上去，“鞭打”它!</div>          <div class="root"><span class="lbl">根</span>谐音联想：we(我们) + p(扑) → 扑上去抽一鞭</div>          <div class="zt"><span class="lbl">真题</span>In a Los Angeles Times article, one employee referred to the board as a &quot;digital whip”.在《洛杉矶时报》的一篇文章中，一名员 工称该董事会为“数字鞭子”。</div>          <div class="fam"><span class="lbl">族</span>whipping n. 鞭打</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">confuse</span>
+          <span class="ipa">/kən&#x27;fju:z/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I do not mean to confuse you</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：所有人（con） 的肤(fu)色(se)。所有人的肤色都混在一起，多 么令人困惑啊！→使糊涂；使迷惑。</div>          <div class="root"><span class="lbl">根</span>con(一起) + fuse(倒) → 全倒在一起 → 分不清</div>          <div class="zt"><span class="lbl">真题</span>When students feel isolated or confused and reach out with questions that go unanswered, their motivation to continue begins to fade. 当学生感到孤立或困惑，并提出 没有答案的问题时，他们继续学习的动力就会 开始消退。(2019)</div>          <div class="fam"><span class="lbl">族</span>confusion n. 困惑 / confused adj. 困惑的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">blunt</span>
+          <span class="ipa">/blant/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不锋利的，钝的；率直的，直言不讳的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I will not be blunt about bad work</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：不烂它。拿 刀切肉，剁了半天也没有剁烂，为什么？因为刀 是“钝的，不锋利的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：不(bl)烂(un)它(t) → 刀钝了剁不烂</div>          <div class="fam"><span class="lbl">族</span>bluntly adv. 直率地 / bluntness n. 直率</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5 · Day 31</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

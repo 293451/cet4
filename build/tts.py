@@ -142,25 +142,40 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
         if not core:
             continue
 
-        k = 0          # 已匹配的 core 下标
-        first = None   # 首个匹配字符在音节流中的位置
-        last = None    # 最后一个匹配字符的位置
-        while j < len(stream) and k < len(core):
-            c = stream[j]
-            if not _is_word_char(c):
-                # 纯标点：若是词内标点（撇号已算词字符），跳过
-                j += 1
-                continue
-            if c.lower() == core[k]:
-                if first is None:
-                    first = j
-                last = j
-                k += 1
-                j += 1
-            else:
-                break  # 音节流和原文不同步，交给校验报错
+        # 从音节流当前位置起，找一个能容纳这个词的位置。
+        #
+        # 为什么不直接匹配当前位置：MiniMax 对缩写（Mr. / Mrs. / St.）和
+        # 引号的处理和原文不完全一致，一次错位就会让后面**全部**失败
+        # （实测 Day 31 只还原出 2/241 词）。
+        # 所以给自己留一点回旋：最多向前找 LOOKAHEAD 个字符宽度的窗口。
+        LOOKAHEAD = 12
+        match = None
+        for probe in range(0, LOOKAHEAD + 1):
+            p = j + probe
+            if p >= len(stream):
+                break
+            k = 0
+            first = last = None
+            q = p
+            while q < len(stream) and k < len(core):
+                c = stream[q]
+                if not _is_word_char(c):
+                    q += 1
+                    continue
+                if c.lower() == core[k]:
+                    if first is None:
+                        first = q
+                    last = q
+                    k += 1
+                    q += 1
+                else:
+                    break
+            if k == len(core) and first is not None:
+                match = (first, last, q)
+                break
 
-        if k == len(core) and first is not None:
+        if match:
+            first, last, q = match
             words.append(
                 {
                     "text": want,
@@ -168,7 +183,8 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
                     "end": stream_time[last][1],
                 }
             )
-        # 匹配失败则不推进指针，continue 到下一个词
+            j = q
+        # 找不到就跳过这个词，指针不动 —— 让下一个词还有机会对齐
 
     return words
 
@@ -205,10 +221,23 @@ def run_day(day: str, speed: float, key: str) -> bool:
         return False
 
     print(f"  Day {day} · {data.get('title', '')}")
-    audio, syllables = synthesize(key, text, speed)
 
-    merged = merge_syllables(syllables, text)
-    ok = verify(merged, text)
+    # 重试：MiniMax 偶尔会返回截断的音频（实测 Day 31 只出了 0.5 秒 / 2 个词）。
+    # 校验不通过就重来，最多 3 次 —— 一条坏数据不该废掉一整天。
+    n_words = len(text.split())
+    audio = syllables = merged = None
+    ok = False
+    for attempt in range(1, 4):
+        audio, syllables = synthesize(key, text, speed)
+        merged = merge_syllables(syllables, text)
+        ok = verify(merged, text)
+        if ok:
+            break
+        got = len([w for w in merged if w["text"].strip()])
+        print(f"    [重试 {attempt}/3] 只还原出 {got}/{n_words} 词，重来 ...")
+    if not ok:
+        print(f"    [放弃] 三次都没通过，跳过 day-{day}")
+        return False
 
     out_dir = ROOT / "docs" / "audio"
     out_dir.mkdir(parents=True, exist_ok=True)

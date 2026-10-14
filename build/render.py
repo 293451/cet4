@@ -90,26 +90,35 @@ def match_target(token: str, targets: list[dict]) -> dict | None:
     t_fold = t.replace("i", "y")
     t_stem_fold = t_stem.replace("i", "y")
 
-    # ② 剥后缀后相等
+    # ② 剥后缀后相等 / ③ 剥后缀后前缀匹配
+    #
+    # 这里要选**最接近**的目标词，而不是第一个碰上的。
+    # 反例：文章里有 complicate / compound / complex，目标词也有这三个。
+    # 如果按顺序第一个命中就返回，complicate 会被 compound 抢走，
+    # 结果 complicate 自己反而标不中（实测 Day 31 就是这样）。
+    # 所以给每个候选打分，取分最高的。
+    best = None
+    best_score = -1
     for w in targets:
         base = re.sub(r"[^a-z]", "", w["w"].lower())
         if len(base) < 3:
             continue
-        if _strip(base).replace("i", "y") == t_stem_fold:
-            return w
-        if base.replace("i", "y") == t_stem_fold:
-            return w
-
-    # ③ 剥后缀后前缀匹配
-    for w in targets:
-        base = re.sub(r"[^a-z]", "", w["w"].lower())
-        if len(base) < 3:
-            continue
+        b_fold = base.replace("i", "y")
         b_stem = _strip(base).replace("i", "y")
-        a, b = (t_stem_fold, b_stem) if len(t_stem_fold) <= len(b_stem) else (b_stem, t_stem_fold)
-        if len(a) >= 4 and b.startswith(a) and len(b) - len(a) <= 4:
-            return w
-    return None
+
+        score = -1
+        if b_stem == t_stem_fold or b_fold == t_stem_fold:
+            score = 100 - abs(len(base) - len(t))          # 完全匹配，长度越近越好
+        elif b_fold == t_fold:
+            score = 95 - abs(len(base) - len(t))
+        else:
+            a, b = (t_stem_fold, b_stem) if len(t_stem_fold) <= len(b_stem) else (b_stem, t_stem_fold)
+            if len(a) >= 4 and b.startswith(a) and len(b) - len(a) <= 4:
+                score = 50 - (len(b) - len(a))
+
+        if score > best_score:
+            best, best_score = w, score
+    return best
 
 
 # ── HTML 片段 ─────────────────────────────────────────────

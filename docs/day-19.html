@@ -1,0 +1,695 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 19 · The Street Where the Parade Passed</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 19 · 10/31 · Unit 3 第 541-570 词</div>
+  <h1>The Street Where the Parade Passed<span class="cn">游行经过的那条街</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-19.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3029"><p class="en"><span class="w" data-s="43" data-e="171">On</span> <span class="w" data-s="213" data-e="341">the</span> <span class="w target" data-s="384" data-e="427" title="主要的;最重要的 n. 主线路；总管道 n. 主流；主流思想；主流群体">main</span> <span class="w" data-s="469" data-e="683">street</span> <span class="w" data-s="725" data-e="939">there</span> <span class="w" data-s="981" data-e="1067">was</span> <span class="w" data-s="1109" data-e="1237">one</span> <span class="w" data-s="1280" data-e="1664">bakery</span> <span class="w" data-s="1707" data-e="2005">and</span> <span class="w" data-s="2133" data-e="2304">one</span> <span class="w" data-s="2347" data-e="2475">old</span> <span class="w target" data-s="2517" data-e="2859" title="理发师">barber</span> <span class="w" data-s="2901" data-e="3029">shop.</span></p><p class="zh">镇上的主街上有一家面包房和一家老理发店。</p></div>
+<div class="pair" data-s0="3285" data-s1="6912"><p class="en"><span class="w" data-s="3285" data-e="3968">Behind</span> <span class="w" data-s="4011" data-e="4181">the</span> <span class="w" data-s="4224" data-e="4309">counter</span> <span class="w" data-s="4352" data-e="4651">stood</span> <span class="w" data-s="4693" data-e="5163">Sarah,</span> <span class="w" data-s="5291" data-e="5419">the</span> <span class="w" data-s="5589" data-e="5760">only</span> <span class="w target" data-s="5803" data-e="6187" title="女子；雌性植物(动物) adj. 女性的">female</span> <span class="w" data-s="6229" data-e="6528">baker</span> <span class="w" data-s="6571" data-e="6699">in</span> <span class="w" data-s="6741" data-e="6784">the</span> <span class="w" data-s="6827" data-e="6912">town.</span></p><p class="zh">柜台后面站的是萨拉，镇上唯一的女面包师。</p></div>
+<div class="pair" data-s0="7168" data-s1="10112"><p class="en"><span class="w" data-s="7168" data-e="7723">Her</span> <span class="w" data-s="7765" data-e="7936">brother</span> <span class="w" data-s="7979" data-e="8235">was</span> <span class="w" data-s="8277" data-e="8405">the</span> <span class="w" data-s="8448" data-e="8576">only</span> <span class="w target" data-s="8619" data-e="8832" title="男子;雄性植物(动物) adj. 男性的">male</span> <span class="w" data-s="8875" data-e="9045">in</span> <span class="w" data-s="9088" data-e="9131">the</span> <span class="w" data-s="9173" data-e="9259">family</span> <span class="w" data-s="9301" data-e="9600">who</span> <span class="w" data-s="9643" data-e="9728">could</span> <span class="w" data-s="9771" data-e="9899">not</span> <span class="w" data-s="9941" data-e="10112">cook.</span></p><p class="zh">她哥哥是家里唯一一个完全不会做饭的男性。</p></div>
+<div class="pair" data-s0="10894" data-s1="14435"><p class="en"><span class="w" data-s="10894" data-e="11192">Within</span> <span class="w" data-s="11235" data-e="11278">a</span> <span class="w" data-s="11320" data-e="11406">year,</span> <span class="w" data-s="11619" data-e="12259">everyone</span> <span class="w" data-s="12302" data-e="12558">said</span> <span class="w" data-s="12600" data-e="12728">her</span> <span class="w" data-s="12771" data-e="12984">bread</span> <span class="w" data-s="13027" data-e="13155">had</span> <span class="w" data-s="13198" data-e="13368">become</span> <span class="w target" data-s="13411" data-e="13923" title="蒸汽，水汽；精力；情绪的紧张v. 蒸发，蒸">mainstream</span> <span class="w" data-s="13966" data-e="14222">in</span> <span class="w" data-s="14264" data-e="14307">the</span> <span class="w" data-s="14350" data-e="14435">town.</span></p><p class="zh">一年之内，大家都说她的面包成了镇上的主流。</p></div>
+<div class="pair" data-s0="14691" data-s1="18958"><p class="en"><span class="w target" data-s="14691" data-e="15331" title="">Steam</span> <span class="w" data-s="15374" data-e="15630">rose</span> <span class="w" data-s="15672" data-e="15971">from</span> <span class="w" data-s="16014" data-e="16099">the</span> <span class="w" data-s="16142" data-e="16227">big</span> <span class="w" data-s="16270" data-e="16440">pot,</span> <span class="w" data-s="16654" data-e="16867">and</span> <span class="w" data-s="16952" data-e="17294">water</span> <span class="w" data-s="17336" data-e="17592">ran</span> <span class="w" data-s="17635" data-e="17806">down</span> <span class="w" data-s="17848" data-e="17976">the</span> <span class="w" data-s="18019" data-e="18104">wall</span> <span class="w" data-s="18147" data-e="18318">in</span> <span class="w" data-s="18360" data-e="18446">a</span> <span class="w" data-s="18488" data-e="18574">small</span> <span class="w target" data-s="18616" data-e="18958" title="溪流，小河 v. 流动；涌出">stream.</span></p><p class="zh">大锅上冒着蒸汽，水顺着墙流成一条小小的溪流。</p></div>
+<div class="pair" data-s0="19655" data-s1="22983"><p class="en"><span class="w" data-s="19655" data-e="19740">When</span> <span class="w" data-s="19783" data-e="19911">the</span> <span class="w" data-s="19953" data-e="20081">oven</span> <span class="w" data-s="20124" data-e="20252">door</span> <span class="w" data-s="20295" data-e="20508">opened</span> <span class="w" data-s="20551" data-e="20807">by</span> <span class="w" data-s="20849" data-e="21148">mistake,</span> <span class="w" data-s="21361" data-e="21788">the</span> <span class="w" data-s="21831" data-e="21959">children</span> <span class="w" data-s="22001" data-e="22385">outside</span> <span class="w" data-s="22428" data-e="22684">would</span> <span class="w target" data-s="22727" data-e="22983" title="&amp; v. 尖叫，喊叫">scream.</span></p><p class="zh">烤箱门一开错，外面的孩子就会尖叫。</p></div>
+<div class="pair" data-s0="23239" data-s1="26097"><p class="en"><span class="w" data-s="23239" data-e="23964">On</span> <span class="w" data-s="24007" data-e="24433">Sundays</span> <span class="w" data-s="24476" data-e="24604">she</span> <span class="w" data-s="24647" data-e="24775">added</span> <span class="w target" data-s="24817" data-e="25031" title="奶油，乳脂；奶油色">cream</span> <span class="w" data-s="25073" data-e="25372">and</span> <span class="w target" data-s="25415" data-e="25543" title="黄油；牛油 v. 涂黄油于">butter</span> <span class="w" data-s="25585" data-e="25799">to</span> <span class="w" data-s="25841" data-e="25927">the</span> <span class="w" data-s="25969" data-e="26097">dough.</span></p><p class="zh">星期天她会往面团里加奶油和黄油。</p></div>
+<div class="pair" data-s0="26311" data-s1="29340"><p class="en"><span class="w" data-s="26311" data-e="26823">In</span> <span class="w" data-s="26865" data-e="27207">summer</span> <span class="w" data-s="27249" data-e="27505">the</span> <span class="w" data-s="27548" data-e="27676">water</span> <span class="w" data-s="27719" data-e="27932">in</span> <span class="w" data-s="27975" data-e="28017">the</span> <span class="w" data-s="28060" data-e="28145">pot</span> <span class="w" data-s="28188" data-e="28359">would</span> <span class="w" data-s="28401" data-e="28615">slowly</span> <span class="w target" data-s="28657" data-e="29340" title="(使)蒸发；消失">evaporate.</span></p><p class="zh">夏天一热，锅里的水就会慢慢蒸发掉。</p></div>
+<div class="pair" data-s0="29887" data-s1="32617"><p class="en"><span class="w" data-s="29887" data-e="30015">That</span> <span class="w" data-s="30057" data-e="30313">summer,</span> <span class="w" data-s="30569" data-e="30783">a</span> <span class="w" data-s="30996" data-e="31209">strange</span> <span class="w target" data-s="31252" data-e="31764" title="病菌，细菌；微生物">germ</span> <span class="w target" data-s="31807" data-e="32063" title="显得；似乎；出现；起源">appeared</span> <span class="w" data-s="32105" data-e="32319">in</span> <span class="w" data-s="32361" data-e="32447">the</span> <span class="w" data-s="32489" data-e="32617">river.</span></p><p class="zh">那年夏天，河里出现了一种奇怪的病菌。</p></div>
+<div class="pair" data-s0="32831" data-s1="37225"><p class="en"><span class="w" data-s="32831" data-e="33385">People</span> <span class="w" data-s="33428" data-e="33556">said</span> <span class="w" data-s="33599" data-e="33769">the</span> <span class="w" data-s="33812" data-e="33897">water</span> <span class="w" data-s="33940" data-e="34409">carried</span> <span class="w" data-s="34452" data-e="34537">a</span> <span class="w target" data-s="34580" data-e="34879" title="病毒；有害影响">virus,</span> <span class="w" data-s="35049" data-e="35305">and</span> <span class="w target" data-s="35391" data-e="36073" title="细菌">bacteria</span> <span class="w" data-s="36116" data-e="36287">from</span> <span class="w" data-s="36329" data-e="36415">the</span> <span class="w" data-s="36457" data-e="36543">farm</span> <span class="w" data-s="36585" data-e="36841">had</span> <span class="w" data-s="36884" data-e="37012">got</span> <span class="w" data-s="37055" data-e="37225">in.</span></p><p class="zh">人们说水里带着病毒，农场的细菌进了河。</p></div>
+<div class="pair" data-s0="37396" data-s1="41023"><p class="en"><span class="w" data-s="37396" data-e="38164">Sarah</span> <span class="w" data-s="38207" data-e="38377">had</span> <span class="w" data-s="38420" data-e="38505">a</span> <span class="w" data-s="38548" data-e="38633">strong</span> <span class="w target" data-s="38676" data-e="39103" title="有免疫力的；受保护的；免除的；豁免的； 不受影响的">immune</span> <span class="w" data-s="39145" data-e="39316">system,</span> <span class="w" data-s="39572" data-e="39828">but</span> <span class="w" data-s="39956" data-e="40169">many</span> <span class="w" data-s="40212" data-e="40468">others</span> <span class="w" data-s="40511" data-e="40724">fell</span> <span class="w" data-s="40767" data-e="41023">ill.</span></p><p class="zh">萨拉的免疫系统很强，但很多其他人都病倒了。</p></div>
+<div class="pair" data-s0="41666" data-s1="44909"><p class="en"><span class="w" data-s="41666" data-e="41794">A</span> <span class="w" data-s="41837" data-e="41965">small</span> <span class="w target" data-s="42008" data-e="42349" title="虫子；小病；计算机故障">bug</span> <span class="w" data-s="42392" data-e="42562">bit</span> <span class="w" data-s="42605" data-e="42733">her</span> <span class="w" data-s="42776" data-e="42946">arm,</span> <span class="w" data-s="43202" data-e="43458">and</span> <span class="w" data-s="43544" data-e="43672">an</span> <span class="w target" data-s="43714" data-e="44013" title="昆虫">insect</span> <span class="w" data-s="44056" data-e="44354">flew</span> <span class="w" data-s="44397" data-e="44525">into</span> <span class="w" data-s="44568" data-e="44653">the</span> <span class="w" data-s="44696" data-e="44909">flour.</span></p><p class="zh">一只小虫子咬了她的胳膊，一只昆虫飞进了面粉里。</p></div>
+<div class="pair" data-s0="45122" data-s1="48194"><p class="en"><span class="w" data-s="45122" data-e="45890">She</span> <span class="w" data-s="45933" data-e="46061">found</span> <span class="w" data-s="46104" data-e="46274">a</span> <span class="w target" data-s="46317" data-e="46488" title="虫，蠕虫">worm</span> <span class="w" data-s="46530" data-e="46658">in</span> <span class="w" data-s="46701" data-e="46744">an</span> <span class="w" data-s="46786" data-e="46872">old</span> <span class="w" data-s="46914" data-e="47213">apple</span> <span class="w" data-s="47256" data-e="47426">and</span> <span class="w" data-s="47469" data-e="47896">threw</span> <span class="w" data-s="47938" data-e="48066">it</span> <span class="w" data-s="48109" data-e="48194">out.</span></p><p class="zh">她在一个旧苹果里发现了一条虫子，就把它扔了。</p></div>
+<div class="pair" data-s0="48408" data-s1="50797"><p class="en"><span class="w" data-s="48408" data-e="49005">Her</span> <span class="w target" data-s="49048" data-e="49432" title="外貌，外观，外表；(尤指突然的)抵达，到来">appearance</span> <span class="w" data-s="49474" data-e="49560">at</span> <span class="w" data-s="49602" data-e="49688">the</span> <span class="w" data-s="49730" data-e="49773">town</span> <span class="w" data-s="49816" data-e="50029">meeting</span> <span class="w" data-s="50072" data-e="50413">surprised</span> <span class="w" data-s="50456" data-e="50797">everyone.</span></p><p class="zh">她出现在镇民大会上，让所有人都吃了一惊。</p></div>
+<div class="pair" data-s0="51266" data-s1="54253"><p class="en"><span class="w" data-s="51266" data-e="51437">Some</span> <span class="w" data-s="51480" data-e="51906">shops</span> <span class="w" data-s="51949" data-e="52077">closed,</span> <span class="w" data-s="52376" data-e="52674">and</span> <span class="w" data-s="52845" data-e="52973">the</span> <span class="w" data-s="53016" data-e="53144">small</span> <span class="w" data-s="53186" data-e="53400">ones</span> <span class="w" data-s="53442" data-e="53698">seemed</span> <span class="w" data-s="53741" data-e="53912">to</span> <span class="w target" data-s="53954" data-e="54253" title="突然消失">vanish.</span></p><p class="zh">有些店关了门，那些小店仿佛消失了。</p></div>
+<div class="pair" data-s0="54424" data-s1="57752"><p class="en"><span class="w" data-s="54424" data-e="55576">Sarah</span> <span class="w" data-s="55618" data-e="55704">had</span> <span class="w" data-s="55746" data-e="55874">to</span> <span class="w target" data-s="55917" data-e="56045" title="(使)平衡 n. 平衡">balance</span> <span class="w" data-s="56088" data-e="56344">the</span> <span class="w" data-s="56386" data-e="56557">books</span> <span class="w" data-s="56600" data-e="56728">of</span> <span class="w" data-s="56770" data-e="56856">the</span> <span class="w" data-s="56898" data-e="57240">bakery</span> <span class="w" data-s="57282" data-e="57496">every</span> <span class="w" data-s="57538" data-e="57752">night.</span></p><p class="zh">萨拉每天晚上都得把面包房的账目做平衡。</p></div>
+<div class="pair" data-s0="58687" data-s1="61972"><p class="en"><span class="w" data-s="58687" data-e="58815">Her</span> <span class="w" data-s="58857" data-e="59028">life</span> <span class="w" data-s="59071" data-e="59284">and</span> <span class="w" data-s="59327" data-e="59412">her</span> <span class="w" data-s="59455" data-e="59753">mother&#x27;s</span> <span class="w" data-s="59796" data-e="59924">life</span> <span class="w" data-s="59967" data-e="60180">had</span> <span class="w" data-s="60223" data-e="60351">run</span> <span class="w" data-s="60393" data-e="60521">in</span> <span class="w target" data-s="60564" data-e="61033" title="平行线；相似处，相似物 adj.平行的；类似 的v.与……相似；比得上">parallel</span> <span class="w" data-s="61076" data-e="61204">lines,</span> <span class="w" data-s="61503" data-e="61716">she</span> <span class="w" data-s="61801" data-e="61972">said.</span></p><p class="zh">她说，她的生活和母亲的生活曾经是平行的两条线。</p></div>
+<div class="pair" data-s0="62228" data-s1="66281"><p class="en"><span class="w" data-s="62228" data-e="62356">The</span> <span class="w target" data-s="62868" data-e="63337" title="矛盾的人(或事物、情况);悖论">paradox</span> <span class="w" data-s="63380" data-e="63593">was</span> <span class="w" data-s="63636" data-e="63892">that</span> <span class="w" data-s="63935" data-e="64020">the</span> <span class="w" data-s="64063" data-e="64404">busiest</span> <span class="w" data-s="64447" data-e="64532">week</span> <span class="w" data-s="64575" data-e="64745">of</span> <span class="w" data-s="64788" data-e="64873">the</span> <span class="w" data-s="64916" data-e="65001">year</span> <span class="w" data-s="65044" data-e="65385">was</span> <span class="w" data-s="65471" data-e="65641">also</span> <span class="w" data-s="65684" data-e="65940">the</span> <span class="w" data-s="65983" data-e="66281">sickest.</span></p><p class="zh">矛盾之处在于，一年里最忙的那一周也是最多人病倒的一周。</p></div>
+<div class="pair" data-s0="66537" data-s1="71529"><p class="en"><span class="w" data-s="66537" data-e="66708">In</span> <span class="w" data-s="66751" data-e="67135">October</span> <span class="w" data-s="67177" data-e="67391">a</span> <span class="w" data-s="67433" data-e="67775">great</span> <span class="w target" data-s="67817" data-e="68201" title="">parade</span> <span class="w" data-s="68244" data-e="68500">filled</span> <span class="w" data-s="68543" data-e="68713">the</span> <span class="w" data-s="68756" data-e="68884">street,</span> <span class="w" data-s="69097" data-e="69353">and</span> <span class="w" data-s="69609" data-e="69737">the</span> <span class="w" data-s="69780" data-e="69865">whole</span> <span class="w" data-s="69908" data-e="70079">town</span> <span class="w" data-s="70121" data-e="70420">came</span> <span class="w" data-s="70463" data-e="70591">out</span> <span class="w" data-s="70633" data-e="70719">to</span> <span class="w target" data-s="70761" data-e="70932" title="(使)行军，(使)行进n. 示威游行；行军，行 程；(March)三月（略作 Mar.)">march</span> <span class="w" data-s="70975" data-e="71145">behind</span> <span class="w" data-s="71188" data-e="71401">the</span> <span class="w" data-s="71444" data-e="71529">band.</span></p><p class="zh">十月，一场盛大的游行占满了街道，全镇人都出来跟着乐队行进。</p></div>
+<div class="pair" data-s0="71828" data-s1="74175"><p class="en"><span class="w" data-s="71828" data-e="72297">For</span> <span class="w" data-s="72340" data-e="72468">one</span> <span class="w" data-s="72511" data-e="72724">afternoon</span> <span class="w" data-s="72767" data-e="73108">the</span> <span class="w" data-s="73151" data-e="73279">street</span> <span class="w" data-s="73321" data-e="73535">looked</span> <span class="w" data-s="73577" data-e="73705">like</span> <span class="w target" data-s="73748" data-e="74175" title="天堂；乐土；乐园；完美去处">paradise.</span></p><p class="zh">有那么一个下午，这条街看起来就像天堂一样。</p></div>
+<div class="pair" data-s0="75168" data-s1="80544"><p class="en"><span class="w" data-s="75168" data-e="75254">The</span> <span class="w" data-s="75296" data-e="75424">sky</span> <span class="w" data-s="75467" data-e="75766">above</span> <span class="w" data-s="75808" data-e="75936">the</span> <span class="w" data-s="75979" data-e="76278">roofs</span> <span class="w" data-s="76320" data-e="76491">opened</span> <span class="w" data-s="76534" data-e="76832">like</span> <span class="w target" data-s="76875" data-e="77088" title="">heaven</span> <span class="w" data-s="77131" data-e="77430">itself,</span> <span class="w" data-s="77814" data-e="78070">though</span> <span class="w" data-s="78411" data-e="78539">the</span> <span class="w" data-s="78582" data-e="78667">tired</span> <span class="w" data-s="78710" data-e="79008">shop</span> <span class="w" data-s="79051" data-e="79435">owners</span> <span class="w" data-s="79478" data-e="79648">called</span> <span class="w" data-s="79691" data-e="79862">it</span> <span class="w" data-s="79904" data-e="79990">a</span> <span class="w" data-s="80032" data-e="80160">small</span> <span class="w target" data-s="80203" data-e="80544" title="地狱；悲惨的境况；该死">hell.</span></p><p class="zh">屋顶上方的天空像天堂一样敞开了，不过累坏了的店主说这一天真是活受罪。</p></div>
+<div class="pair" data-s0="80800" data-s1="83574"><p class="en"><span class="w" data-s="80800" data-e="81398">Two</span> <span class="w" data-s="81440" data-e="81654">men</span> <span class="w" data-s="81696" data-e="81910">had</span> <span class="w" data-s="81952" data-e="82038">to</span> <span class="w target" data-s="82080" data-e="82251" title="举；拖；拉；抛 v.(用力)举起；拖；拉；抛">heave</span> <span class="w" data-s="82294" data-e="82379">a</span> <span class="w target" data-s="82422" data-e="82550" title="举；拖；拉；抛 v.(用力)举起；拖；拉；抛">heavy</span> <span class="w" data-s="82592" data-e="82934">drum</span> <span class="w" data-s="82976" data-e="83190">onto</span> <span class="w" data-s="83232" data-e="83446">a</span> <span class="w" data-s="83488" data-e="83574">truck.</span></p><p class="zh">两个男人只好把一只沉重的鼓使劲抬上卡车。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">male</span>
+          <span class="ipa">/merl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">男子;雄性植物(动物) adj. 男性的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her brother was the only male in the family</div>          <div class="root"><span class="lbl">根</span>联想：man 里的 ma + le → 男性</div>          <div class="zt"><span class="lbl">真题</span>Only about three percent of early childhood teachers are male. 只有大约 3%的幼 儿教师是男性。</div>          <div class="fam"><span class="lbl">族</span>masculine adj. 男性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">female</span>
+          <span class="ipa">/&#x27;fi:merl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">女子；雌性植物(动物) adj. 女性的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the only female baker in the town</div>          <div class="root"><span class="lbl">根</span>fe(想成 fee) + male → 与 male 相对</div>          <div class="zt"><span class="lbl">真题</span>Russians also get up an hour later on International Women&#x27;s Day, the day for treating and celebrating female relatives. 在国 际妇女节这天，俄罗斯人也会晚起一小时，这是 一个款待和庆祝女性家人的日子。(2015)</div>          <div class="fam"><span class="lbl">族</span>feminine adj. 女性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">main</span>
+          <span class="ipa">/mein/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">主要的;最重要的 n. 主线路；总管道 n. 主流；主流思想；主流群体</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On the main street</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：man。根据希腊 神话，男人以前就是这个地球上“主要的”生物， 后来才有女人。</div>          <div class="root"><span class="lbl">根</span>谐音 man：从前人们觉得男人才是「主要的」</div>          <div class="zt"><span class="lbl">真题</span>The technology is just now becoming mainstream. 这项技术现在正在成为主流。(2018)</div>          <div class="fam"><span class="lbl">族</span>mainly adv. 主要地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">mainstream</span>
+          <span class="ipa">/&#x27;meinstri:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">蒸汽，水汽；精力；情绪的紧张v. 蒸发，蒸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her bread had become mainstream in the town</div>          <div class="mnem"><span class="lbl">记</span>一个s型美女在喝茶（tea），茶 会冒“蒸汽”啊。</div>          <div class="root"><span class="lbl">根</span>main(主要) + stream(流) → 主流</div>          <div class="zt"><span class="lbl">真题</span>Taking a walk can be great for clearing your head or blowing off some steam. 散步可 以很好地清理你的头脑或释放一些压力。(2023) (072)</div>          <div class="fam"><span class="lbl">族</span>mainstream adj. 主流的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">stream</span>
+          <span class="ipa">/stri:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">溪流，小河 v. 流动；涌出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>water ran down the wall in a small stream</div>          <div class="mnem"><span class="lbl">记</span>steam(蒸汽)+r(想象成 run， 跑)，连起来就是蒸汽跑起来了→流动。</div>          <div class="root"><span class="lbl">根</span>steam(蒸汽) + r(想成 run 跑) → 水跑起来 → 溪流</div>          <div class="zt"><span class="lbl">真题</span>They value quiet forests, clear streams and abundant wildlife. 他们珍视宁静的森林、清 澈的溪流和丰富的野生动物。</div>          <div class="fam"><span class="lbl">族</span>streamline v. 使简化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">scream</span>
+          <span class="ipa">/skri:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 尖叫，喊叫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the children outside would scream</div>          <div class="mnem"><span class="lbl">记</span>cream 奶油，把奶油涂在 s 美女 的脸上，她会有什么反应？→尖叫。</div>          <div class="root"><span class="lbl">根</span>cream(奶油) + s → 奶油抹脸上就会尖叫</div>          <div class="zt"><span class="lbl">真题</span>Pay attention to the whispers so you won&#x27;t have to hear the screams. 注意耳语，这 样你就不会听到尖叫。(2017)</div>          <div class="fam"><span class="lbl">族</span>screaming adj. 尖叫的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">cream</span>
+          <span class="ipa">/kri:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">奶油，乳脂；奶油色</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she added cream and butter to the dough</div>          <div class="mnem"><span class="lbl">记</span>ice cream（冰激凌）我们很熟 悉，cream 就是奶油。</div>          <div class="root"><span class="lbl">根</span>联想：ice cream(冰激凌) 里的 cream</div>          <div class="zt"><span class="lbl">真题</span>Ana Castro, a manager at a Ben &amp; Jerry&#x27;s ice cream shop at the airport had been working 10 years. 安娜·卡斯特罗是机场一家 名叫本&amp;杰瑞冰激凌店的经理，她已经工作10 年了。</div>          <div class="fam"><span class="lbl">族</span>creamy adj. 奶油般的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">butter</span>
+          <span class="ipa">/&#x27;batər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">黄油；牛油 v. 涂黄油于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cream and butter to the dough</div>          <div class="mnem"><span class="lbl">记</span>爸爸(bu)特别(tter)喜欢吃面 包加“黄油”。</div>          <div class="root"><span class="lbl">根</span>谐音「爸爸特」→ 爸爸特别爱吃黄油面包</div>          <div class="zt"><span class="lbl">真题</span>He shaped delicious masterpieces out of flour，butter and sugar. 他用面粉、黄油和糖做 出杰出的美味。(2018)</div>          <div class="fam"><span class="lbl">族</span>buttery adj. 涂黄油的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">steam</span>
+          <span class="ipa">/sti:m/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Steam rose from the big pot</div>          <div class="root"><span class="lbl">根</span>联想：s 形美女喝茶(tea) → 茶会冒蒸汽</div>          <div class="fam"><span class="lbl">族</span>steamy adj. 蒸汽的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">evaporate</span>
+          <span class="ipa">/i&#x27;væpərert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)蒸发；消失</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the water in the pot would slowly evaporate</div>          <div class="mnem"><span class="lbl">记</span>e表示“出去”；vapor发音类似 “外婆”；连在一起：外婆有老年痴呆，出去后再 也没回来，那就是“蒸发；消失”了。</div>          <div class="root"><span class="lbl">根</span>e(出去) + vapor(蒸汽) + ate → 变成汽跑掉</div>          <div class="fam"><span class="lbl">族</span>evaporation n. 蒸发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">appear</span>
+          <span class="ipa">/ə&#x27;pir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">显得；似乎；出现；起源</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a strange germ appeared in the river</div>          <div class="mnem"><span class="lbl">记</span>ape为“类人猿，猿猴”，ear为 “耳朵”。耳朵的化石是很难保存下来的，那么 类人猿的耳朵长什么样子，只能通过考古学家 的猜测和想象来描绘出来，appear的另外一个 意思就是“似乎”。</div>          <div class="root"><span class="lbl">根</span>ap(一再) + pear(想成 peer 看) → 出现在眼前</div>          <div class="zt"><span class="lbl">真题</span>There does appear to be some psychology behind it. 这背后似乎确实有一些心理因素。</div>          <div class="fam"><span class="lbl">族</span>appearance n. 出现；外貌 / disappear v. 消失</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">appearance</span>
+          <span class="ipa">/ə&#x27;pirəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">外貌，外观，外表；(尤指突然的)抵达，到来</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her appearance at the town meeting</div>          <div class="mnem"><span class="lbl">记</span>appear出现，appearance，出现 (073) 第三单元 的东西。你给别人看到的不就是你的“外表，外 貌”吗？</div>          <div class="root"><span class="lbl">根</span>appear(出现) + ance(名词后缀) → 出现的样子</div>          <div class="zt"><span class="lbl">真题</span>He became one of the first modern chefs to focus on the appearance of his table, not just the flavor of his dishes. 他成为第一批注重 餐桌外观的现代厨师之一，而不仅仅是菜肴的 味道。(2018)</div>          <div class="fam"><span class="lbl">族</span>appear v. 出现</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">vanish</span>
+          <span class="ipa">/&#x27;vænıʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">突然消失</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the small ones seemed to vanish</div>          <div class="mnem"><span class="lbl">记</span>谐音为“哇，你失”，消失不见 了，不复存在了！</div>          <div class="root"><span class="lbl">根</span>谐音「哇你失」→ 一下子不见了</div>          <div class="fam"><span class="lbl">族</span>vanishing adj. 消失的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">bacteria</span>
+          <span class="ipa">/bæk&#x27;tıriə/</span>
+          <span class="pos">n.</span>
+          <span class="cn">细菌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>bacteria from the farm had got in</div>          <div class="mnem"><span class="lbl">记</span>bac（想象成 back，背后）+ te (特)+ri(日，太阳)，连起来就是背后特别没有 太阳的地方，容易滋生“细菌”。</div>          <div class="root"><span class="lbl">根</span>bac(想成 back) + teria → 背光潮湿处的微生物</div>          <div class="zt"><span class="lbl">真题</span>Also, certain types of bacteria are extremely harmful, and it takes only a small number to make you sick. 此外，某些类型的细 菌是非常有害的，只需要少量的细菌就能让你 生病。(2018)</div>          <div class="fam"><span class="lbl">族</span>bacterial adj. 细菌的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">virus</span>
+          <span class="ipa">/&#x27;vairəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">病毒；有害影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the water carried a virus</div>          <div class="mnem"><span class="lbl">记</span>vi是罗马数字六，r 想象成花， us想成美国。那这个单词可以联想成：六朵花， 在美国，它的意思就是病毒。（国外的花和水果 都不能带入国内，这点常识我们还是有的。)</div>          <div class="root"><span class="lbl">根</span>本义「毒液」→ 病毒</div>          <div class="zt"><span class="lbl">真题</span>When a virus attacks your body, your body works hard to get rid of it. 当病毒攻击人 体时，人体会努力清除病毒。</div>          <div class="fam"><span class="lbl">族</span>viral adj. 病毒性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">germ</span>
+          <span class="ipa">/d33:rm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">病菌，细菌；微生物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a strange germ appeared in the river</div>          <div class="mnem"><span class="lbl">记</span>发音类似：这么。这么多的病 菌和微生物啊。想象在显微镜下，看到的手上 有那么多“细菌”。</div>          <div class="root"><span class="lbl">根</span>谐音「这么」→ 这么多病菌</div>          <div class="zt"><span class="lbl">真题</span>An urban food myth contends that if food spends just a few seconds on the floor, dirt and germs won&#x27;t have much of a chance to contaminate it. 一个有关都市食物的荒诞说法 是，即便食物在地板上停留几秒钟，灰尘和细菌 也不会有太多机会污染它。</div>          <div class="fam"><span class="lbl">族</span>germ-free adj. 无菌的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">immune</span>
+          <span class="ipa">/i&#x27;mju:n/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有免疫力的；受保护的；免除的；豁免的； 不受影响的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Sarah had a strong immune system</div>          <div class="mnem"><span class="lbl">记</span>单词可以记忆为：我（i）木讷 (mune)，我很迟钝，反应慢，也就是“不受影响 的；免疫的”。</div>          <div class="root"><span class="lbl">根</span>im(不) + mune(义务) → 免于……的</div>          <div class="zt"><span class="lbl">真题</span>This is evidence that our immune system really doesn&#x27;t function so well when we age. 这 表明，随着年龄的增长，我们的免疫系统真的不 能很好地发挥作用。(2019)</div>          <div class="fam"><span class="lbl">族</span>immunity n. 免疫力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">balance</span>
+          <span class="ipa">/&#x27;bæləns/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)平衡 n. 平衡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to balance the books of the bakery</div>          <div class="mnem"><span class="lbl">记</span>bala发音像“芭蕾”，我们都知 道芭蕾舞者在跳舞的时候，平衡感特别好，可以 在空中完成很多优雅“平衡”的动作！</div>          <div class="root"><span class="lbl">根</span>bala(想成芭蕾) + nce → 芭蕾舞者的平衡感</div>          <div class="zt"><span class="lbl">真题</span>They are under growing pressure to balance their national budgets. 他们承受着越 来越大的平衡国家预算的压力。(2016)</div>          <div class="fam"><span class="lbl">族</span>balanced adj. 平衡的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">parallel</span>
+          <span class="ipa">/&#x27;pærəlel/</span>
+          <span class="pos">n.</span>
+          <span class="cn">平行线；相似处，相似物 adj.平行的；类似 的v.与……相似；比得上</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had run in parallel lines</div>          <div class="root"><span class="lbl">根</span>para(旁边) + allel(彼此) → 并排走的线</div>          <div class="zt"><span class="lbl">真题</span>It is one that has seen no parallel in economic history.这在经济史上是史无前例 的。(2016)</div>          <div class="fam"><span class="lbl">族</span>parallelism n. 相似；平行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">paradox</span>
+          <span class="ipa">/&#x27;pærəda:ks/</span>
+          <span class="pos">n.</span>
+          <span class="cn">矛盾的人(或事物、情况);悖论</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The paradox was that the busiest week</div>          <div class="mnem"><span class="lbl">记</span>旁边的(para)人捣蛋(do)死(x) 了，太捣蛋了，就是跟你做的事情是“矛盾的”。</div>          <div class="root"><span class="lbl">根</span>para(相反) + dox(想成 doctor 的看法) → 相反的两种说法</div>          <div class="zt"><span class="lbl">真题</span>I hesitate to share his optimism because of paradox we seem to exhibit. 我不愿意分享 他的乐观，因为我们似乎表现出了矛盾。</div>          <div class="fam"><span class="lbl">族</span>paradoxical adj. 矛盾的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">parade</span>
+          <span class="ipa">/pə&#x27;reid/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a great parade filled the street</div>          <div class="mnem"><span class="lbl">记</span>para(附近，旁边)，de(的），连 在一起就是：旁边的。是不是你旁边总有些同 学在你面前“炫耀”他的新衣服、新手机？人总 喜欢跟旁边的人比，不会跟离自己很远的人去 比较。</div>          <div class="root"><span class="lbl">根</span>par(准备) + ade → 把队伍准备好 → 游行</div>          <div class="zt"><span class="lbl">真题</span>There were joyous celebrations all over the country, with parades and the ringing of church bells to honor the great achievement. 全 国各地都举行了欢乐的庆祝活动，通过游行和 教堂的钟声纪念这一伟大的成就。</div>          <div class="fam"><span class="lbl">族</span>parade v. 游行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">march</span>
+          <span class="ipa">/ma:t∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)行军，(使)行进n. 示威游行；行军，行 程；(March)三月（略作 Mar.)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>came out to march behind the band</div>          <div class="mnem"><span class="lbl">记</span>这个单词是“三月”，我们很熟 悉吧。三月是万物复苏的季节，所有小动物，都 排着队(行进)出来了。</div>          <div class="root"><span class="lbl">根</span>本义「三月」→ 三月队伍出发 → 行进</div>          <div class="zt"><span class="lbl">真题</span>Laura Chigi, a grandmother at the march, says the local and national governments have failed to do anything about the crowds for decades, because they&#x27;re only interested in tourism.劳拉·奇吉是参加游行的一位老妇 人，她说，几十年来，地方和国家政府对人群没 有采取任何措施，因为他们只对旅游业感兴趣。 (2018) 例 The army began their long march to the coast.部队开始了他们前往沿海地区的长途 行军。</div>          <div class="fam"><span class="lbl">族</span>marcher n. 游行的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">paradise</span>
+          <span class="ipa">/&#x27;pærədais/</span>
+          <span class="pos">n.</span>
+          <span class="cn">天堂；乐土；乐园；完美去处</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the street looked like paradise</div>          <div class="mnem"><span class="lbl">记</span>附近；旁边（para）的（di），我们 总觉得旁边人(周围的人)比我们过得好，觉得 自己是最悲惨的。所以旁边的人的生活就是 “乐土；天堂”。</div>          <div class="root"><span class="lbl">根</span>para(旁边) + dise(想成 dis) → 旁边的乐土</div>          <div class="zt"><span class="lbl">真题</span>Drawing .in adventure seekers and experienced divers, this new artificial airbus reef will be a scuba diver&#x27;s paradise. 吸引探险 者和经验丰富的潜水员，这个新的人工空中客 车礁将成为潜水者的天堂。(2019) (074)</div>          <div class="fam"><span class="lbl">族</span>paradise n. 天堂；乐园</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">heaven</span>
+          <span class="ipa">/&#x27;hevn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>opened like heaven itself</div>          <div class="mnem"><span class="lbl">记</span>有（have)一道门（n想成门）。 做噩梦时自己在黑暗中摸索，突然看到一道门， 就像看到了希望一样。那 haven就是避难所； 再看 heaven 比 haven 多了一个字母 e,那就是 避难所里还有一个阿姨(e的谐音)在照顾你，那 避难所就变成了天堂。</div>          <div class="root"><span class="lbl">根</span>联想：have(有) + n(门) → 避难所多一个 e(阿姨) 成了天堂</div>          <div class="zt"><span class="lbl">真题</span>But the club also acts as a recreation center and safe haven(庇护所)for teenagers, with video games readily available. 但俱乐部同 时也是青少年的娱乐中心和避风港，随时可以 玩电子游戏。(2023)</div>          <div class="fam"><span class="lbl">族</span>heavenly adj. 天堂般的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">heave</span>
+          <span class="ipa">/hi:v/</span>
+          <span class="pos">n.</span>
+          <span class="cn">举；拖；拉；抛 v.(用力)举起；拖；拉；抛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to heave a heavy drum onto a truck</div>          <div class="mnem"><span class="lbl">记</span>heaven是“天堂”，去掉最后一 个n，就是heave，天堂在上面啊，所以要把你 “举”到天堂上去啊。</div>          <div class="root"><span class="lbl">根</span>heaven(天堂) 去掉最后一个 n → 把东西举上去</div>          <div class="fam"><span class="lbl">族</span>heave-ho 用力抬的号子</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">hell</span>
+          <span class="ipa">/hel/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地狱；悲惨的境况；该死</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>called it a small hell</div>          <div class="root"><span class="lbl">根</span>联想：hello 去掉 o → 地狱</div>          <div class="zt"><span class="lbl">真题</span>But the Greek church resists this practice, they believe the only place where people burn is hell. 但是希腊教会反对这种做法，他们相信 只有地狱才能把人烧死。 (075) 第三单元</div>          <div class="fam"><span class="lbl">族</span>hellish adj. 可怕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">barber</span>
+          <span class="ipa">/&#x27;ba:rbər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">理发师</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one old barber shop</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：叭叭。有些“理 发师”从开始理发到最后，嘴都叭叭的，让你办 卡啊，推荐各种消费。</div>          <div class="root"><span class="lbl">根</span>谐音「叭叭」→ 理发师一直叭叭地推销</div>          <div class="zt"><span class="lbl">真题</span>They checked the accuracy of the map by testing 200 hair samples collected from 65 barber shops. 他们对从 65 家理发店收集的 200 份头发样本进行测试，来检验染色体的准确性。</div>          <div class="fam"><span class="lbl">族</span>barbershop n. 理发店</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">bug</span>
+          <span class="ipa">/b^g/</span>
+          <span class="pos">n.</span>
+          <span class="cn">虫子；小病；计算机故障</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A small bug bit her arm</div>          <div class="mnem"><span class="lbl">记</span>我们经常说，电脑的某个程序 有几个bug，就是小病，小故障。</div>          <div class="root"><span class="lbl">根</span>本义「虫子」→ 程序里的小虫 → 故障</div>          <div class="zt"><span class="lbl">真题</span>This is the strangest bug I&#x27;ve ever seen. 这是我见过的最奇怪的虫子。(2015)</div>          <div class="fam"><span class="lbl">族</span>buggy adj. 有故障的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">insect</span>
+          <span class="ipa">/&#x27;ınsekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">昆虫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an insect flew into the flour</div>          <div class="mnem"><span class="lbl">记</span>里面(in)塞个它(sect 的发音类 似“塞个它”)，耳朵总不舒服，结果医生发现，你 耳朵里塞了一个“昆虫”，多么恐怖啊。</div>          <div class="root"><span class="lbl">根</span>in(里) + sect(切) → 身体一节节的小虫</div>          <div class="zt"><span class="lbl">真题</span>On the road there is little to protect them from mud, insects, and bird droppings. 在路 上，几乎没有什么能保护它们免受泥土、昆虫和 鸟粪的伤害。</div>          <div class="fam"><span class="lbl">族</span>insecticide n. 杀虫剂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">worm</span>
+          <span class="ipa">/w3:rm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">虫，蠕虫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She found a worm in an old apple</div>          <div class="mnem"><span class="lbl">记</span>发音类似：乌木。乌木受潮了， 里面长了很多“虫”。</div>          <div class="root"><span class="lbl">根</span>谐音「乌木」→ 乌木受潮就长虫</div>          <div class="fam"><span class="lbl">族</span>wormy adj. 有虫的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 19</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

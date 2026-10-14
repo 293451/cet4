@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 34 · A Reporter in the County Court</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 34 · 11/15 · Unit 5 第 991-1020 词</div>
+  <h1>A Reporter in the County Court<span class="cn">县法院里的记者</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-34.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5376"><p class="en"><span class="w" data-s="43" data-e="171">On</span> <span class="w" data-s="213" data-e="299">a</span> <span class="w" data-s="341" data-e="469">wet</span> <span class="w" data-s="512" data-e="811">Tuesday</span> <span class="w" data-s="853" data-e="981">morning,</span> <span class="w" data-s="1195" data-e="1707">Nina</span> <span class="w" data-s="1749" data-e="1963">stood</span> <span class="w" data-s="2005" data-e="2133">on</span> <span class="w" data-s="2176" data-e="2261">the</span> <span class="w target" data-s="2304" data-e="2645" title="人行道">sidewalk</span> <span class="w" data-s="2688" data-e="2944">outside</span> <span class="w" data-s="2987" data-e="3243">the</span> <span class="w" data-s="3285" data-e="3541">county</span> <span class="w target" data-s="3584" data-e="3669" title="法院；法庭；球场">court</span> <span class="w" data-s="3712" data-e="4011">and</span> <span class="w" data-s="4053" data-e="4480">waited</span> <span class="w" data-s="4523" data-e="4693">for</span> <span class="w" data-s="4736" data-e="4779">the</span> <span class="w" data-s="4821" data-e="5035">doors</span> <span class="w" data-s="5077" data-e="5163">to</span> <span class="w" data-s="5205" data-e="5376">open.</span></p><p class="zh">一个潮湿的星期二早上，妮娜站在县法院外的人行道上，等着大门打开。</p></div>
+<div class="pair" data-s0="5589" data-s1="8448"><p class="en"><span class="w" data-s="5589" data-e="5803">She</span> <span class="w" data-s="6059" data-e="6229">was</span> <span class="w" data-s="6272" data-e="6315">a</span> <span class="w target" data-s="6357" data-e="6443" title="字体；出版界；指纹；版画 v. 打印；印刷；登 载;洗印">print</span> <span class="w" data-s="6485" data-e="6955">reporter,</span> <span class="w" data-s="7040" data-e="7211">and</span> <span class="w" data-s="7339" data-e="7467">this</span> <span class="w" data-s="7509" data-e="7680">was</span> <span class="w" data-s="7723" data-e="7808">her</span> <span class="w" data-s="7851" data-e="7979">first</span> <span class="w target" data-s="8021" data-e="8448" title="试验，试用；审判 v. 测试">trial.</span></p><p class="zh">她是一名纸媒记者，这是她第一次报道庭审。</p></div>
+<div class="pair" data-s0="9013" data-s1="13749"><p class="en"><span class="w" data-s="9013" data-e="9098">The</span> <span class="w" data-s="9141" data-e="9226">case</span> <span class="w" data-s="9269" data-e="9482">was</span> <span class="w" data-s="9525" data-e="9610">a</span> <span class="w" data-s="9653" data-e="9823">small</span> <span class="w target" data-s="9866" data-e="10250" title="犯罪，犯罪行为 adj.犯罪的，犯法的">crime:</span> <span class="w" data-s="10506" data-e="11018">someone</span> <span class="w" data-s="11061" data-e="11274">had</span> <span class="w" data-s="11317" data-e="11615">copied</span> <span class="w" data-s="11658" data-e="11871">another</span> <span class="w" data-s="11914" data-e="12298">man&#x27;s</span> <span class="w target" data-s="12341" data-e="12682" title="(建筑、机器等的)蓝图；行动方案；计划蓝图； (生物细胞的);模型，型板">blueprint</span> <span class="w" data-s="12725" data-e="12981">and</span> <span class="w" data-s="13109" data-e="13237">sold</span> <span class="w" data-s="13279" data-e="13450">it</span> <span class="w" data-s="13493" data-e="13749">twice.</span></p><p class="zh">案子是一桩小罪案：有人抄了别人的蓝图，把它卖了两次。</p></div>
+<div class="pair" data-s0="13962" data-s1="18399"><p class="en"><span class="w" data-s="13962" data-e="14645">Police</span> <span class="w" data-s="14687" data-e="14815">had</span> <span class="w" data-s="14858" data-e="14986">found</span> <span class="w" data-s="15029" data-e="15199">one</span> <span class="w target" data-s="15242" data-e="15754" title="指纹；指印">fingerprint</span> <span class="w" data-s="15797" data-e="15967">on</span> <span class="w" data-s="16010" data-e="16095">the</span> <span class="w" data-s="16138" data-e="16266">paper,</span> <span class="w" data-s="16522" data-e="16735">but</span> <span class="w" data-s="16863" data-e="17077">they</span> <span class="w" data-s="17119" data-e="17205">could</span> <span class="w" data-s="17247" data-e="17375">not</span> <span class="w target" data-s="17418" data-e="17802" title="核实；证明；核准">verify</span> <span class="w" data-s="17845" data-e="18058">whose</span> <span class="w" data-s="18101" data-e="18229">it</span> <span class="w" data-s="18271" data-e="18399">was.</span></p><p class="zh">警方在纸上找到了一枚指纹，但他们无法核实那是谁的。</p></div>
+<div class="pair" data-s0="19132" data-s1="23484"><p class="en"><span class="w" data-s="19132" data-e="19217">A</span> <span class="w target" data-s="19260" data-e="19729" title="旁观者">bystander</span> <span class="w" data-s="19772" data-e="19943">said</span> <span class="w" data-s="19985" data-e="20199">he</span> <span class="w" data-s="20241" data-e="20327">had</span> <span class="w" data-s="20369" data-e="20497">seen</span> <span class="w" data-s="20540" data-e="20668">a</span> <span class="w" data-s="20711" data-e="20753">man</span> <span class="w target" data-s="20796" data-e="21308" title="(绕过城市的)旁路，旁道 v. 绕过；避开">bypass</span> <span class="w" data-s="21351" data-e="21564">the</span> <span class="w" data-s="21607" data-e="21692">back</span> <span class="w" data-s="21735" data-e="21991">gate,</span> <span class="w" data-s="22204" data-e="22588">yet</span> <span class="w" data-s="22631" data-e="22759">he</span> <span class="w" data-s="22801" data-e="22929">had</span> <span class="w" data-s="22972" data-e="23143">no</span> <span class="w" data-s="23185" data-e="23484">proof.</span></p><p class="zh">一名旁观者说，他看见有人绕过后门进去，但他没有证据。</p></div>
+<div class="pair" data-s0="23612" data-s1="27153"><p class="en"><span class="w" data-s="23612" data-e="24551">Lawyers</span> <span class="w" data-s="24593" data-e="24679">on</span> <span class="w" data-s="24721" data-e="24849">both</span> <span class="w" data-s="24892" data-e="25148">sides</span> <span class="w target" data-s="25191" data-e="25660" title="呼吁，恳求；上诉v.有吸引力；上诉；呼吁， 恳请">appealed</span> <span class="w" data-s="25703" data-e="25873">to</span> <span class="w" data-s="25916" data-e="26001">the</span> <span class="w target" data-s="26044" data-e="26257" title="陪审团；(竞赛或展览的)评判委员会">jury</span> <span class="w" data-s="26300" data-e="26428">with</span> <span class="w" data-s="26471" data-e="26641">long</span> <span class="w" data-s="26684" data-e="27153">speeches.</span></p><p class="zh">双方的律师都用长篇陈述向陪审团陈情。</p></div>
+<div class="pair" data-s0="27799" data-s1="32279"><p class="en"><span class="w" data-s="27799" data-e="27927">One</span> <span class="w" data-s="27969" data-e="28140">tried</span> <span class="w" data-s="28183" data-e="28353">to</span> <span class="w target" data-s="28396" data-e="28609" title="控告；控诉；谴责">accuse</span> <span class="w" data-s="28652" data-e="28780">the</span> <span class="w" data-s="28823" data-e="28951">other</span> <span class="w" data-s="28993" data-e="29164">side</span> <span class="w" data-s="29207" data-e="29420">of</span> <span class="w" data-s="29463" data-e="29676">hiding</span> <span class="w" data-s="29719" data-e="29932">evidence,</span> <span class="w" data-s="30145" data-e="30401">and</span> <span class="w" data-s="30615" data-e="30785">one</span> <span class="w" data-s="30828" data-e="30999">tried</span> <span class="w" data-s="31041" data-e="31169">to</span> <span class="w target" data-s="31212" data-e="31553" title="原谅；免除 n. 借口">excuse</span> <span class="w" data-s="31596" data-e="31724">his</span> <span class="w" data-s="31767" data-e="31937">own</span> <span class="w" data-s="31980" data-e="32279">client.</span></p><p class="zh">一方试图控告对方隐瞒证据，另一方试图替自己的当事人开脱。</p></div>
+<div class="pair" data-s0="32449" data-s1="36545"><p class="en"><span class="w" data-s="32449" data-e="33431">Nina</span> <span class="w" data-s="33473" data-e="33644">wrote</span> <span class="w" data-s="33687" data-e="33815">down</span> <span class="w" data-s="33857" data-e="34071">every</span> <span class="w" data-s="34113" data-e="34327">word</span> <span class="w" data-s="34369" data-e="34711">and</span> <span class="w" data-s="34881" data-e="35052">could</span> <span class="w" data-s="35095" data-e="35180">not</span> <span class="w" data-s="35223" data-e="35479">decide</span> <span class="w" data-s="35521" data-e="35777">who</span> <span class="w" data-s="35820" data-e="36204">deserved</span> <span class="w" data-s="36247" data-e="36332">the</span> <span class="w target" data-s="36375" data-e="36545" title="责备，责怪η.责备，责任">blame.</span></p><p class="zh">妮娜把每个字都记下来，却分不清该责怪谁。</p></div>
+<div class="pair" data-s0="37152" data-s1="41248"><p class="en"><span class="w" data-s="37152" data-e="37237">The</span> <span class="w target" data-s="37280" data-e="37408" title="要价，收费；控告；指责；掌管；责任v.收 (费)；(向……)要价；控告;起诉;指责；充电">charge</span> <span class="w" data-s="37450" data-e="37706">was</span> <span class="w" data-s="37749" data-e="37920">serious,</span> <span class="w" data-s="38218" data-e="38432">and</span> <span class="w" data-s="38688" data-e="38773">if</span> <span class="w" data-s="38816" data-e="38901">the</span> <span class="w target" data-s="38944" data-e="39157" title="陪审团；(竞赛或展览的)评判委员会">jury</span> <span class="w target" data-s="39200" data-e="39584" title="定罪；表明；作为……的证据η.囚犯，犯人">convicted</span> <span class="w" data-s="39626" data-e="39754">him,</span> <span class="w" data-s="39925" data-e="40096">he</span> <span class="w" data-s="40224" data-e="40352">would</span> <span class="w" data-s="40394" data-e="40480">go</span> <span class="w" data-s="40522" data-e="40650">to</span> <span class="w" data-s="40693" data-e="40821">prison</span> <span class="w" data-s="40864" data-e="41077">for</span> <span class="w" data-s="41120" data-e="41248">years.</span></p><p class="zh">指控很重，如果陪审团判他有罪，他就要在监狱里待上好几年。</p></div>
+<div class="pair" data-s0="41546" data-s1="45770"><p class="en"><span class="w" data-s="41546" data-e="42314">The</span> <span class="w target" data-s="42357" data-e="42656" title="意见；审判;判断">judge</span> <span class="w" data-s="42698" data-e="42826">told</span> <span class="w" data-s="42869" data-e="43040">them</span> <span class="w" data-s="43082" data-e="43168">not</span> <span class="w" data-s="43210" data-e="43381">to</span> <span class="w target" data-s="43424" data-e="43680" title="诅咒，咒骂 n. 咒骂，咒语">curse</span> <span class="w" data-s="43722" data-e="43850">or</span> <span class="w target" data-s="43893" data-e="44277" title="谴责；宣判；使陷入；宣布……不安全；证 明……有罪">condemn</span> <span class="w" data-s="44320" data-e="44490">anyone</span> <span class="w" data-s="44533" data-e="44832">before</span> <span class="w" data-s="44874" data-e="45088">they</span> <span class="w" data-s="45130" data-e="45216">had</span> <span class="w" data-s="45258" data-e="45344">heard</span> <span class="w" data-s="45386" data-e="45770">everything.</span></p><p class="zh">法官让他们在听完所有陈述之前，不要咒骂或谴责任何人。</p></div>
+<div class="pair" data-s0="46331" data-s1="48677"><p class="en"><span class="w" data-s="46331" data-e="46416">A</span> <span class="w target" data-s="46459" data-e="46757" title="目击者 v. 当场看到，目击">witness</span> <span class="w" data-s="46800" data-e="47184">described</span> <span class="w" data-s="47227" data-e="47355">the</span> <span class="w" data-s="47397" data-e="47611">man&#x27;s</span> <span class="w target" data-s="47653" data-e="47995" title="投降，自首；交出；放弃">surrender</span> <span class="w" data-s="48037" data-e="48123">at</span> <span class="w" data-s="48165" data-e="48251">the</span> <span class="w" data-s="48293" data-e="48379">police</span> <span class="w" data-s="48421" data-e="48677">station.</span></p><p class="zh">一位证人描述了那人在警察局自首的情形。</p></div>
+<div class="pair" data-s0="48976" data-s1="55035"><p class="en"><span class="w" data-s="48976" data-e="49659">The</span> <span class="w" data-s="49701" data-e="50000">lawyer</span> <span class="w" data-s="50043" data-e="50085">for</span> <span class="w" data-s="50128" data-e="50171">the</span> <span class="w" data-s="50213" data-e="50427">defence</span> <span class="w" data-s="50469" data-e="50939">argued</span> <span class="w" data-s="50981" data-e="51067">that</span> <span class="w target" data-s="51109" data-e="51621" title="区别对待；歧视；偏袒">discrimination</span> <span class="w" data-s="51664" data-e="51877">had</span> <span class="w" data-s="51920" data-e="52219">shaped</span> <span class="w" data-s="52261" data-e="52304">the</span> <span class="w" data-s="52347" data-e="52432">case</span> <span class="w" data-s="52475" data-e="52688">from</span> <span class="w" data-s="52731" data-e="52816">the</span> <span class="w" data-s="52859" data-e="52987">start,</span> <span class="w" data-s="53243" data-e="53456">and</span> <span class="w" data-s="53584" data-e="53755">that</span> <span class="w" data-s="53797" data-e="53840">his</span> <span class="w" data-s="53883" data-e="54181">client</span> <span class="w" data-s="54224" data-e="54352">had</span> <span class="w" data-s="54395" data-e="54480">the</span> <span class="w" data-s="54523" data-e="54608">right</span> <span class="w" data-s="54651" data-e="54779">to</span> <span class="w target" data-s="54821" data-e="55035" title="控告;提起诉讼；(尤指在法庭上)提出请求">sue.</span></p><p class="zh">被告方律师辩称，歧视从一开始就影响了这桩案子，他的当事人有权起诉。</p></div>
+<div class="pair" data-s0="55555" data-s1="60376"><p class="en"><span class="w" data-s="55555" data-e="55683">He</span> <span class="w" data-s="55725" data-e="55853">said</span> <span class="w" data-s="55896" data-e="55981">the</span> <span class="w target" data-s="56024" data-e="56152" title="法院；法庭；球场">court</span> <span class="w" data-s="56195" data-e="56365">had</span> <span class="w" data-s="56408" data-e="56536">no</span> <span class="w" data-s="56579" data-e="56749">way</span> <span class="w" data-s="56792" data-e="56963">to</span> <span class="w target" data-s="57005" data-e="57304" title="证明……是正当的，为……辩护">justify</span> <span class="w" data-s="57347" data-e="57560">a</span> <span class="w" data-s="57603" data-e="57688">long</span> <span class="w" data-s="57731" data-e="58157">sentence,</span> <span class="w" data-s="58371" data-e="58712">and</span> <span class="w" data-s="58755" data-e="58883">that</span> <span class="w target" data-s="58925" data-e="59096" title="公平；公正；法官；司法制度">justice</span> <span class="w" data-s="59139" data-e="59523">meant</span> <span class="w" data-s="59565" data-e="59736">more</span> <span class="w" data-s="59779" data-e="59907">than</span> <span class="w" data-s="59949" data-e="60035">a</span> <span class="w target" data-s="60077" data-e="60376" title="结论；裁决，判决">verdict.</span></p><p class="zh">他说，法庭没有理由证明重判是正当的，正义的含义远远不止一个裁决。</p></div>
+<div class="pair" data-s0="60504" data-s1="63491"><p class="en"><span class="w" data-s="60504" data-e="61229">The</span> <span class="w target" data-s="61272" data-e="61869" title="">prosecutor</span> <span class="w" data-s="61912" data-e="62040">asked</span> <span class="w" data-s="62083" data-e="62253">the</span> <span class="w target" data-s="62296" data-e="62509" title="陪审团；(竞赛或展览的)评判委员会">jury</span> <span class="w" data-s="62552" data-e="62680">to</span> <span class="w" data-s="62723" data-e="62808">be</span> <span class="w" data-s="62851" data-e="62979">careful</span> <span class="w" data-s="63021" data-e="63320">and</span> <span class="w" data-s="63363" data-e="63491">fair.</span></p><p class="zh">检察官请陪审团务必谨慎、公正。</p></div>
+<div class="pair" data-s0="63832" data-s1="66733"><p class="en"><span class="w" data-s="63832" data-e="64429">After</span> <span class="w" data-s="64472" data-e="64685">four</span> <span class="w" data-s="64728" data-e="64941">hours</span> <span class="w" data-s="64984" data-e="65368">the</span> <span class="w target" data-s="65411" data-e="65795" title="陪审团；(竞赛或展览的)评判委员会">jury</span> <span class="w" data-s="65837" data-e="66008">reached</span> <span class="w" data-s="66051" data-e="66264">its</span> <span class="w target" data-s="66307" data-e="66733" title="意见；审判;判断">judgement.</span></p><p class="zh">四个小时后，陪审团作出了判断。</p></div>
+<div class="pair" data-s0="67299" data-s1="70670"><p class="en"><span class="w" data-s="67299" data-e="67385">The</span> <span class="w target" data-s="67427" data-e="67683" title="结论；裁决，判决">verdict</span> <span class="w" data-s="67726" data-e="67854">was</span> <span class="w" data-s="67897" data-e="68025">not</span> <span class="w" data-s="68067" data-e="68366">guilty,</span> <span class="w" data-s="68537" data-e="68707">and</span> <span class="w" data-s="69006" data-e="69262">the</span> <span class="w" data-s="69305" data-e="69390">man</span> <span class="w" data-s="69433" data-e="69603">was</span> <span class="w target" data-s="69646" data-e="70201" title="排出(物)；获准离开；免职；出院；退伍 v. 准许(某人)离开；解雇">discharged</span> <span class="w" data-s="70243" data-e="70329">that</span> <span class="w" data-s="70371" data-e="70670">afternoon.</span></p><p class="zh">裁决是无罪，那天下午那人就被释放了。</p></div>
+<div class="pair" data-s0="70969" data-s1="74638"><p class="en"><span class="w" data-s="70969" data-e="71353">The</span> <span class="w" data-s="71737" data-e="71907">state</span> <span class="w" data-s="71950" data-e="72163">said</span> <span class="w" data-s="72206" data-e="72334">it</span> <span class="w" data-s="72377" data-e="72419">would</span> <span class="w" data-s="72462" data-e="72547">not</span> <span class="w target" data-s="72590" data-e="73017" title="">prosecute</span> <span class="w" data-s="73059" data-e="73273">again,</span> <span class="w" data-s="73486" data-e="73614">and</span> <span class="w" data-s="73657" data-e="74169">would</span> <span class="w" data-s="74211" data-e="74297">not</span> <span class="w target" data-s="74339" data-e="74638" title="呼吁，恳求；上诉v.有吸引力；上诉；呼吁， 恳请">appeal.</span></p><p class="zh">州里表示不会再次起诉，也不会上诉。</p></div>
+<div class="pair" data-s0="74851" data-s1="76387"><p class="en"><span class="w" data-s="74851" data-e="75619">Nina</span> <span class="w" data-s="75662" data-e="75790">closed</span> <span class="w" data-s="75833" data-e="76046">her</span> <span class="w" data-s="76089" data-e="76387">notebook.</span></p><p class="zh">妮娜合上了笔记本。</p></div>
+<div class="pair" data-s0="76686" data-s1="81593"><p class="en"><span class="w" data-s="76686" data-e="76985">Later</span> <span class="w" data-s="77027" data-e="77155">she</span> <span class="w" data-s="77198" data-e="77369">said</span> <span class="w" data-s="77411" data-e="77539">that</span> <span class="w" data-s="77582" data-e="77710">watching</span> <span class="w" data-s="77753" data-e="77966">a</span> <span class="w target" data-s="78009" data-e="78307" title="试验，试用；审判 v. 测试">trial</span> <span class="w" data-s="78350" data-e="78521">was</span> <span class="w" data-s="78563" data-e="78649">a</span> <span class="w" data-s="78691" data-e="78734">kind</span> <span class="w" data-s="78777" data-e="78947">of</span> <span class="w target" data-s="78990" data-e="79331" title="拷问，拷打；折磨v.折磨，使痛苦；拷问，严 刑逼供">torture,</span> <span class="w" data-s="79459" data-e="79673">but</span> <span class="w" data-s="80099" data-e="80227">that</span> <span class="w" data-s="80270" data-e="80355">she</span> <span class="w" data-s="80398" data-e="80526">had</span> <span class="w" data-s="80569" data-e="80697">seen</span> <span class="w" data-s="80739" data-e="81038">how</span> <span class="w" data-s="81081" data-e="81209">the</span> <span class="w" data-s="81251" data-e="81379">law</span> <span class="w" data-s="81422" data-e="81593">worked.</span></p><p class="zh">后来她说，旁听一场庭审是一种折磨，但她看清了法律是怎么运转的。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">sidewalk</span>
+          <span class="ipa">/&#x27;sardwo:k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">人行道</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood on the sidewalk outside the county court</div>          <div class="mnem"><span class="lbl">记</span>旁边的（side)路(walk)，“人行 道”都是在路的两边，中间是车道。</div>          <div class="root"><span class="lbl">根</span>side(旁边) + walk(走的路) → 路边的走道</div>          <div class="zt"><span class="lbl">真题</span>But just before he reached the car door, he suddenly stopped, crouching(蹲伏) down to peer at something on the sidewalk. 但就在他 到达车门之前，他突然停下来，蹲在地上，盯着 人行道上的某处看。</div>          <div class="fam"><span class="lbl">族</span>walkway n. 走道</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">bypass</span>
+          <span class="ipa">/&#x27;baipæs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(绕过城市的)旁路，旁道 v. 绕过；避开</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had seen a man bypass the back gate</div>          <div class="root"><span class="lbl">根</span>by(旁边) + pass(经过) → 从旁边绕过去</div>          <div class="zt"><span class="lbl">真题</span>The odds of criminal using technical means to bypass a security system are so small that the FBI doesn&#x27;t even track those statistics. 犯罪分子利用技术手段绕过安全系统的概率很 小，以至联邦调查局甚至没有跟踪这些统计数 据。(2016)</div>          <div class="fam"><span class="lbl">族</span>pass v. 经过 / passage n. 通道</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">print</span>
+          <span class="ipa">/print/</span>
+          <span class="pos">n.</span>
+          <span class="cn">字体；出版界；指纹；版画 v. 打印；印刷；登 载;洗印</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She was a print reporter</div>          <div class="mnem"><span class="lbl">记</span>派(p)人(r)印(in)它(t)，就是 去“印刷”(print)啊。</div>          <div class="root"><span class="lbl">根</span>p(派) + r(人) + in(印) + t(它) → 派人去印</div>          <div class="zt"><span class="lbl">真题</span>It is true that textbook publishers have recently reported losses, largely due to students renting or buying used print textbooks. (129) 第五单元 确实，教科书出版商最近报告了亏损，主要原因 是学生租用或购买二手印刷教科书。(2019)</div>          <div class="fam"><span class="lbl">族</span>printer n. 打印机 / printing n. 印刷</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">fingerprint</span>
+          <span class="ipa">/&#x27;fingərprint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">指纹；指印</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had found one fingerprint on the paper</div>          <div class="root"><span class="lbl">根</span>finger(手指) + print(印) → 手指留下的印</div>          <div class="zt"><span class="lbl">真题</span>Faces, like fingerprints,are unique. 人脸 和指纹一样，都是独一无二的。</div>          <div class="fam"><span class="lbl">族</span>print n. 印记</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">blueprint</span>
+          <span class="ipa">/&#x27;blu:print/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(建筑、机器等的)蓝图；行动方案；计划蓝图； (生物细胞的);模型，型板</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>copied another man&#x27;s blueprint</div>          <div class="root"><span class="lbl">根</span>blue(蓝) + print(印) → 蓝色的印图 → 蓝图</div>          <div class="zt"><span class="lbl">真题</span>He studied the blueprints of other famous buildings. 他研究了其他著名建筑的蓝 图。(2021)</div>          <div class="fam"><span class="lbl">族</span>print v. 印刷</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">justice</span>
+          <span class="ipa">/&#x27;dzastis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">公平；公正；法官；司法制度</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>justice meant more than a verdict</div>          <div class="root"><span class="lbl">根</span>just(公正) + ice → 公正的状态</div>          <div class="zt"><span class="lbl">真题</span>It is to recognize that in America&#x27;s vast criminal justice system, second chances are crucial.要认识到，在美国庞大的刑事司法体系 中，第二次机会至关重要。(2015)</div>          <div class="fam"><span class="lbl">族</span>just adj. 公正的 / justify v. 证明正当</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">judgement</span>
+          <span class="ipa">/&#x27;dzad3mənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">意见；审判;判断</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the jury reached its judgement</div>          <div class="mnem"><span class="lbl">记</span>该单词来自 judge n. 法官 v. 判断，裁判；那后面加ment，就是该单词的名词 形式。</div>          <div class="root"><span class="lbl">根</span>judge(判断) + ment(名词后缀) → 判断的结果</div>          <div class="zt"><span class="lbl">真题</span>They are afraid they might meet with unfair judgement in these areas. 他们担心在这 些方面可能会遇到不公平的判断。</div>          <div class="fam"><span class="lbl">族</span>judge n. 法官 v. 判断</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">justify</span>
+          <span class="ipa">/&#x27;d3astıfai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证明……是正当的，为……辩护</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>no way to justify a long sentence</div>          <div class="mnem"><span class="lbl">记</span>你觉得我说的话“恰当，正好 (just)”，说明你在维护我→证明……是正当的， 为……辩护。</div>          <div class="root"><span class="lbl">根</span>just(公正) + ify(使) → 使显得公正 → 证明正当</div>          <div class="zt"><span class="lbl">真题</span>Are the benefits of the product important enough to justify buying it?产品的好处是否重 要到值得购买？</div>          <div class="fam"><span class="lbl">族</span>justification n. 正当理由 / just adj. 公正的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">court</span>
+          <span class="ipa">/kə:rt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">法院；法庭；球场</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the county court</div>          <div class="root"><span class="lbl">根</span>靠搭配记：go to court 打官司 → 法院</div>          <div class="zt"><span class="lbl">真题</span>The suspect returns to court a week or two later. 嫌疑人会在一两个星期后回到法庭。</div>          <div class="fam"><span class="lbl">族</span>courthouse n. 法院大楼</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">jury</span>
+          <span class="ipa">/&#x27;dzuəri/</span>
+          <span class="pos"></span>
+          <span class="cn">陪审团；(竞赛或展览的)评判委员会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>appealed to the jury</div>          <div class="mnem"><span class="lbl">记</span>救(ju 的谐音)阿姨(ry 想成 re 阿姨)。谁救阿姨？→“陪审团”才能主持公 道啊。</div>          <div class="root"><span class="lbl">根</span>jur(法律) + y → 依法律判断的人 → 陪审团</div>          <div class="fam"><span class="lbl">族</span>juror n. 陪审员 / injure 无关，注意区分</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">trial</span>
+          <span class="ipa">/&#x27;traiəl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">试验，试用；审判 v. 测试</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>this was her first trial</div>          <div class="mnem"><span class="lbl">记</span>这个单词就是try(尝试)的名 词形式，当名词就是试验，试用。“审判”就是在 试图确定被告人有罪。</div>          <div class="root"><span class="lbl">根</span>try(审、试) + al → 审的过程</div>          <div class="zt"><span class="lbl">真题</span>We learn, in a sense, by trial and error. 从某种意义上说，我们是通过试错来学习的。 (2019)</div>          <div class="fam"><span class="lbl">族</span>try v. 尝试；审判</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">crime</span>
+          <span class="ipa">/kraim/</span>
+          <span class="pos">n.</span>
+          <span class="cn">犯罪，犯罪行为 adj.犯罪的，犯法的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The case was a small crime</div>          <div class="mnem"><span class="lbl">记</span>cri音同 cry(哭)，罪犯往往在 最后审判的时候都会痛苦流涕，悔恨自己的行 为。cri(哭)十me(我)→犯罪，犯罪行为。</div>          <div class="root"><span class="lbl">根</span>crim(罪) + e → 罪行</div>          <div class="zt"><span class="lbl">真题</span>This is based on higher earnings and avoided costs in health care, crime, welfare dependence and other things. 这是基于更高的 收入，以及在医疗保健、犯罪、福利依赖和其他 方面避免的成本。(2021)</div>          <div class="fam"><span class="lbl">族</span>criminal n. 罪犯 adj. 犯罪的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">discrimination</span>
+          <span class="ipa">/dıskrımr&#x27;nerʃn/</span>
+          <span class="pos"></span>
+          <span class="cn">区别对待；歧视；偏袒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>argued that discrimination had shaped the case</div>          <div class="root"><span class="lbl">根</span>dis(分开) + crimin(分辨) + ation → 把人分开看</div>          <div class="zt"><span class="lbl">真题</span>They are victims of age discrimination, because employers can easily find a young, energetic worker. 他们是年龄歧视的受害者，因 为雇主可以很容易找到一个年轻的、精力充沛 的工人。</div>          <div class="fam"><span class="lbl">族</span>discriminate v. 歧视 / discriminate A from B 区分</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">sue</span>
+          <span class="ipa">/su:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">控告;提起诉讼；(尤指在法庭上)提出请求</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his client had the right to sue</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“诉”→起诉， 控告。</div>          <div class="root"><span class="lbl">根</span>谐音联想：诉 → 起诉</div>          <div class="zt"><span class="lbl">真题</span>The judge made clear that Kimberly did have standing to sue on her own behalf. 法官明 确表示，金伯利确实有资格代表她自己起诉。</div>          <div class="fam"><span class="lbl">族</span>suit n. 诉讼 / lawsuit n. 官司</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">curse</span>
+          <span class="ipa">/k3:rs/</span>
+          <span class="pos">v.</span>
+          <span class="cn">诅咒，咒骂 n. 咒骂，咒语</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not to curse or condemn anyone</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“克死”。很明 显是“诅咒”的意思。</div>          <div class="root"><span class="lbl">根</span>谐音联想：克死 → 咒人克死 → 诅咒</div>          <div class="zt"><span class="lbl">真题</span>They seemed cursed to suffer disastrous fates.他们似乎被诅咒了，要遭受灾难性的 命运。</div>          <div class="fam"><span class="lbl">族</span>cursed adj. 被诅咒的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">accuse</span>
+          <span class="ipa">/ə&#x27;kju:z/</span>
+          <span class="pos">v.</span>
+          <span class="cn">控告；控诉；谴责</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to accuse the other side</div>          <div class="mnem"><span class="lbl">记</span>cuse 发音类似“curse(诅咒)”， 一再地(ac)诅咒你→谴责；控诉。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + cuse(联想 curse 咒骂) → 一再地指责</div>          <div class="zt"><span class="lbl">真题</span>He was accused of causing a fire. 他被指 控引发火灾。</div>          <div class="fam"><span class="lbl">族</span>accusation n. 指控 / the accused n. 被告</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">excuse</span>
+          <span class="ipa">/ıks&#x27;kjuiz, 1ks&#x27;kju:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">原谅；免除 n. 借口</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to excuse his own client</div>          <div class="root"><span class="lbl">根</span>ex(往外) + cuse(责难) → 把责难推出去 → 开脱</div>          <div class="zt"><span class="lbl">真题</span>To forbid a thing one day and excuse it (130) the next is no foundation for morality. 一天禁 止一件事，第二天原谅它，这是没有道德基础 的。(2010)</div>          <div class="fam"><span class="lbl">族</span>excusable adj. 可原谅的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">appeal</span>
+          <span class="ipa">/ə&#x27;pi:l/</span>
+          <span class="pos">n.</span>
+          <span class="cn">呼吁，恳求；上诉v.有吸引力；上诉；呼吁， 恳请</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Lawyers on both sides appealed to the jury</div>          <div class="mnem"><span class="lbl">记</span>在古时候，有些贪官污吏被抓 起来后，群情激愤，人民一再地(ap)请求将之剥 皮(peal 发音类似“皮”)→恳请；呼吁。</div>          <div class="root"><span class="lbl">根</span>ap(朝向) + peal(驱使) → 朝着人呼吁 → 上诉；恳请</div>          <div class="zt"><span class="lbl">真题</span>It appeals to kids&#x27;curiosity to find out what is hidden inside.它吸引了孩子们的好奇 心，要弄清里面藏着什么。(2016)</div>          <div class="fam"><span class="lbl">族</span>appealing adj. 有吸引力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">prosecute</span>
+          <span class="ipa">/&#x27;prosikjuit/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would not prosecute again</div>          <div class="mnem"><span class="lbl">记</span>pro（往前）十 secute（联想成 secure，保护，安全)→要想保护人们的安全，就 要提前“检举，告发”对人民不利的事。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + secute(跟随) → 一路追下去 → 起诉</div>          <div class="fam"><span class="lbl">族</span>prosecutor n. 检察官 / prosecution n. 起诉</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">charge</span>
+          <span class="ipa">/t∫a:rd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">要价，收费；控告；指责；掌管；责任v.收 (费)；(向……)要价；控告;起诉;指责；充电</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The charge was serious</div>          <div class="mnem"><span class="lbl">记</span>cha(叉)十r(想象成叉子)十ge (哥哥)，用叉子叉住哥哥的手了，那你就得“负 责”。如果你不愿意负责，哥哥就要“控告；起 诉”你了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：face a charge 面临指控 → 指控；收费</div>          <div class="zt"><span class="lbl">真题</span>He faces trial on several charges. 他面 临 针对多项指控的审判。</div>          <div class="fam"><span class="lbl">族</span>charged adj. 带电的 / charge v. 充电</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">discharge</span>
+          <span class="ipa">/&#x27;dist∫a:rd3,dıs&#x27;tʃa:rd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">排出(物)；获准离开；免职；出院；退伍 v. 准许(某人)离开；解雇</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the man was discharged that afternoon</div>          <div class="mnem"><span class="lbl">记</span>不(dis)指控（charge)了，你走 吧→释放，准许离开。</div>          <div class="root"><span class="lbl">根</span>dis(去掉) + charge(指控) → 撤掉指控 → 释放</div>          <div class="zt"><span class="lbl">真题</span>The child had been treated and was being prepared for discharge. 这个孩子已经接受了治 疗，目前正在准备出院。 第五单元)</div>          <div class="fam"><span class="lbl">族</span>charge n. 指控 / discharge v. 排出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">blame</span>
+          <span class="ipa">/blerm/</span>
+          <span class="pos">v.</span>
+          <span class="cn">责备，责怪η.责备，责任</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>could not decide who deserved the blame</div>          <div class="mnem"><span class="lbl">记</span>不(b)拉(la)我（me)。我腿脚 不灵活，跑步时他还不拉我一把，我就“责备，责 怪”他。</div>          <div class="root"><span class="lbl">根</span>谐音联想：不(bl)拉(la)我(me) → 只能怪他 → 责备</div>          <div class="zt"><span class="lbl">真题</span>But not everything is to be blamed on technology. 但并不是所有的事情都要归咎于科 技。(2017)</div>          <div class="fam"><span class="lbl">族</span>blameless adj. 无可指责的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">surrender</span>
+          <span class="ipa">/sə&#x27;rendə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">投降，自首；交出；放弃</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>described the man&#x27;s surrender at the police station</div>          <div class="root"><span class="lbl">根</span>sur(在……之上) + render(交出) → 交出去 → 投降</div>          <div class="zt"><span class="lbl">真题</span>Privacy economist A lessandro Acauisti has run a series of tests that reveal people will surrender personal information like security numbers just to get a 50-cents-off coupon(优惠 券). 隐私经济学家 A lessandro Acauisti 进行了 一系列测试，结果显示，人们会放弃安全号码等 个人信息，只为了获得50美分折扣的优惠券。</div>          <div class="fam"><span class="lbl">族</span>render v. 给予；使成为</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">condemn</span>
+          <span class="ipa">/kən&#x27;dem/</span>
+          <span class="pos">v.</span>
+          <span class="cn">谴责；宣判；使陷入；宣布……不安全；证 明……有罪</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not to curse or condemn anyone</div>          <div class="mnem"><span class="lbl">记</span>所有（con）人都骂他（demn发 音类似 damn骂），就是所有人都在“谴责”他。</div>          <div class="root"><span class="lbl">根</span>con(一起) + demn(联想 damn 骂) → 一起骂 → 谴责</div>          <div class="zt"><span class="lbl">真题</span>The president condemns their greed. 总 统谴责了他们的贪婪。</div>          <div class="fam"><span class="lbl">族</span>condemnation n. 谴责</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">verify</span>
+          <span class="ipa">/&#x27;verifai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">核实；证明；核准</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>could not verify whose it was</div>          <div class="mnem"><span class="lbl">记</span>very除了表示“很，非常”，还有 “正好的，正是”的意思。verify就是“使正好，恰 好”，那你就要“证明”给我们看啊。 (131)</div>          <div class="root"><span class="lbl">根</span>ver(真实) + ify(使) → 使成为真的 → 核实</div>          <div class="zt"><span class="lbl">真题</span>However, we also verified that SimpliSafe&#x27;s anti-jamming system works. 不过，我们也验证 了SimpliSafe的抗干扰系统是有效的。(2016)</div>          <div class="fam"><span class="lbl">族</span>verification n. 核实 / verifiable adj. 可核实的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">witness</span>
+          <span class="ipa">/&#x27;witnəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">目击者 v. 当场看到，目击</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A witness described the man&#x27;s surrender</div>          <div class="mnem"><span class="lbl">记</span>等着（wit发音似wait）你死 (ness的谐音)→目睹，目击。所以无论如何，我 们一定要活得精彩。</div>          <div class="root"><span class="lbl">根</span>wit(知道) + ness(人) → 知情的人 → 目击者</div>          <div class="zt"><span class="lbl">真题</span>It has witnessed several traffic accidents this year. 今年这里发生了几起交通事故。(2023)</div>          <div class="fam"><span class="lbl">族</span>witness v. 目击</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">bystander</span>
+          <span class="ipa">/&#x27;baistændər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">旁观者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A bystander said he had seen a man</div>          <div class="mnem"><span class="lbl">记</span>by(旁边，比如 by the river 在 河边)十stand(站)十er(人)→站在旁边的人，不 就是“旁观者”，看热闹的人吗？</div>          <div class="root"><span class="lbl">根</span>by(旁边) + stand(站) + er(人) → 站在旁边的人</div>          <div class="fam"><span class="lbl">族</span>stand v. 站 / bystander effect 旁观者效应</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">convict</span>
+          <span class="ipa">/kən&#x27;vıkt; &#x27;ka:nvıkt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">定罪；表明；作为……的证据η.囚犯，犯人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>if the jury convicted him</div>          <div class="mnem"><span class="lbl">记</span>所有的(con)六个人(vi罗马数 字，表示六)都尅了他(ct的谐音)，你要“证明” 这六个人都动手打了他啊。</div>          <div class="root"><span class="lbl">根</span>con(完全) + vict(征服) → 完全说服 → 定罪</div>          <div class="zt"><span class="lbl">真题</span>They are convicted regardless of their individual circumstances. 不管他们的个人情况 如何，他们都被定罪。(2015)</div>          <div class="fam"><span class="lbl">族</span>conviction n. 定罪；信念</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">verdict</span>
+          <span class="ipa">/&#x27;v3:dıkt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">结论；裁决，判决</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>justice meant more than a verdict</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“为抵个它”， 因为对“判决”不服，所以才抵抗它。</div>          <div class="root"><span class="lbl">根</span>ver(真) + dict(说) → 说真话 → 裁决</div>          <div class="fam"><span class="lbl">族</span>dictate v. 口述；dictation n. 听写</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">torture</span>
+          <span class="ipa">/&#x27;to:t∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">拷问，拷打；折磨v.折磨，使痛苦；拷问，严 刑逼供</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>watching a trial was a kind of torture</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“掏钱”。古时 候有句话，“衙门朝南开，有理无钱莫进来”，意 思是没钱“孝敬”差役，不严刑“拷打”你才怪。</div>          <div class="root"><span class="lbl">根</span>tort(扭曲) + ure → 把身体扭过去 → 拷打，折磨</div>          <div class="zt"><span class="lbl">真题</span>For a student who considers any class before noon to be uncivilized, getting to a factory by 6 o&#x27;clock each morning is torture. 对 于一个认为中午之前的任何一堂课都是不文明 的学生来说，每天早上6点前到工厂是一种 折磨。</div>          <div class="fam"><span class="lbl">族</span>tortured adj. 饱受折磨的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5 · Day 34</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

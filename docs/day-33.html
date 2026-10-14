@@ -1,0 +1,689 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 33 · The Print Shop Beside the Highway</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 33 · 11/14 · Unit 5 第 961-990 词</div>
+  <h1>The Print Shop Beside the Highway<span class="cn">公路边的小印刷店</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-33.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="6016"><p class="en"><span class="w" data-s="43" data-e="171">In</span> <span class="w" data-s="213" data-e="725">Millbrook,</span> <span class="w" data-s="811" data-e="1024">a</span> <span class="w" data-s="1152" data-e="1323">small</span> <span class="w" data-s="1365" data-e="1621">print</span> <span class="w" data-s="1664" data-e="1877">shop</span> <span class="w" data-s="1920" data-e="2261">stood</span> <span class="w" data-s="2304" data-e="2560">beside</span> <span class="w" data-s="2603" data-e="2816">the</span> <span class="w" data-s="2859" data-e="2944">old</span> <span class="w target" data-s="2987" data-e="3371" title="公路;大路">highway,</span> <span class="w" data-s="3541" data-e="3669">and</span> <span class="w" data-s="3925" data-e="4053">the</span> <span class="w target" data-s="4096" data-e="4181" title="压力">pressure</span> <span class="w" data-s="4224" data-e="4523">of</span> <span class="w" data-s="4565" data-e="4864">traffic</span> <span class="w" data-s="4907" data-e="5205">never</span> <span class="w" data-s="5248" data-e="5632">dropped</span> <span class="w" data-s="5675" data-e="5845">all</span> <span class="w" data-s="5888" data-e="6016">day.</span></p><p class="zh">在米尔布鲁克，一家小印刷店立在老公路旁边，白天的车流压力从未减轻。</p></div>
+<div class="pair" data-s0="6357" data-s1="12075"><p class="en"><span class="w" data-s="6357" data-e="6699">Ada</span> <span class="w" data-s="6741" data-e="6869">was</span> <span class="w" data-s="6912" data-e="6997">a</span> <span class="w target" data-s="7040" data-e="7467" title="技术员;技师；(艺术、体育等的)技巧精湛者， 精于技巧者">technician</span> <span class="w" data-s="7509" data-e="7637">by</span> <span class="w" data-s="7680" data-e="7851">training</span> <span class="w" data-s="7893" data-e="8235">and</span> <span class="w" data-s="8277" data-e="8320">a</span> <span class="w target" data-s="8363" data-e="8576" title="技巧；技艺；技术；技能">skilled</span> <span class="w target" data-s="8619" data-e="9088" title="机械师；机械修理工；技工">mechanic,</span> <span class="w" data-s="9259" data-e="9472">and</span> <span class="w" data-s="9515" data-e="9771">she</span> <span class="w" data-s="9813" data-e="9941">could</span> <span class="w" data-s="9984" data-e="10069">fix</span> <span class="w" data-s="10112" data-e="10368">any</span> <span class="w target" data-s="10411" data-e="10880" title="机械装置；机件；方法；(生物体内的)机制， 构造">mechanism</span> <span class="w" data-s="10923" data-e="11093">in</span> <span class="w" data-s="11136" data-e="11179">the</span> <span class="w" data-s="11221" data-e="11307">shop</span> <span class="w target" data-s="11349" data-e="11605" title="(使)撤回；提，取(银行账户中的款)">with</span> <span class="w" data-s="11648" data-e="11733">her</span> <span class="w" data-s="11776" data-e="11904">own</span> <span class="w" data-s="11947" data-e="12075">hands.</span></p><p class="zh">阿达是科班出身的技术员，也是个熟练的机械修理工，店里任何机件她都能亲手修好。</p></div>
+<div class="pair" data-s0="13146" data-s1="19418"><p class="en"><span class="w" data-s="13146" data-e="13231">Her</span> <span class="w" data-s="13274" data-e="13615">finest</span> <span class="w target" data-s="13658" data-e="13914" title="技巧；技艺；技术；技能">skill</span> <span class="w" data-s="13957" data-e="14213">was</span> <span class="w" data-s="14255" data-e="14469">setting</span> <span class="w" data-s="14511" data-e="14767">type,</span> <span class="w" data-s="15066" data-e="15237">a</span> <span class="w target" data-s="15365" data-e="15834" title="技巧;技艺；工艺;技术；技能">technique</span> <span class="w" data-s="15877" data-e="16005">her</span> <span class="w" data-s="16047" data-e="16175">father</span> <span class="w" data-s="16218" data-e="16474">had</span> <span class="w" data-s="16517" data-e="16645">taught</span> <span class="w" data-s="16687" data-e="16815">her,</span> <span class="w" data-s="16986" data-e="17157">and</span> <span class="w" data-s="17242" data-e="17455">she</span> <span class="w" data-s="17498" data-e="17797">trusted</span> <span class="w" data-s="17839" data-e="17967">no</span> <span class="w" data-s="18010" data-e="18181">new</span> <span class="w target" data-s="18223" data-e="18693" title="科技；工艺；工程技术；技术学；工艺学；技术 性机器(或设备)">technology</span> <span class="w" data-s="18735" data-e="18949">to</span> <span class="w" data-s="18991" data-e="19205">replace</span> <span class="w" data-s="19247" data-e="19418">it.</span></p><p class="zh">她最拿手的技艺是排版，这是父亲教她的方法，她不相信有什么新技术能取代它。</p></div>
+<div class="pair" data-s0="19589" data-s1="24154"><p class="en"><span class="w" data-s="19589" data-e="20058">Even</span> <span class="w" data-s="20101" data-e="20186">a</span> <span class="w" data-s="20229" data-e="20314">young</span> <span class="w target" data-s="20357" data-e="20954" title="技术专家；工艺师">technologist</span> <span class="w" data-s="20997" data-e="21125">from</span> <span class="w" data-s="21167" data-e="21295">a</span> <span class="w target" data-s="21338" data-e="22021" title="生物科技">biotechnology</span> <span class="w" data-s="22063" data-e="22277">company</span> <span class="w" data-s="22319" data-e="22575">in</span> <span class="w" data-s="22618" data-e="22661">the</span> <span class="w" data-s="22703" data-e="22831">city</span> <span class="w" data-s="22874" data-e="23130">once</span> <span class="w" data-s="23173" data-e="23386">came</span> <span class="w" data-s="23429" data-e="23599">to</span> <span class="w" data-s="23642" data-e="23770">watch</span> <span class="w" data-s="23813" data-e="23983">her</span> <span class="w" data-s="24026" data-e="24154">hands.</span></p><p class="zh">就连城里一家生物科技公司的年轻技术专家，也曾来看她干活的手。</p></div>
+<div class="pair" data-s0="24811" data-s1="31637"><p class="en"><span class="w" data-s="24811" data-e="25237">Above</span> <span class="w" data-s="25280" data-e="25323">her</span> <span class="w" data-s="25365" data-e="25621">desk</span> <span class="w" data-s="25664" data-e="26133">hung</span> <span class="w" data-s="26176" data-e="26219">an</span> <span class="w" data-s="26261" data-e="26389">old</span> <span class="w target" data-s="26432" data-e="26773" title="雷达">radar</span> <span class="w" data-s="26816" data-e="26944">set</span> <span class="w" data-s="26987" data-e="27285">and</span> <span class="w" data-s="27456" data-e="27584">a</span> <span class="w" data-s="27627" data-e="27669">box</span> <span class="w" data-s="27712" data-e="27925">of</span> <span class="w target" data-s="27968" data-e="28352" title="硬件；(家庭及园艺用)工具，设备，五金制品； 机器；车辆">hardware,</span> <span class="w" data-s="28523" data-e="28651">and</span> <span class="w" data-s="28821" data-e="29077">she</span> <span class="w" data-s="29120" data-e="29461">joked</span> <span class="w" data-s="29504" data-e="29675">that</span> <span class="w" data-s="29845" data-e="29973">they</span> <span class="w" data-s="30016" data-e="30101">gave</span> <span class="w" data-s="30144" data-e="30357">off</span> <span class="w" data-s="30400" data-e="30528">more</span> <span class="w target" data-s="30571" data-e="30997" title="辐射；放射线；辐射的热(或能量等)；放射 疗法">radiation</span> <span class="w" data-s="31040" data-e="31339">than</span> <span class="w" data-s="31381" data-e="31467">the</span> <span class="w" data-s="31509" data-e="31637">sun.</span></p><p class="zh">她书桌上方挂着一台旧雷达设备和一箱工具，她开玩笑说它们发出的辐射比太阳还多。</p></div>
+<div class="pair" data-s0="31893" data-s1="35904"><p class="en"><span class="w" data-s="31893" data-e="32405">A</span> <span class="w target" data-s="32448" data-e="32789" title="抽屉 (126)">drawer</span> <span class="w" data-s="32832" data-e="32917">under</span> <span class="w" data-s="32960" data-e="33045">the</span> <span class="w" data-s="33088" data-e="33216">counter</span> <span class="w" data-s="33259" data-e="33557">held</span> <span class="w" data-s="33600" data-e="33771">her</span> <span class="w target" data-s="33813" data-e="34325" title="手稿，原稿">manuscript,</span> <span class="w" data-s="34496" data-e="34923">forty</span> <span class="w" data-s="34965" data-e="35264">pages</span> <span class="w" data-s="35307" data-e="35520">about</span> <span class="w" data-s="35563" data-e="35733">the</span> <span class="w" data-s="35776" data-e="35904">road.</span></p><p class="zh">柜台下的一个抽屉里放着她的手稿，四十页，写的都是那条路。</p></div>
+<div class="pair" data-s0="36683" data-s1="39926"><p class="en"><span class="w" data-s="36683" data-e="36769">The</span> <span class="w target" data-s="36811" data-e="37067" title="手迹，笔迹，剧本">script</span> <span class="w" data-s="37110" data-e="37238">was</span> <span class="w" data-s="37281" data-e="37451">plain,</span> <span class="w" data-s="37750" data-e="37963">and</span> <span class="w" data-s="38177" data-e="38433">she</span> <span class="w" data-s="38475" data-e="38603">had</span> <span class="w" data-s="38646" data-e="38774">written</span> <span class="w" data-s="38817" data-e="38945">it</span> <span class="w" data-s="38987" data-e="39073">by</span> <span class="w" data-s="39115" data-e="39286">hand</span> <span class="w" data-s="39329" data-e="39627">one</span> <span class="w" data-s="39670" data-e="39926">winter.</span></p><p class="zh">手迹很朴素，是她用一个冬天手写出来的。</p></div>
+<div class="pair" data-s0="40139" data-s1="44875"><p class="en"><span class="w" data-s="40139" data-e="40353">A</span> <span class="w" data-s="40694" data-e="40865">doctor</span> <span class="w" data-s="40907" data-e="41206">down</span> <span class="w" data-s="41249" data-e="41377">the</span> <span class="w" data-s="41419" data-e="41547">street</span> <span class="w" data-s="41590" data-e="41889">said</span> <span class="w" data-s="42102" data-e="42273">he</span> <span class="w" data-s="42315" data-e="42401">would</span> <span class="w target" data-s="42443" data-e="42913" title="规定；开处方">prescribe</span> <span class="w" data-s="42955" data-e="43083">rest</span> <span class="w" data-s="43126" data-e="43339">for</span> <span class="w" data-s="43382" data-e="43510">her,</span> <span class="w" data-s="43638" data-e="43894">but</span> <span class="w" data-s="44065" data-e="44235">she</span> <span class="w" data-s="44278" data-e="44406">never</span> <span class="w" data-s="44449" data-e="44875">rested.</span></p><p class="zh">街那头的一位医生说他愿意给她开休息的处方，可她从来没有休息过。</p></div>
+<div class="pair" data-s0="45131" data-s1="50678"><p class="en"><span class="w" data-s="45131" data-e="45259">Then</span> <span class="w" data-s="45302" data-e="45473">the</span> <span class="w" data-s="45515" data-e="45601">state</span> <span class="w" data-s="45643" data-e="45942">announced</span> <span class="w" data-s="45985" data-e="46155">a</span> <span class="w" data-s="46198" data-e="46283">new</span> <span class="w target" data-s="46326" data-e="46710" title="(英国)高速公路">motorway</span> <span class="w" data-s="46753" data-e="47094">and</span> <span class="w" data-s="47222" data-e="47307">a</span> <span class="w target" data-s="47350" data-e="47649" title="(美国)高速公路">freeway</span> <span class="w" data-s="47691" data-e="47819">through</span> <span class="w" data-s="47862" data-e="47990">the</span> <span class="w" data-s="48033" data-e="48289">valley,</span> <span class="w" data-s="48459" data-e="48630">and</span> <span class="w" data-s="48758" data-e="49142">an</span> <span class="w target" data-s="49185" data-e="49654" title="(美国)高速公路">expressway</span> <span class="w" data-s="49697" data-e="49867">link</span> <span class="w" data-s="49910" data-e="50038">was</span> <span class="w" data-s="50081" data-e="50251">added</span> <span class="w" data-s="50294" data-e="50422">to</span> <span class="w" data-s="50465" data-e="50550">the</span> <span class="w" data-s="50593" data-e="50678">plan.</span></p><p class="zh">后来州里宣布要修一条穿过山谷的高速公路和快速路，方案里还加了一条高速连接线。</p></div>
+<div class="pair" data-s0="51667" data-s1="56061"><p class="en"><span class="w" data-s="51667" data-e="52136">Reporters</span> <span class="w" data-s="52179" data-e="52307">from</span> <span class="w" data-s="52349" data-e="52435">the</span> <span class="w target" data-s="52477" data-e="52563" title="新闻；出版社v. 按，压">press</span> <span class="w" data-s="52605" data-e="53075">arrived</span> <span class="w" data-s="53117" data-e="53245">to</span> <span class="w" data-s="53288" data-e="53416">ask</span> <span class="w" data-s="53459" data-e="53629">questions,</span> <span class="w" data-s="54013" data-e="54355">and</span> <span class="w" data-s="54653" data-e="54739">the</span> <span class="w" data-s="54781" data-e="54824">whole</span> <span class="w" data-s="54867" data-e="55080">town</span> <span class="w" data-s="55123" data-e="55421">was</span> <span class="w" data-s="55464" data-e="55592">full</span> <span class="w" data-s="55635" data-e="55805">of</span> <span class="w" data-s="55848" data-e="56061">noise.</span></p><p class="zh">新闻界的记者赶来提问，整个小镇闹哄哄的。</p></div>
+<div class="pair" data-s0="56275" data-s1="63272"><p class="en"><span class="w" data-s="56275" data-e="57085">To</span> <span class="w" data-s="57128" data-e="57256">buy</span> <span class="w" data-s="57299" data-e="57512">new</span> <span class="w" data-s="57555" data-e="57896">equipment</span> <span class="w" data-s="57939" data-e="58237">Ada</span> <span class="w" data-s="58280" data-e="58323">had</span> <span class="w" data-s="58365" data-e="58536">to</span> <span class="w target" data-s="58579" data-e="58877" title="透支;夸张">overdraw</span> <span class="w" data-s="58920" data-e="59133">her</span> <span class="w" data-s="59176" data-e="59347">account</span> <span class="w" data-s="59389" data-e="59603">at</span> <span class="w" data-s="59645" data-e="59688">the</span> <span class="w" data-s="59731" data-e="59859">bank,</span> <span class="w" data-s="60115" data-e="60285">and</span> <span class="w" data-s="60328" data-e="60712">she</span> <span class="w" data-s="60755" data-e="60883">went</span> <span class="w" data-s="60925" data-e="61096">there</span> <span class="w" data-s="61139" data-e="61309">herself</span> <span class="w" data-s="61352" data-e="61693">to</span> <span class="w target" data-s="61736" data-e="62035" title="(使)撤回；提，取(银行账户中的款)">withdraw</span> <span class="w" data-s="62077" data-e="62291">the</span> <span class="w" data-s="62333" data-e="62461">last</span> <span class="w" data-s="62504" data-e="62675">of</span> <span class="w" data-s="62717" data-e="62845">her</span> <span class="w" data-s="62888" data-e="63272">savings.</span></p><p class="zh">为了买新设备，阿达不得不透支银行账户，她还亲自去银行取出了最后一点存款。</p></div>
+<div class="pair" data-s0="63969" data-s1="69217"><p class="en"><span class="w" data-s="63969" data-e="64097">At</span> <span class="w" data-s="64139" data-e="64267">the</span> <span class="w" data-s="64310" data-e="64438">meeting,</span> <span class="w" data-s="64609" data-e="64822">an</span> <span class="w" data-s="65078" data-e="65419">official</span> <span class="w" data-s="65462" data-e="65590">tried</span> <span class="w" data-s="65633" data-e="65803">to</span> <span class="w target" data-s="65846" data-e="66059" title="镇压；抑制(感情)">repress</span> <span class="w" data-s="66102" data-e="66315">the</span> <span class="w" data-s="66358" data-e="66529">small</span> <span class="w" data-s="66571" data-e="66955">protest</span> <span class="w" data-s="66998" data-e="67339">and</span> <span class="w" data-s="67553" data-e="67766">to</span> <span class="w target" data-s="67809" data-e="68022" title="镇压；忍住(眼泪等)">suppress</span> <span class="w" data-s="68065" data-e="68278">the</span> <span class="w" data-s="68321" data-e="68449">questions</span> <span class="w" data-s="68491" data-e="68875">people</span> <span class="w" data-s="68918" data-e="69217">asked.</span></p><p class="zh">会上，一名官员试图镇压这场小小的抗议，压制人们提出的问题。</p></div>
+<div class="pair" data-s0="69847" data-s1="74284"><p class="en"><span class="w" data-s="69847" data-e="70103">Ada</span> <span class="w" data-s="70145" data-e="70273">felt</span> <span class="w target" data-s="70316" data-e="70615" title="压迫，压抑；使烦恼">oppressed</span> <span class="w" data-s="70657" data-e="70871">by</span> <span class="w" data-s="70913" data-e="71041">the</span> <span class="w" data-s="71084" data-e="71383">silence,</span> <span class="w" data-s="71553" data-e="71724">and</span> <span class="w" data-s="72023" data-e="72151">she</span> <span class="w" data-s="72193" data-e="72321">could</span> <span class="w" data-s="72364" data-e="72492">not</span> <span class="w target" data-s="72535" data-e="72919" title="压缩，缩短">compress</span> <span class="w" data-s="72961" data-e="73132">her</span> <span class="w" data-s="73175" data-e="73345">anger</span> <span class="w" data-s="73388" data-e="73644">into</span> <span class="w" data-s="73687" data-e="73857">a</span> <span class="w" data-s="73900" data-e="74028">single</span> <span class="w" data-s="74071" data-e="74284">line.</span></p><p class="zh">阿达被这种沉默压得难受，她无法把怒气压缩成一行字。</p></div>
+<div class="pair" data-s0="75137" data-s1="77277"><p class="en"><span class="w" data-s="75137" data-e="75180">&quot;I</span> <span class="w" data-s="75223" data-e="75351">must</span> <span class="w target" data-s="75393" data-e="75692" title="表示；表达；表露 adj.特快的；快速的；快 递的 n. 特快列车">express</span> <span class="w" data-s="75735" data-e="75948">what</span> <span class="w" data-s="75991" data-e="76076">I</span> <span class="w" data-s="76119" data-e="76204">think,&quot;</span> <span class="w" data-s="77021" data-e="77064">she</span> <span class="w" data-s="77107" data-e="77277">said.</span></p><p class="zh">“我必须表达我的想法，”她说。</p></div>
+<div class="pair" data-s0="77789" data-s1="82056"><p class="en"><span class="w" data-s="77789" data-e="77832">&quot;You</span> <span class="w" data-s="78301" data-e="78600">cannot</span> <span class="w target" data-s="78643" data-e="78856" title="新闻；出版社v. 按，压">press</span> <span class="w" data-s="78899" data-e="79027">a</span> <span class="w" data-s="79069" data-e="79155">whole</span> <span class="w" data-s="79197" data-e="79496">valley</span> <span class="w" data-s="79539" data-e="79667">into</span> <span class="w" data-s="79709" data-e="79837">a</span> <span class="w" data-s="79880" data-e="80008">road,</span> <span class="w" data-s="80179" data-e="80477">and</span> <span class="w" data-s="80605" data-e="80691">you</span> <span class="w" data-s="80733" data-e="80861">cannot</span> <span class="w target" data-s="80904" data-e="81245" title="使沮丧；使萧条；压制 v.留下印象，使铭记">depress</span> <span class="w" data-s="81288" data-e="81416">us</span> <span class="w" data-s="81459" data-e="81629">into</span> <span class="w" data-s="81672" data-e="82056">silence.&quot;</span></p><p class="zh">“你不能把整条山谷压成一条路，也不能压得我们不敢出声。”</p></div>
+<div class="pair" data-s0="82525" data-s1="86835"><p class="en"><span class="w" data-s="82525" data-e="82952">Her</span> <span class="w" data-s="82995" data-e="83549">photographs,</span> <span class="w" data-s="83720" data-e="84189">printed</span> <span class="w" data-s="84232" data-e="84317">the</span> <span class="w" data-s="84360" data-e="84445">next</span> <span class="w" data-s="84488" data-e="84701">morning,</span> <span class="w" data-s="84915" data-e="85469">did</span> <span class="w target" data-s="85512" data-e="85811" title="">impress</span> <span class="w" data-s="85853" data-e="86152">everyone</span> <span class="w" data-s="86195" data-e="86451">who</span> <span class="w" data-s="86493" data-e="86621">saw</span> <span class="w" data-s="86664" data-e="86835">them.</span></p><p class="zh">第二天早上印出来的照片，确实让每个看到的人都印象深刻。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">script</span>
+          <span class="ipa">/skrıpt/</span>
+          <span class="pos"></span>
+          <span class="cn">手迹，笔迹，剧本</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The script was plain</div>          <div class="mnem"><span class="lbl">记</span>词根 script 的含义同 scribe 一 样，表示“写”，写的东西→手迹。</div>          <div class="root"><span class="lbl">根</span>词根 script(写) → 写出来的东西</div>          <div class="zt"><span class="lbl">真题</span>Page 55 is missing from the woman&#x27;s scripts. 这位女士的手稿中少了第 55 页。</div>          <div class="fam"><span class="lbl">族</span>manuscript n. 手稿 / describe v. 描述</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">manuscript</span>
+          <span class="ipa">/&#x27;mænjuskrıpt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">手稿，原稿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>held her manuscript, forty pages</div>          <div class="mnem"><span class="lbl">记</span>人(man)写(script)的东西→手 稿，原稿。</div>          <div class="root"><span class="lbl">根</span>manu(手) + script(写) → 手写的东西</div>          <div class="fam"><span class="lbl">族</span>script n. 手迹 / prescribe v. 规定</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">prescribe</span>
+          <span class="ipa">/prı&#x27;skraib/</span>
+          <span class="pos">v.</span>
+          <span class="cn">规定；开处方</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would prescribe rest for her</div>          <div class="mnem"><span class="lbl">记</span>pre表示“提前”；scribe表示 写。提前都写下来，医院的医生提前给你开处 方或法律提前写下来→开处方；规定。</div>          <div class="root"><span class="lbl">根</span>pre(提前) + scribe(写) → 提前写下来 → 开处方</div>          <div class="zt"><span class="lbl">真题</span>In a new clinical report, they are urging doctors to prescribe it liberally to the children in their care. 在一份新的临床报告中，他们敦促 医生为他们照顾的孩子们大量开这种药。 (2020)</div>          <div class="fam"><span class="lbl">族</span>prescription n. 处方</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">skill</span>
+          <span class="ipa">/skıl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">技巧；技艺；技术；技能</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her finest skill was setting type</div>          <div class="root"><span class="lbl">根</span>联想 ski(滑雪) + ll → 滑雪靠练出来的本事</div>          <div class="zt"><span class="lbl">真题</span>Cooking skills can be improved with practice.烹饪技巧可以通过练习来提高。(2015) (125)</div>          <div class="fam"><span class="lbl">族</span>skilled adj. 熟练的 / skillful adj. 娴熟的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">technique</span>
+          <span class="ipa">/tek&#x27;ni:k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">技巧;技艺；工艺;技术；技能</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a technique her father had taught her</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：泰坦尼克。 这艘船之所以出问题，估计造船的“技艺；工艺” 不成熟。</div>          <div class="root"><span class="lbl">根</span>techn(技术) + ique → 做事的门道</div>          <div class="zt"><span class="lbl">真题</span>Different populations of killer whales have had to learn different hunting techniques in order to gain the upper hand over their local prey.不同种群的虎鲸不得不学习不同的捕猎 技巧，以便在与当地猎物的较量中占据上风。 (2019)</div>          <div class="fam"><span class="lbl">族</span>technical adj. 技术的 / technician n. 技术员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">technology</span>
+          <span class="ipa">/tek&#x27;na:lədzi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">科技；工艺；工程技术；技术学；工艺学；技术 性机器(或设备)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>trusted no new technology to replace it</div>          <div class="root"><span class="lbl">根</span>techno(技术) + logy(学问) → 技术的学问</div>          <div class="zt"><span class="lbl">真题</span>The era of personal technology is in many ways just beginning. 从很多方面来说，个 人技术的时代才刚刚开始。</div>          <div class="fam"><span class="lbl">族</span>technological adj. 技术的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">biotechnology</span>
+          <span class="ipa">/ibarəutek&#x27;na:lədzi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">生物科技</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a biotechnology company</div>          <div class="mnem"><span class="lbl">记</span>bio是前缀，表示生物学的、生 物的，bio 是 biology 的简称，即生物；technology 是“科学技术”，合在一起即为“生物科技”。</div>          <div class="root"><span class="lbl">根</span>bio(生物) + technology(技术) → 生物科技</div>          <div class="zt"><span class="lbl">真题</span>Microsoft and scores of other leading software and biotechnology companies have set up shop around the university. 微软和其他几 十家领先的软件和生物技术公司已经在大学周 围设立了办事处。</div>          <div class="fam"><span class="lbl">族</span>biology n. 生物学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">technician</span>
+          <span class="ipa">/tek&#x27;nı∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">技术员;技师；(艺术、体育等的)技巧精湛者， 精于技巧者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Ada was a technician by training</div>          <div class="mnem"><span class="lbl">记</span>technology 技术；ian 是名词后 缀，表示人。和技术打交道的人，就是“技术 员”。</div>          <div class="root"><span class="lbl">根</span>techn(技术) + ician(人) → 搞技术的人</div>          <div class="zt"><span class="lbl">真题</span>He asked a technician to fix the broken production line. 他请技术人员修理坏了的生产 线。(2016)</div>          <div class="fam"><span class="lbl">族</span>technical adj. 技术的 / technique n. 技巧</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">technologist</span>
+          <span class="ipa">/tek&#x27;na:ləd3ist/</span>
+          <span class="pos">n.</span>
+          <span class="cn">技术专家；工艺师</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a young technologist from a biotechnology company</div>          <div class="mnem"><span class="lbl">记</span>technology 技术，这个单词我 们很熟悉；ist是表示“人”的后缀；那就是搞技 术的人→技术专家。</div>          <div class="root"><span class="lbl">根</span>technology(技术) + ist(人) → 技术专家</div>          <div class="zt"><span class="lbl">真题</span>As a technologist, Mr. Jobs was different. 作为一名技术专家，乔布斯先生与众不同。</div>          <div class="fam"><span class="lbl">族</span>technology n. 科技</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">mechanic</span>
+          <span class="ipa">/mə&#x27;kænık/</span>
+          <span class="pos">n.</span>
+          <span class="cn">机械师；机械修理工；技工</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a skilled mechanic</div>          <div class="mnem"><span class="lbl">记</span>machine机器；ic后缀表示人， 那这个单词就是“机械师”。</div>          <div class="root"><span class="lbl">根</span>mechan(机械) + ic(人) → 摆弄机器的人</div>          <div class="zt"><span class="lbl">真题</span>Buying that second-hand car without having it checked by a mechanic first cost us dear.购买二手车时没有先请技师检查，让我们 损失惨重。</div>          <div class="fam"><span class="lbl">族</span>mechanical adj. 机械的 / mechanism n. 机件</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">mechanism</span>
+          <span class="ipa">/&#x27;mekənizəm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">机械装置；机件；方法；(生物体内的)机制， 构造</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fix any mechanism in the shop</div>          <div class="root"><span class="lbl">根</span>mechan(机械) + ism(体系) → 机械装置</div>          <div class="zt"><span class="lbl">真题</span>There is no mechanism to ensure that they make the required effort. 没有任何机制可 以确保他们做出必要的努力。</div>          <div class="fam"><span class="lbl">族</span>mechanic n. 技工 / mechanical adj. 机械的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">drawer</span>
+          <span class="ipa">/drə:r/</span>
+          <span class="pos"></span>
+          <span class="cn">抽屉 (126)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A drawer under the counter</div>          <div class="mnem"><span class="lbl">记</span>drawv.画画，抽取，拔除；那 drawer就是抽出来的东西→抽屉。</div>          <div class="root"><span class="lbl">根</span>draw(抽) + er(东西) → 能抽出来的东西</div>          <div class="zt"><span class="lbl">真题</span>We are instructing owners to keep the bomb in a cabinet and the fuse(导火索) separately in a drawer. 我们要求炸弹的主人将 炸弹锁在柜子里，导火索单独放在抽屉里。</div>          <div class="fam"><span class="lbl">族</span>draw v. 拉，抽</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">overdraw</span>
+          <span class="ipa">/euvər&#x27;dre:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">透支;夸张</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to overdraw her account at the bank</div>          <div class="mnem"><span class="lbl">记</span>过度的（over)抽出（draw），就 是“透支”。或者你看过《月亮和六便士》吗？一 个四十多岁的男人，抛妻弃子，不顾世俗眼光， 从事自己的画画梦想，最后即使得了麻风病，依 然坚持画画，那就是过分地(over)画了(draw)， 最后死在画满了图案的画室里，“透支”了自己 的精力和人生而死去。</div>          <div class="root"><span class="lbl">根</span>over(过度) + draw(取) → 取得太多 → 透支</div>          <div class="fam"><span class="lbl">族</span>overdraft n. 透支额</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">withdraw</span>
+          <span class="ipa">/wið&#x27;drə:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)撤回；提，取(银行账户中的款)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>went there herself to withdraw the last of her savings</div>          <div class="root"><span class="lbl">根</span>with(往回) + draw(拉) → 往回拉 → 取出</div>          <div class="fam"><span class="lbl">族</span>withdrawal n. 提取；撤回</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">hardware</span>
+          <span class="ipa">/&#x27;ha:rdwer/</span>
+          <span class="pos">n.</span>
+          <span class="cn">硬件；(家庭及园艺用)工具，设备，五金制品； 机器；车辆</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a box of hardware</div>          <div class="mnem"><span class="lbl">记</span>hard本来就是“硬的”意思。 wa，汉语拼音类似“挖”；re重复。用一个硬东 西，重复地挖东西。那这个东西就是“工具，设 备”。</div>          <div class="root"><span class="lbl">根</span>hard(硬的) + ware(制品) → 硬家伙 → 五金、硬件</div>          <div class="zt"><span class="lbl">真题</span>For the consumer, it&#x27;s a matter of paying now for the hardware to save later on the utilities.对于消费者来说，现在支付硬件费用 可以节省以后的水电费。(2013)</div>          <div class="fam"><span class="lbl">族</span>software n. 软件 / ironware n. 铁器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">radar</span>
+          <span class="ipa">/&#x27;reida:r/</span>
+          <span class="pos"></span>
+          <span class="cn">雷达</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an old radar set</div>          <div class="mnem"><span class="lbl">记</span>radar的发音类似“雷达”。</div>          <div class="root"><span class="lbl">根</span>音译词（缩略自 RAdio Detection And Ranging）→ 雷达</div>          <div class="fam"><span class="lbl">族</span>radar station n. 雷达站</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">radiation</span>
+          <span class="ipa">/ireidi&#x27;eı∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">辐射；放射线；辐射的热(或能量等)；放射 疗法</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>gave off more radiation than the sun</div>          <div class="root"><span class="lbl">根</span>radi(光线) + ation → 往外发光线</div>          <div class="zt"><span class="lbl">真题</span>Enormous quantities of radiation from the sun are screened off. 来自太阳的大量辐射 被屏蔽掉。</div>          <div class="fam"><span class="lbl">族</span>radiate v. 辐射 / radioactive adj. 放射性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">press</span>
+          <span class="ipa">/pres/</span>
+          <span class="pos">n.</span>
+          <span class="cn">新闻；出版社v. 按，压</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>You cannot press a whole valley into a road</div>          <div class="mnem"><span class="lbl">记</span>“新闻媒体”发挥着舆论监督 作用。 【拓展】pressing /&#x27;presin/adj.急迫的；不容 忽视的</div>          <div class="root"><span class="lbl">根</span>press 本义是“压、按” → 印刷机、新闻界</div>          <div class="zt"><span class="lbl">真题</span>F&amp;C Motors, a major auto company, is holding a press conference next week. F&amp;C 汽 车，一个大型汽车公司，将于下周举行新闻发 布会。</div>          <div class="fam"><span class="lbl">族</span>pressing adj. 急迫的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">pressure</span>
+          <span class="ipa">/&#x27;pre∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">压力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the pressure of traffic never dropped</div>          <div class="root"><span class="lbl">根</span>press(压) + ure(名词后缀) → 压力</div>          <div class="zt"><span class="lbl">真题</span>In-class exams force students to learn how to perform under pressure, and essential work skill. 课堂考试迫使学生学习如何在压力 下表现，和基本的工作技能。(2017)</div>          <div class="fam"><span class="lbl">族</span>press v. 按，压</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">depress</span>
+          <span class="ipa">/dı&#x27;pres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使沮丧；使萧条；压制 v.留下印象，使铭记</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>you cannot depress us into silence</div>          <div class="mnem"><span class="lbl">记</span>im(=in里面);press(按，压)。 把我的名字按压到你脑子里，就是“留下印象， 使铭记”。</div>          <div class="root"><span class="lbl">根</span>de(往下) + press(压) → 往下压 → 使沮丧</div>          <div class="zt"><span class="lbl">真题</span>I was under the impression that the tickets were sold out a long time ago. 我的印象 是门票很久以前就卖光了。</div>          <div class="fam"><span class="lbl">族</span>depression n. 沮丧；萧条</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">impress</span>
+          <span class="ipa">/ım&#x27;pres/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>did impress everyone who saw them</div>          <div class="mnem"><span class="lbl">记</span>sup(往下)十 press(压)→压下 去→忍住。</div>          <div class="root"><span class="lbl">根</span>im(往里) + press(压) → 往脑子里压 → 留下印象</div>          <div class="fam"><span class="lbl">族</span>impression n. 印象 / impressive adj. 令人印象深刻的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">compress</span>
+          <span class="ipa">/kəm&#x27;pres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">压缩，缩短</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>could not compress her anger into a single line</div>          <div class="mnem"><span class="lbl">记</span>com(全部)十 press(压)→全部 压到一起→压缩。</div>          <div class="root"><span class="lbl">根</span>com(全部) + press(压) → 全压到一起 → 压缩</div>          <div class="fam"><span class="lbl">族</span>compression n. 压缩</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">repress</span>
+          <span class="ipa">/i&#x27;pres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">镇压；抑制(感情)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an official tried to repress the small protest</div>          <div class="mnem"><span class="lbl">记</span>re(回)十press(压)→压回去→ 镇压。</div>          <div class="root"><span class="lbl">根</span>re(往回) + press(压) → 压回去 → 镇压</div>          <div class="fam"><span class="lbl">族</span>repression n. 镇压</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">suppress</span>
+          <span class="ipa">/sə&#x27;pres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">镇压；忍住(眼泪等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and to suppress the questions people asked</div>          <div class="root"><span class="lbl">根</span>sup(往下) + press(压) → 压下去 → 压制</div>          <div class="zt"><span class="lbl">真题</span>First, suppressed emotions can contribute to stress-related disorders. 首先，压抑的情绪会导 致压力相关的疾病。</div>          <div class="fam"><span class="lbl">族</span>suppression n. 压制</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">oppress</span>
+          <span class="ipa">/ə&#x27;pres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">压迫，压抑；使烦恼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Ada felt oppressed by the silence</div>          <div class="mnem"><span class="lbl">记</span>op表示方向；press表示压。 朝着一个方向压，就是“压迫，压抑”。</div>          <div class="root"><span class="lbl">根</span>op(朝向) + press(压) → 压在身上 → 压迫</div>          <div class="zt"><span class="lbl">真题</span>Jews at the time were severely oppressed and ill-treated in that part of the world. 当时的 犹太人在世界的那个地区受到严重的压迫和 虐待。</div>          <div class="fam"><span class="lbl">族</span>oppression n. 压迫 / oppressive adj. 压抑的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">express</span>
+          <span class="ipa">/ik&#x27;spres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">表示；表达；表露 adj.特快的；快速的；快 递的 n. 特快列车</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I must express what I think</div>          <div class="mnem"><span class="lbl">记</span>往外(ex)压(press)，就是把内 心的话“表达”出来。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + press(压) → 把心里话压出来 → 表达</div>          <div class="zt"><span class="lbl">真题</span>Most people express gratitude for help. 大多数人都对别人的帮助表示感激。</div>          <div class="fam"><span class="lbl">族</span>expression n. 表达 / expressive adj. 有表现力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">expressway</span>
+          <span class="ipa">/ik&#x27;spreswei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(美国)高速公路</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an expressway link was added to the plan</div>          <div class="root"><span class="lbl">根</span>express(快速的) + way(路) → 快速路</div>          <div class="zt"><span class="lbl">真题</span>There was an immense network of paved roads, residential streets and expressways. 铺 设的道路、住宅街道和高速公路组成了庞大的 网络。</div>          <div class="fam"><span class="lbl">族</span>express adj. 特快的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">freeway</span>
+          <span class="ipa">/&#x27;fri:wei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(美国)高速公路</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a new motorway and a freeway through the valley</div>          <div class="root"><span class="lbl">根</span>free(无阻的) + way(路) → 畅行的路</div>          <div class="zt"><span class="lbl">真题</span>The speed limit on the freeway is 55mph. 高速公路限速每小时55 英里。 (128)</div>          <div class="fam"><span class="lbl">族</span>highway n. 公路</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">motorway</span>
+          <span class="ipa">/&#x27;məutərwei/</span>
+          <span class="pos"></span>
+          <span class="cn">(英国)高速公路</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the state announced a new motorway</div>          <div class="root"><span class="lbl">根</span>motor(机动车) + way(路) → 机动车专用道</div>          <div class="zt"><span class="lbl">真题</span>In 1958, Britain celebrated the opening of its first motorway—the Preston Bypass. 1958年，英国庆祝其第一条高速公路——普雷 斯顿公路的开通。(2016)</div>          <div class="fam"><span class="lbl">族</span>motor n. 马达</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">highway</span>
+          <span class="ipa">/&#x27;haiwer/</span>
+          <span class="pos">n.</span>
+          <span class="cn">公路;大路</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood beside the old highway</div>          <div class="root"><span class="lbl">根</span>high(主要) + way(路) → 主干公路</div>          <div class="zt"><span class="lbl">真题</span>He left his paintings at a highway rest stop. 他把画忘在高速公路休息站了。(2022)</div>          <div class="fam"><span class="lbl">族</span>freeway n. 高速公路</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5 · Day 33</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

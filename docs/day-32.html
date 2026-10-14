@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 32 · Reading Night at Raven Hill</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 32 · 11/13 · Unit 5 第 931-960 词</div>
+  <h1>Reading Night at Raven Hill<span class="cn">雷文山的阅读之夜</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-32.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4693"><p class="en"><span class="w" data-s="43" data-e="341">Lily</span> <span class="w" data-s="384" data-e="555">stood</span> <span class="w" data-s="597" data-e="725">on</span> <span class="w" data-s="768" data-e="853">a</span> <span class="w" data-s="896" data-e="981">hill</span> <span class="w" data-s="1024" data-e="1280">above</span> <span class="w" data-s="1323" data-e="1536">the</span> <span class="w" data-s="1579" data-e="1664">town</span> <span class="w" data-s="1707" data-e="1963">and</span> <span class="w" data-s="2005" data-e="2517">watched</span> <span class="w" data-s="2560" data-e="2816">a</span> <span class="w" data-s="2859" data-e="3200">golden</span> <span class="w target" data-s="3243" data-e="3499" title="鹰">eagle</span> <span class="w" data-s="3541" data-e="3840">turn</span> <span class="w" data-s="3925" data-e="4181">over</span> <span class="w" data-s="4224" data-e="4352">the</span> <span class="w" data-s="4395" data-e="4693">valley.</span></p><p class="zh">莉莉站在小镇上方的一座小丘上，看着一只金雕在山谷上空盘旋。</p></div>
+<div class="pair" data-s0="4821" data-s1="9173"><p class="en"><span class="w" data-s="4821" data-e="5547">Its</span> <span class="w target" data-s="5589" data-e="5717" title="形状；状况；外形；身材v.形成，塑造，使 成形">shape</span> <span class="w" data-s="5760" data-e="6016">in</span> <span class="w" data-s="6059" data-e="6101">the</span> <span class="w" data-s="6144" data-e="6315">pale</span> <span class="w" data-s="6357" data-e="6571">sky</span> <span class="w" data-s="6613" data-e="6955">was</span> <span class="w target" data-s="6997" data-e="7296" title="锋利的；清晰的；急转的">sharp;</span> <span class="w" data-s="7509" data-e="8235">nothing</span> <span class="w" data-s="8277" data-e="8875">escaped</span> <span class="w" data-s="8917" data-e="9003">its</span> <span class="w" data-s="9045" data-e="9173">eyes.</span></p><p class="zh">它在淡色天空里的身形锐利；什么也逃不过它的眼睛。</p></div>
+<div class="pair" data-s0="9557" data-s1="14464"><p class="en"><span class="w" data-s="9557" data-e="9728">Below</span> <span class="w" data-s="9771" data-e="9984">her,</span> <span class="w" data-s="10112" data-e="10624">the</span> <span class="w" data-s="10667" data-e="11051">library</span> <span class="w" data-s="11093" data-e="11221">was</span> <span class="w" data-s="11264" data-e="11392">busy</span> <span class="w" data-s="11435" data-e="11648">with</span> <span class="w" data-s="11691" data-e="11776">its</span> <span class="w" data-s="11819" data-e="12117">yearly</span> <span class="w" data-s="12160" data-e="12331">reading</span> <span class="w" data-s="12373" data-e="12587">night,</span> <span class="w" data-s="12800" data-e="12971">when</span> <span class="w" data-s="13312" data-e="13483">people</span> <span class="w" data-s="13525" data-e="13739">talked</span> <span class="w" data-s="13781" data-e="14037">about</span> <span class="w target" data-s="14080" data-e="14464" title="文学；文献，文学作品">literature.</span></p><p class="zh">在她下方，图书馆正忙着筹备一年一度的阅读之夜，那一晚人们谈论的是文学。</p></div>
+<div class="pair" data-s0="15503" data-s1="20665"><p class="en"><span class="w" data-s="15503" data-e="15801">Lily</span> <span class="w" data-s="15844" data-e="15929">had</span> <span class="w" data-s="15972" data-e="16228">entered</span> <span class="w" data-s="16271" data-e="16356">the</span> <span class="w" data-s="16399" data-e="16697">contest</span> <span class="w" data-s="16740" data-e="16953">with</span> <span class="w" data-s="16996" data-e="17081">a</span> <span class="w" data-s="17124" data-e="17209">piece</span> <span class="w" data-s="17252" data-e="17508">about</span> <span class="w" data-s="17551" data-e="17679">her</span> <span class="w" data-s="17721" data-e="18191">grandmother&#x27;s</span> <span class="w" data-s="18233" data-e="18489">kitchen,</span> <span class="w target" data-s="18617" data-e="19172" title="引用；引述n. 原话，引语">quoting</span> <span class="w" data-s="19215" data-e="19343">three</span> <span class="w" data-s="19385" data-e="19641">lines</span> <span class="w" data-s="19684" data-e="19983">from</span> <span class="w" data-s="20025" data-e="20111">a</span> <span class="w" data-s="20153" data-e="20409">famous</span> <span class="w" data-s="20452" data-e="20665">writer.</span></p><p class="zh">莉莉带着一篇写外婆厨房的文章参加了比赛，里面引用了某位名作家的三行文字。</p></div>
+<div class="pair" data-s0="20964" data-s1="25743"><p class="en"><span class="w" data-s="20964" data-e="21092">Her</span> <span class="w" data-s="21135" data-e="21391">teacher</span> <span class="w" data-s="21433" data-e="21561">said</span> <span class="w" data-s="21604" data-e="21732">the</span> <span class="w" data-s="21775" data-e="21860">piece</span> <span class="w" data-s="21903" data-e="22073">could</span> <span class="w target" data-s="22116" data-e="22671" title="是……的典型(或典范、榜样)；举例说明；例 证；例示">exemplify</span> <span class="w" data-s="22713" data-e="22927">what</span> <span class="w" data-s="22969" data-e="23012">a</span> <span class="w" data-s="23055" data-e="23140">young</span> <span class="w" data-s="23183" data-e="23481">reader</span> <span class="w" data-s="23524" data-e="23609">feels;</span> <span class="w" data-s="23993" data-e="24420">her</span> <span class="w target" data-s="24548" data-e="24932" title="读写能力，识字，专业知识">literacy</span> <span class="w" data-s="24975" data-e="25145">had</span> <span class="w" data-s="25188" data-e="25401">grown</span> <span class="w" data-s="25444" data-e="25529">that</span> <span class="w" data-s="25572" data-e="25743">year.</span></p><p class="zh">她的老师说，这篇东西足以例证一个年轻读者的感受；她那一年读写能力长进不少。</p></div>
+<div class="pair" data-s0="26383" data-s1="28388"><p class="en"><span class="w" data-s="26383" data-e="26425">&quot;Do</span> <span class="w" data-s="26468" data-e="26596">not</span> <span class="w" data-s="26639" data-e="26767">read</span> <span class="w" data-s="26809" data-e="26895">it</span> <span class="w target" data-s="26937" data-e="27065" title="字面意义的；完全按原文的；缺乏想象力的">literally,&quot;</span> <span class="w" data-s="27620" data-e="27705">the</span> <span class="w" data-s="27748" data-e="28004">teacher</span> <span class="w" data-s="28047" data-e="28132">had</span> <span class="w" data-s="28175" data-e="28388">warned.</span></p><p class="zh">“不要照着字面去读，”老师事先警告过她。</p></div>
+<div class="pair" data-s0="29167" data-s1="33817"><p class="en"><span class="w" data-s="29167" data-e="29295">This</span> <span class="w" data-s="29337" data-e="29551">year</span> <span class="w" data-s="29593" data-e="29849">the</span> <span class="w" data-s="29892" data-e="30148">judge</span> <span class="w" data-s="30191" data-e="30276">was</span> <span class="w" data-s="30319" data-e="30404">a</span> <span class="w target" data-s="30447" data-e="30788" title="要求高的;苛求的">demanding</span> <span class="w" data-s="30831" data-e="31172">editor,</span> <span class="w" data-s="31428" data-e="31513">and</span> <span class="w" data-s="31556" data-e="31983">the</span> <span class="w" data-s="32025" data-e="32111">rules</span> <span class="w target" data-s="32153" data-e="32580" title="需要；要求；规定">required</span> <span class="w" data-s="32623" data-e="32964">everyone</span> <span class="w" data-s="33007" data-e="33305">to</span> <span class="w" data-s="33348" data-e="33476">read</span> <span class="w" data-s="33519" data-e="33817">aloud.</span></p><p class="zh">今年的评委是一位要求很高的编辑，规则要求每个人都要大声朗读。</p></div>
+<div class="pair" data-s0="34073" data-s1="37529"><p class="en"><span class="w" data-s="34073" data-e="34287">A</span> <span class="w" data-s="34543" data-e="34756">boy</span> <span class="w" data-s="34799" data-e="35012">made</span> <span class="w" data-s="35055" data-e="35140">a</span> <span class="w target" data-s="35183" data-e="35311" title="&amp;. v.要求，请求">request</span> <span class="w" data-s="35353" data-e="35609">to</span> <span class="w" data-s="35652" data-e="35780">read</span> <span class="w" data-s="35823" data-e="35993">first;</span> <span class="w" data-s="36292" data-e="36932">Lily</span> <span class="w" data-s="36975" data-e="37145">did</span> <span class="w" data-s="37188" data-e="37273">not</span> <span class="w" data-s="37316" data-e="37529">mind.</span></p><p class="zh">一个男孩请求第一个读；莉莉并不介意。</p></div>
+<div class="pair" data-s0="38311" data-s1="42194"><p class="en"><span class="w" data-s="38311" data-e="38439">She</span> <span class="w target" data-s="38482" data-e="38780" title="询问；查究;研究">inquired</span> <span class="w" data-s="38823" data-e="39036">about</span> <span class="w" data-s="39079" data-e="39207">the</span> <span class="w" data-s="39250" data-e="39335">time</span> <span class="w" data-s="39378" data-e="39676">limit;</span> <span class="w" data-s="39890" data-e="39975">the</span> <span class="w" data-s="40231" data-e="40487">editor</span> <span class="w" data-s="40530" data-e="40700">said</span> <span class="w" data-s="40743" data-e="40914">he</span> <span class="w" data-s="40956" data-e="41042">would</span> <span class="w target" data-s="41084" data-e="41383" title="悬；挂；吊；暂停；中止；使暂停发挥作用(或使 用等）">suspend</span> <span class="w" data-s="41426" data-e="41596">the</span> <span class="w" data-s="41639" data-e="41724">clock</span> <span class="w" data-s="41767" data-e="41980">for</span> <span class="w" data-s="42023" data-e="42194">nobody.</span></p><p class="zh">她询问时间限制；编辑说不会为任何人暂停计时。</p></div>
+<div class="pair" data-s0="42492" data-s1="47058"><p class="en"><span class="w" data-s="42492" data-e="42748">There</span> <span class="w" data-s="43218" data-e="43346">was</span> <span class="w" data-s="43388" data-e="43474">a</span> <span class="w" data-s="43516" data-e="43602">great</span> <span class="w target" data-s="43644" data-e="43858" title="(坚决的)要求；所需之物 v. 强烈要求">demand</span> <span class="w" data-s="43900" data-e="44114">for</span> <span class="w" data-s="44156" data-e="44455">seats,</span> <span class="w" data-s="44583" data-e="44967">and</span> <span class="w" data-s="45010" data-e="45266">everyone</span> <span class="w" data-s="45308" data-e="45735">hoped</span> <span class="w" data-s="45778" data-e="45820">the</span> <span class="w" data-s="45863" data-e="45948">rain</span> <span class="w" data-s="45991" data-e="46204">would</span> <span class="w target" data-s="46247" data-e="46503" title="停止，终了">cease</span> <span class="w" data-s="46546" data-e="46759">before</span> <span class="w" data-s="46802" data-e="47058">nine.</span></p><p class="zh">座位需求很大，大家都盼着雨能在九点前停。</p></div>
+<div class="pair" data-s0="47792" data-s1="50010"><p class="en"><span class="w" data-s="47792" data-e="47920">It</span> <span class="w" data-s="47962" data-e="48090">did</span> <span class="w" data-s="48133" data-e="48261">not</span> <span class="w target" data-s="48304" data-e="48645" title="停止，终了">cease,</span> <span class="w" data-s="48773" data-e="49029">and</span> <span class="w" data-s="49114" data-e="49200">the</span> <span class="w" data-s="49242" data-e="49456">buses</span> <span class="w" data-s="49498" data-e="49626">had</span> <span class="w" data-s="49669" data-e="49754">to</span> <span class="w target" data-s="49797" data-e="50010" title="(使)停止，停下 n. 停止；阻止；暂停">halt.</span></p><p class="zh">雨没有停，公交车只好停下。</p></div>
+<div class="pair" data-s0="50138" data-s1="53808"><p class="en"><span class="w" data-s="50138" data-e="50352">A</span> <span class="w" data-s="50522" data-e="50906">girl</span> <span class="w" data-s="50949" data-e="51248">beside</span> <span class="w" data-s="51290" data-e="51461">her</span> <span class="w" data-s="51504" data-e="51674">tried</span> <span class="w" data-s="51717" data-e="51888">to</span> <span class="w target" data-s="51930" data-e="52186" title="使气馁，使灰心">discourage</span> <span class="w" data-s="52229" data-e="52485">her;</span> <span class="w" data-s="52698" data-e="52826">her</span> <span class="w" data-s="52997" data-e="53253">ticket</span> <span class="w" data-s="53296" data-e="53381">had</span> <span class="w target" data-s="53424" data-e="53808" title="到期，失效；去世">expired.</span></p><p class="zh">旁边一个女孩想让她气馁；她说自己的票已经过期了。</p></div>
+<div class="pair" data-s0="54064" data-s1="56197"><p class="en"><span class="w" data-s="54064" data-e="54789">Lily</span> <span class="w" data-s="54832" data-e="54917">would</span> <span class="w" data-s="54960" data-e="55088">not</span> <span class="w" data-s="55130" data-e="55258">let</span> <span class="w" data-s="55301" data-e="55472">that</span> <span class="w target" data-s="55514" data-e="55984" title="使气馁，使沮丧">dispirit</span> <span class="w" data-s="56026" data-e="56197">her.</span></p><p class="zh">莉莉不会让这件事令她沮丧。</p></div>
+<div class="pair" data-s0="56671" data-s1="61748"><p class="en"><span class="w" data-s="56671" data-e="56799">She</span> <span class="w" data-s="56841" data-e="56969">kept</span> <span class="w" data-s="57012" data-e="57225">her</span> <span class="w target" data-s="57268" data-e="57396" title="精神；心灵；意志；心态；本质，实质">spirit</span> <span class="w" data-s="57439" data-e="57823">quiet;</span> <span class="w" data-s="58207" data-e="58335">her</span> <span class="w" data-s="58804" data-e="59273">grandmother,</span> <span class="w target" data-s="59444" data-e="59913" title="热切的，渴望的">eager</span> <span class="w" data-s="59956" data-e="60041">to</span> <span class="w" data-s="60084" data-e="60169">hear</span> <span class="w" data-s="60212" data-e="60383">the</span> <span class="w" data-s="60425" data-e="60553">piece,</span> <span class="w" data-s="60767" data-e="61151">sat</span> <span class="w" data-s="61193" data-e="61449">near</span> <span class="w" data-s="61492" data-e="61620">the</span> <span class="w" data-s="61663" data-e="61748">front.</span></p><p class="zh">她让自己的精神保持安静；而她渴望听这篇文章的外婆，坐在靠前的位置。</p></div>
+<div class="pair" data-s0="61961" data-s1="64692"><p class="en"><span class="w" data-s="61961" data-e="62601">Her</span> <span class="w" data-s="62644" data-e="62772">only</span> <span class="w target" data-s="62815" data-e="63199" title="愿望；欲望；渴望；情欲 v.渴望；期望；想望">desire</span> <span class="w" data-s="63241" data-e="63497">was</span> <span class="w" data-s="63540" data-e="63668">to</span> <span class="w" data-s="63711" data-e="63881">finish</span> <span class="w" data-s="63924" data-e="64223">without</span> <span class="w" data-s="64265" data-e="64436">a</span> <span class="w" data-s="64479" data-e="64692">pause.</span></p><p class="zh">她唯一的愿望就是中间不停顿地念完。</p></div>
+<div class="pair" data-s0="65432" data-s1="70296"><p class="en"><span class="w" data-s="65432" data-e="65560">Her</span> <span class="w" data-s="65602" data-e="65986">grandmother</span> <span class="w" data-s="66029" data-e="66242">had</span> <span class="w target" data-s="66285" data-e="66669" title="支持;鼓励；激励;刺激">encouraged</span> <span class="w" data-s="66712" data-e="66882">her</span> <span class="w" data-s="66925" data-e="67053">to</span> <span class="w" data-s="67096" data-e="67181">write</span> <span class="w" data-s="67224" data-e="67437">daily,</span> <span class="w" data-s="67736" data-e="67906">and</span> <span class="w" data-s="68034" data-e="68333">an</span> <span class="w" data-s="68376" data-e="68504">old</span> <span class="w" data-s="68546" data-e="68845">writer</span> <span class="w target" data-s="68888" data-e="69357" title="激励，鼓励">inspired</span> <span class="w" data-s="69400" data-e="69570">her</span> <span class="w" data-s="69613" data-e="69698">to</span> <span class="w" data-s="69741" data-e="69784">keep</span> <span class="w" data-s="69826" data-e="69954">a</span> <span class="w" data-s="69997" data-e="70296">notebook.</span></p><p class="zh">外婆一直鼓励她每天写作，还有一位老作家激励她坚持记笔记。</p></div>
+<div class="pair" data-s0="70466" data-s1="74776"><p class="en"><span class="w" data-s="70466" data-e="71106">That</span> <span class="w" data-s="71149" data-e="71533">writer</span> <span class="w" data-s="71576" data-e="71746">became</span> <span class="w" data-s="71789" data-e="72002">her</span> <span class="w target" data-s="72045" data-e="72472" title="灵感；鼓舞人心的人或物；好主意">inspiration,</span> <span class="w" data-s="72770" data-e="73368">someone</span> <span class="w" data-s="73410" data-e="73624">she</span> <span class="w" data-s="73666" data-e="73965">hoped</span> <span class="w" data-s="74008" data-e="74050">to</span> <span class="w target" data-s="74093" data-e="74392" title="渴望，有志于">aspire</span> <span class="w" data-s="74434" data-e="74605">to</span> <span class="w" data-s="74648" data-e="74776">be.</span></p><p class="zh">那位作家成了她的灵感，成了她渴望成为的那种人。</p></div>
+<div class="pair" data-s0="75423" data-s1="77130"><p class="en"><span class="w" data-s="75423" data-e="75509">At</span> <span class="w" data-s="75551" data-e="75637">the</span> <span class="w" data-s="75679" data-e="75807">end,</span> <span class="w" data-s="75935" data-e="76149">the</span> <span class="w" data-s="76405" data-e="76618">editor</span> <span class="w" data-s="76661" data-e="76917">stood</span> <span class="w" data-s="76959" data-e="77130">up.</span></p><p class="zh">最后，编辑站了起来。</p></div>
+<div class="pair" data-s0="77941" data-s1="81439"><p class="en"><span class="w" data-s="77941" data-e="77983">&quot;To</span> <span class="w" data-s="78026" data-e="78197">want</span> <span class="w" data-s="78239" data-e="78325">to</span> <span class="w" data-s="78367" data-e="78453">be</span> <span class="w" data-s="78495" data-e="78623">read,&quot;</span> <span class="w" data-s="79093" data-e="79178">he</span> <span class="w" data-s="79221" data-e="79391">said,</span> <span class="w" data-s="79733" data-e="79775">&quot;is</span> <span class="w" data-s="80159" data-e="80287">the</span> <span class="w" data-s="80330" data-e="80458">first</span> <span class="w target" data-s="80501" data-e="80714" title="探索；探求 η. 探索，寻找，追求(幸福等)">quest</span> <span class="w" data-s="80757" data-e="81013">of</span> <span class="w" data-s="81055" data-e="81141">a</span> <span class="w" data-s="81183" data-e="81439">writer.&quot;</span></p><p class="zh">“想要被读到，”他说，“是每一位作家的第一个追求。”</p></div>
+<div class="pair" data-s0="81781" data-s1="84767"><p class="en"><span class="w" data-s="81781" data-e="82463">Lily</span> <span class="w" data-s="82506" data-e="82634">did</span> <span class="w" data-s="82677" data-e="82762">not</span> <span class="w" data-s="82805" data-e="83018">win,</span> <span class="w" data-s="83274" data-e="83487">but</span> <span class="w" data-s="83701" data-e="83829">she</span> <span class="w target" data-s="83871" data-e="84213" title="获得，得到；购得;养成(习惯)">acquired</span> <span class="w" data-s="84255" data-e="84469">a</span> <span class="w" data-s="84511" data-e="84767">lesson.</span></p><p class="zh">莉莉没有获奖，但她得到了一堂课。</p></div>
+<div class="pair" data-s0="85255" data-s1="90460"><p class="en"><span class="w" data-s="85255" data-e="85383">She</span> <span class="w" data-s="85425" data-e="85639">decided</span> <span class="w" data-s="85681" data-e="85937">to</span> <span class="w target" data-s="85980" data-e="86236" title="签署；订阅；订购；捐款">subscribe</span> <span class="w" data-s="86279" data-e="86620">to</span> <span class="w" data-s="86663" data-e="86748">a</span> <span class="w" data-s="86791" data-e="87089">literary</span> <span class="w" data-s="87132" data-e="87601">magazine,</span> <span class="w" data-s="87857" data-e="87943">and</span> <span class="w" data-s="88284" data-e="88455">the</span> <span class="w" data-s="88497" data-e="88753">editor</span> <span class="w target" data-s="88796" data-e="89265" title="雕刻;铭记；题写">inscribed</span> <span class="w" data-s="89308" data-e="89436">her</span> <span class="w" data-s="89479" data-e="89564">name</span> <span class="w" data-s="89607" data-e="89820">in</span> <span class="w" data-s="89863" data-e="89905">the</span> <span class="w" data-s="89948" data-e="90033">first</span> <span class="w" data-s="90076" data-e="90460">copy.</span></p><p class="zh">她决定订阅一本文学杂志，编辑在头一本的里面题上了她的名字。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">sharp</span>
+          <span class="ipa">/∫a:rp/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">锋利的；清晰的；急转的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was sharp; nothing escaped its eyes</div>          <div class="mnem"><span class="lbl">记</span>Sharp:夏普（电器公司）。 (121)</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a sharp knife 一把快刀 → 锋利的</div>          <div class="zt"><span class="lbl">真题</span>It made a series of sharp turns in the sky. 它在空中做出了一系列的急转弯。</div>          <div class="fam"><span class="lbl">族</span>sharpen v. 削尖 / sharply adv. 急剧地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">shape</span>
+          <span class="ipa">/∫eip/</span>
+          <span class="pos">n.</span>
+          <span class="cn">形状；状况；外形；身材v.形成，塑造，使 成形</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its shape in the pale sky</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：沙皮（狗），沙皮 狗的“外形；身材”可不怎么样，太胖了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：in the shape of 呈……形状</div>          <div class="zt"><span class="lbl">真题</span>Eggs have an oval shape appealing to artists.鸡蛋呈椭圆形，对艺术家很有吸引力。 (2017)</div>          <div class="fam"><span class="lbl">族</span>shapeless adj. 无形状的 / shape v. 塑造</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">exemplify</span>
+          <span class="ipa">/ıg&#x27;zemplifai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">是……的典型(或典范、榜样)；举例说明；例 证；例示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>could exemplify what a young reader feels</div>          <div class="mnem"><span class="lbl">记</span>这个单词的名词形式我们很熟 悉，就是 example。</div>          <div class="root"><span class="lbl">根</span>ex(出) + empl(拿取) + ify → 拿出一个当例子</div>          <div class="fam"><span class="lbl">族</span>example n. 例子 / exemplary adj. 典范的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">quote</span>
+          <span class="ipa">/kwəut/</span>
+          <span class="pos">v.</span>
+          <span class="cn">引用；引述n. 原话，引语</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>quoting three lines from a famous writer</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：夸她。当你在 追求一个女生，写情书夸她时，一定要“引用”一 些著名作家的描述女生的语言，你自己的语言 太没震撼力了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：夸她 → 写情书时引用名家的话夸她</div>          <div class="zt"><span class="lbl">真题</span>When you can quote a specific number like a fifth of the patients were able to quit, that&#x27;s compelling. 当你能引用一个具体的数字 时，比如五分之一的患者能够戒烟，那就很引人 注目了。(2017)</div>          <div class="fam"><span class="lbl">族</span>quotation n. 引语</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">quest</span>
+          <span class="ipa">/kwest/</span>
+          <span class="pos">v.</span>
+          <span class="cn">探索；探求 η. 探索，寻找，追求(幸福等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>is the first quest of a writer</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：快（que的谐 音)，街上(st 想成 street)，你在街上很快地奔 跑，干嘛啊？“寻找，追求”你爱的女人啊。</div>          <div class="root"><span class="lbl">根</span>qu(快) + est(联想 street 街) → 在街上快快奔走寻找</div>          <div class="fam"><span class="lbl">族</span>question n. 问题 / quest v. 追求</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">request</span>
+          <span class="ipa">/rı&#x27;kwest/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp;. v.要求，请求</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A boy made a request to read first</div>          <div class="root"><span class="lbl">根</span>re(再) + quest(寻求) → 一再地求 → 请求</div>          <div class="zt"><span class="lbl">真题</span>As for the organization itself, it declined a request for an interview. 至于该组织本身，它 拒绝了采访请求。(2018)</div>          <div class="fam"><span class="lbl">族</span>request v. 请求</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">require</span>
+          <span class="ipa">/rı&#x27;kwaiər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">需要；要求；规定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the rules required everyone to read aloud</div>          <div class="mnem"><span class="lbl">记</span>quire 词根，意为 ask(询问);re 表示重复的。重复地问一件事情，说明你“需 要”知道啊。</div>          <div class="root"><span class="lbl">根</span>re(反复) + quire(询问) → 反复问清楚 → 要求</div>          <div class="zt"><span class="lbl">真题</span>As what happened with tobacco, this will require a cultural shift, but that can happen.正如烟草的情况一样，这需要文化转 变，但这可能会发生。(2018)</div>          <div class="fam"><span class="lbl">族</span>requirement n. 要求 / required adj. 必需的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">demand</span>
+          <span class="ipa">/dı&#x27;mænd/</span>
+          <span class="pos"></span>
+          <span class="cn">(坚决的)要求；所需之物 v. 强烈要求</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was a great demand for seats</div>          <div class="root"><span class="lbl">根</span>de(向下) + mand(命令) → 下命令要 → 需求</div>          <div class="zt"><span class="lbl">真题</span>They take up a lot of our fresh water demands across the world. 它们占用了我们在 世界各地的大量淡水需求。(2023)</div>          <div class="fam"><span class="lbl">族</span>demanding adj. 要求高的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">demanding</span>
+          <span class="ipa">/dı&#x27;mændın/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">要求高的;苛求的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the judge was a demanding editor</div>          <div class="mnem"><span class="lbl">记</span>demand(要求)我们很熟悉，这 个单词是它的形容词。</div>          <div class="root"><span class="lbl">根</span>demand(要求) + ing → 一直在要求的</div>          <div class="zt"><span class="lbl">真题</span>They find these exercises too demanding. 他们发现这些练习要求太高了。(2023) 引用语；(商业)行情，行市；行市表，估价单</div>          <div class="fam"><span class="lbl">族</span>demand n./v. 要求</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">acquire</span>
+          <span class="ipa">/ə&#x27;kwaiər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">获得，得到；购得;养成(习惯)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she acquired a lesson</div>          <div class="mnem"><span class="lbl">记</span>ac(一再地)+quire(询问)→一 (122) 再地询问→当你想要知道什么，并且一再地询 问，最终总会得到你想要的信息→获得，得到。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + quire(寻求) → 一再寻求终于到手</div>          <div class="zt"><span class="lbl">真题</span>It can be acquired through persistent practice.它可以通过坚持练习获得。(2016)</div>          <div class="fam"><span class="lbl">族</span>acquisition n. 获得 / acquired adj. 后天得来的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">inquire</span>
+          <span class="ipa">/ın&#x27;kwalər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">询问；查究;研究</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She inquired about the time limit</div>          <div class="mnem"><span class="lbl">记</span>in(里面)十quire(询问)→问到 里面去了→询问，打听，可以引申为“研究”的 意思。</div>          <div class="root"><span class="lbl">根</span>in(往里) + quire(问) → 往里问 → 打听</div>          <div class="zt"><span class="lbl">真题</span>He inquired about his client&#x27;s family background. 他询问了客户的家庭背景。</div>          <div class="fam"><span class="lbl">族</span>inquiry n. 询问 / inquiry desk 问询处</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">literal</span>
+          <span class="ipa">/&#x27;litərəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">字面意义的；完全按原文的；缺乏想象力的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Do not read it literally</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似：李（li)特弱 (teral)。李同学的水平很一般，只能按“字面意 义”翻译。</div>          <div class="root"><span class="lbl">根</span>liter(字母) + al → 只按字母来的</div>          <div class="fam"><span class="lbl">族</span>literally adv. 字面上；简直</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">literacy</span>
+          <span class="ipa">/&#x27;litərəsi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">读写能力，识字，专业知识</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her literacy had grown that year</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：丽特弱斯。那 就是一个叫丽丽的同学特别弱，什么特别弱呢？ “专业知识，读写能力”啊。所以才有了 “Knowledge is power.”这句话。</div>          <div class="root"><span class="lbl">根</span>liter(字母) + acy → 认字的本事</div>          <div class="zt"><span class="lbl">真题</span>Furthermore, most basic skills, like calculating and literacy, are always necessary. 此外，大多数基本的技能，如计算和读写能力， 总是必要的。</div>          <div class="fam"><span class="lbl">族</span>literate adj. 识字的 / illiteracy n. 文盲</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">literature</span>
+          <span class="ipa">/&#x27;litrət∫ə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">文学；文献，文学作品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>when people talked about literature</div>          <div class="mnem"><span class="lbl">记</span>liter 想成 litter(垃圾)，ture 想 成true(真的)，有些“文学作品”真的像垃圾 一样。</div>          <div class="root"><span class="lbl">根</span>liter(字母) + ature → 用文字写成的东西</div>          <div class="zt"><span class="lbl">真题</span>Paperbacks of popular literature are more likely to be replaced by e-books. 通俗文学的平 (123) 第五单元 装书更有可能被电子书所取代。</div>          <div class="fam"><span class="lbl">族</span>literary adj. 文学的 / literate adj. 有文化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">encourage</span>
+          <span class="ipa">/ın&#x27;k3:rıd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">支持;鼓励；激励;刺激</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had encouraged her to write daily</div>          <div class="mnem"><span class="lbl">记</span>en使；courage勇气。使你有 勇气→激励；鼓励。</div>          <div class="root"><span class="lbl">根</span>en(使) + courage(勇气) → 给你勇气</div>          <div class="zt"><span class="lbl">真题</span>Parents should encourage their child to take the risks needed to learn and grow. 父母 应该鼓励他们的孩子承担学习和成长所需要的 风险。(2020)</div>          <div class="fam"><span class="lbl">族</span>encouragement n. 鼓励 / encouraging adj. 令人鼓舞的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">discourage</span>
+          <span class="ipa">/dıs&#x27;k3:rıd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使气馁，使灰心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to discourage her</div>          <div class="mnem"><span class="lbl">记</span>dis 否定的前缀；courage 勇气。 使你没有勇气→使气馁，使灰心。</div>          <div class="root"><span class="lbl">根</span>dis(去掉) + courage(勇气) → 把勇气拿走</div>          <div class="zt"><span class="lbl">真题</span>Playing with digital device discourages kids from active discovery. 玩数字设备会阻碍 孩子们积极探索。</div>          <div class="fam"><span class="lbl">族</span>discouraging adj. 令人泄气的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">dispirit</span>
+          <span class="ipa">/dı&#x27;spırıt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使气馁，使沮丧</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would not let that dispirit her</div>          <div class="mnem"><span class="lbl">记</span>dis否定的前缀；spirit精神。 使你没有精神→使气馁。</div>          <div class="root"><span class="lbl">根</span>dis(去掉) + spirit(精神) → 把精神抽掉</div>          <div class="zt"><span class="lbl">真题</span>I was dispirited because I had lost twice. 我很沮丧，因为我已经输了两次了。</div>          <div class="fam"><span class="lbl">族</span>dispirited adj. 沮丧的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">spirit</span>
+          <span class="ipa">/&#x27;spirit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">精神；心灵；意志；心态；本质，实质</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She kept her spirit quiet</div>          <div class="mnem"><span class="lbl">记</span>spir表示“呼吸”，该词根容易 记忆。spirit 联想成雪碧(Sprite)→喝完雪碧瞬 间有了“精神”，什么人有精神？活人。活人最 明显的标志就是呼吸，所以，spir这个词根为 “呼吸”。</div>          <div class="root"><span class="lbl">根</span>spir(呼吸) + it → 活着的那口气 → 精神</div>          <div class="zt"><span class="lbl">真题</span>Companies, marketers and teachers have long looked for fun ways to engage people&#x27;s reward-seeking or competitive spirits. 长期以 来，公司、营销人员和教师一直在寻找有趣的方 式来激发人们寻求奖励或竞争的精神。(2016)</div>          <div class="fam"><span class="lbl">族</span>spiritual adj. 精神的 / spirited adj. 精神饱满的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">inspire</span>
+          <span class="ipa">/ın&#x27;sparər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">激励，鼓励</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an old writer inspired her to keep a notebook</div>          <div class="mnem"><span class="lbl">记</span>往里面(in)给气(spir)，就是给 你打气啊。打气干什么？→激励，鼓励。</div>          <div class="root"><span class="lbl">根</span>in(往里) + spir(呼吸) → 往里给你打气</div>          <div class="zt"><span class="lbl">真题</span>Our philosophy is to inspire kids at a young age to understand that engineering is a great career. 我们的理念是让孩子们从小就明 白工程师是一个伟大的职业。(2017)</div>          <div class="fam"><span class="lbl">族</span>inspiration n. 灵感 / inspiring adj. 鼓舞人心的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">inspiration</span>
+          <span class="ipa">/nspə&#x27;rei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">灵感；鼓舞人心的人或物；好主意</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>became her inspiration</div>          <div class="mnem"><span class="lbl">记</span>想象一下，当你遇到难题，求助 无门的时候，你使劲吸了一口气(spir)，瞬间有 了“灵感”。</div>          <div class="root"><span class="lbl">根</span>in(往里) + spir(呼吸) + ation → 吸一口气就来劲</div>          <div class="zt"><span class="lbl">真题</span>His fall is an inspiration to any businessperson whose career has taken a turn for the worse. 他的失败对事业每况愈下的每一 个商人都是一种鼓舞。</div>          <div class="fam"><span class="lbl">族</span>inspire v. 激励 / inspired adj. 受启发的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">aspire</span>
+          <span class="ipa">/ə&#x27;spaiər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">渴望，有志于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>someone she hoped to aspire to be</div>          <div class="mnem"><span class="lbl">记</span>一再地（as）呼吸（spir）。你什 么时候会一再地看着一个东西一动不动，并且 一再地呼吸？→渴望。</div>          <div class="root"><span class="lbl">根</span>a(向) + spir(呼吸) → 屏息望着高处 → 渴望</div>          <div class="zt"><span class="lbl">真题</span>Part of the reason this happens is a lack of honest self-assessment by those who aspire to leadership in the first place. 出现这种情况的 部分原因是，那些一开始就渴望成为领导者的 人缺乏诚实的自我评估。</div>          <div class="fam"><span class="lbl">族</span>aspiration n. 志向</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">eager</span>
+          <span class="ipa">/&#x27;igər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">热切的，渴望的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>grandmother, eager to hear the piece</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“一哥”。很多人 都想成为某个行业的“一哥”，所以该单词的意 思是“渴望的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：一哥 → 谁都想当一哥 → 热切的</div>          <div class="zt"><span class="lbl">真题</span>At about 18 months of age, most children become eager to help their parents, and in many cultures, they begin helping with housework at that age. 在大约 18 个月大的时 候，大多数孩子变得渴望帮助他们的父母，在许 多文化中，他们在那个年龄开始帮助做家务。 (2020)</div>          <div class="fam"><span class="lbl">族</span>eagerly adv. 热切地 / eagerness n. 渴望</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">eagle</span>
+          <span class="ipa">/&#x27;i:gl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">鹰</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>watched a golden eagle turn over the valley</div>          <div class="root"><span class="lbl">根</span>谐音联想：一(ea)哥(gle) → 天空里的一哥是老鹰</div>          <div class="zt"><span class="lbl">真题</span>They fell victim to eagles. 他们成了老鹰 的牺牲品。</div>          <div class="fam"><span class="lbl">族</span>eagle-eyed adj. 目光锐利的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">desire</span>
+          <span class="ipa">/dı&#x27;zaiər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">愿望；欲望；渴望；情欲 v.渴望；期望；想望</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her only desire was to finish without a pause</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)“渴望”成为鹅(e)的先 生(sir)。</div>          <div class="root"><span class="lbl">根</span>de(向下) + sir(联想 sir 先生) → 心里总盼着</div>          <div class="zt"><span class="lbl">真题</span>What personal qualities are desirable in a teacher？教师需要什么样的个人品质？</div>          <div class="fam"><span class="lbl">族</span>desirable adj. 值得拥有的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">expire</span>
+          <span class="ipa">/ık&#x27;spaiər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">到期，失效；去世</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her ticket had expired</div>          <div class="mnem"><span class="lbl">记</span>往外(ex)排气(pire)，一直排， 就没有气了啊→去世；到期。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + spire(呼吸) → 气排光了 → 到期</div>          <div class="fam"><span class="lbl">族</span>expiry n. 到期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">cease</span>
+          <span class="ipa">/si:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">停止，终了</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>everyone hoped the rain would cease before nine</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“谁死”。所以 它的意思很明显，就是“停止，终了”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：谁死(si:s) → 声音到此为止 → 停止</div>          <div class="zt"><span class="lbl">真题</span>The close link between age and stage may cease to exist in a multi-stage life. 在多阶 段的人生中，年龄和所处阶段之间的密切联系 可能不复存在。(2019) (124)</div>          <div class="fam"><span class="lbl">族</span>ceaseless adj. 不停的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">suspend</span>
+          <span class="ipa">/sə&#x27;spend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">悬；挂；吊；暂停；中止；使暂停发挥作用(或使 用等）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would suspend the clock for nobody</div>          <div class="mnem"><span class="lbl">记</span>sus表示下面，下方；pend 这个 词根很像 pen(钢笔)，过去有钢笔的人通常会 把钢笔挂在衣服上，让别人看得见，证明自己有 文化。所以这个词根就是“悬挂”。→挂在下面 →悬；挂；吊。</div>          <div class="root"><span class="lbl">根</span>sus(下面) + pend(挂) → 挂在下面 → 悬；暂停</div>          <div class="zt"><span class="lbl">真题</span>They suspend import of necessities from overseas. 他们暂停从海外进口生活必需品。 (2016)</div>          <div class="fam"><span class="lbl">族</span>suspension n. 暂停 / suspended adj. 暂停的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">halt</span>
+          <span class="ipa">/ho:lt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)停止，停下 n. 停止；阻止；暂停</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the buses had to halt</div>          <div class="mnem"><span class="lbl">记</span>孩子把沙子撒得满屋都是，父 亲吼他(halt的谐音)，就是“阻止”他这样做，让 他“停下”来。</div>          <div class="root"><span class="lbl">根</span>谐音联想：吼他(halt) → 一声吼就停下</div>          <div class="zt"><span class="lbl">真题</span>The eyes of a very good reader move quickly, taking long jumps and making very short halts. 一个优秀的阅读者的眼睛移动得很 快，跳得很远，停顿很短。</div>          <div class="fam"><span class="lbl">族</span>halting adj. 断断续续的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">subscribe</span>
+          <span class="ipa">/səb&#x27;skraib/</span>
+          <span class="pos">v.</span>
+          <span class="cn">签署；订阅；订购；捐款</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She decided to subscribe to a literary magazine</div>          <div class="mnem"><span class="lbl">记</span>describe这个单词我们比较熟 悉，意思为“描述”。de表示“往下”，那 scribe当 词根时意思很容易猜，应为“写”。subscribe：写 (scribe)在下面(sub)。当你在订阅一个东西的 时候，是不是要在下面写上你的名字？所以其意 思是“订购；订阅；签署”。</div>          <div class="root"><span class="lbl">根</span>sub(在下面) + scribe(写) → 在下面签名订购</div>          <div class="fam"><span class="lbl">族</span>subscription n. 订阅 / subscriber n. 订户</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">inscribe</span>
+          <span class="ipa">/in&#x27;skrarb/</span>
+          <span class="pos">v.</span>
+          <span class="cn">雕刻;铭记；题写</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the editor inscribed her name in the first copy</div>          <div class="mnem"><span class="lbl">记</span>写到(scribe)里面(in)→雕刻； 铭记。</div>          <div class="root"><span class="lbl">根</span>in(往里) + scribe(写) → 写到里面去</div>          <div class="fam"><span class="lbl">族</span>inscription n. 题字 / script n. 手迹</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 5 · Day 32</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

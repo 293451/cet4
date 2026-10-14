@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 14 · The Cutter in the Mountain Shed</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 14 · 10/26 · Unit 2 第 391-420 词</div>
+  <h1>The Cutter in the Mountain Shed<span class="cn">山间棚屋里的打磨人</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-14.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3883"><p class="en"><span class="w" data-s="43" data-e="256">Old</span> <span class="w" data-s="299" data-e="512">Chen</span> <span class="w" data-s="555" data-e="725">had</span> <span class="w" data-s="768" data-e="811">a</span> <span class="w target" data-s="853" data-e="1067" title="胡须">beard</span> <span class="w" data-s="1109" data-e="1237">as</span> <span class="w" data-s="1280" data-e="1408">white</span> <span class="w" data-s="1451" data-e="1621">as</span> <span class="w" data-s="1664" data-e="1920">salt</span> <span class="w" data-s="1963" data-e="2261">and</span> <span class="w" data-s="2432" data-e="2560">a</span> <span class="w" data-s="2603" data-e="2731">small</span> <span class="w target" data-s="2773" data-e="3200" title="简易房；棚v.散发出光；把光照到；流，洒">shed</span> <span class="w" data-s="3243" data-e="3456">behind</span> <span class="w" data-s="3499" data-e="3712">his</span> <span class="w" data-s="3755" data-e="3883">house.</span></p><p class="zh">老陈的胡子白得像盐，屋后有一间小小的棚屋。</p></div>
+<div class="pair" data-s0="4181" data-s1="9173"><p class="en"><span class="w" data-s="4181" data-e="4992">Every</span> <span class="w" data-s="5035" data-e="5291">morning</span> <span class="w" data-s="5333" data-e="5589">he</span> <span class="w" data-s="5632" data-e="5717">would</span> <span class="w target" data-s="5760" data-e="5973" title="刺耳的摩擦声；令人疲惫的工作 v. 磨碎， 磨光；用力挤压；摩擦">grind</span> <span class="w" data-s="6016" data-e="6187">a</span> <span class="w" data-s="6229" data-e="6315">rough</span> <span class="w" data-s="6357" data-e="6571">stone</span> <span class="w" data-s="6613" data-e="6912">against</span> <span class="w" data-s="6955" data-e="7125">the</span> <span class="w" data-s="7168" data-e="7381">wheel</span> <span class="w" data-s="7424" data-e="7637">and</span> <span class="w target" data-s="7680" data-e="8277" title="擦光剂v.擦亮，磨光">polish</span> <span class="w" data-s="8320" data-e="8448">it</span> <span class="w" data-s="8491" data-e="8661">until</span> <span class="w" data-s="8704" data-e="8832">it</span> <span class="w" data-s="8875" data-e="9173">shone.</span></p><p class="zh">每天早上，他都要把一块粗石贴到砂轮上磨，一直抛光到发亮。</p></div>
+<div class="pair" data-s0="9779" data-s1="12979"><p class="en"><span class="w" data-s="9779" data-e="9864">He</span> <span class="w" data-s="9907" data-e="10035">had</span> <span class="w" data-s="10078" data-e="10206">lived</span> <span class="w" data-s="10248" data-e="10376">in</span> <span class="w" data-s="10419" data-e="10504">this</span> <span class="w target" data-s="10547" data-e="10803" title="地区;(身体)部位">region</span> <span class="w" data-s="10846" data-e="10974">for</span> <span class="w" data-s="11016" data-e="11272">forty</span> <span class="w" data-s="11315" data-e="11486">years</span> <span class="w" data-s="11528" data-e="11870">and</span> <span class="w" data-s="11912" data-e="12339">knew</span> <span class="w" data-s="12382" data-e="12467">its</span> <span class="w" data-s="12510" data-e="12766">rocks</span> <span class="w" data-s="12808" data-e="12979">well.</span></p><p class="zh">他在这个地区住了四十年，对这里的石头了如指掌。</p></div>
+<div class="pair" data-s0="13150" data-s1="18312"><p class="en"><span class="w" data-s="13150" data-e="13406">He</span> <span class="w target" data-s="13790" data-e="14259" title="勘查;探索;研究">explored</span> <span class="w" data-s="14302" data-e="14430">the</span> <span class="w" data-s="14472" data-e="14558">old</span> <span class="w" data-s="14600" data-e="14814">mine</span> <span class="w" data-s="14856" data-e="15070">alone,</span> <span class="w" data-s="15326" data-e="15582">but</span> <span class="w" data-s="15710" data-e="15838">he</span> <span class="w" data-s="15880" data-e="15923">was</span> <span class="w" data-s="15966" data-e="16094">never</span> <span class="w target" data-s="16136" data-e="16563" title="鲁莽的，不顾后果的；粗心大意的">reckless;</span> <span class="w" data-s="16819" data-e="17118">he</span> <span class="w" data-s="17160" data-e="17331">never</span> <span class="w" data-s="17374" data-e="17544">went</span> <span class="w" data-s="17587" data-e="17715">in</span> <span class="w" data-s="17758" data-e="17928">without</span> <span class="w" data-s="17971" data-e="18099">a</span> <span class="w" data-s="18142" data-e="18312">lamp.</span></p><p class="zh">他喜欢一个人去探那座老矿，但他从不莽撞；没有灯，他绝不进去。</p></div>
+<div class="pair" data-s0="18830" data-s1="22030"><p class="en"><span class="w" data-s="18830" data-e="19129">Others</span> <span class="w" data-s="19172" data-e="19300">came</span> <span class="w" data-s="19342" data-e="19513">to</span> <span class="w target" data-s="19556" data-e="19897" title="利用，开发，开拓；剥削n.英勇事迹，壮举">exploit</span> <span class="w" data-s="19940" data-e="20068">the</span> <span class="w" data-s="20110" data-e="20366">mountain</span> <span class="w" data-s="20409" data-e="20537">for</span> <span class="w" data-s="20580" data-e="20708">quick</span> <span class="w" data-s="20750" data-e="20964">money,</span> <span class="w" data-s="21177" data-e="21348">and</span> <span class="w" data-s="21604" data-e="21732">he</span> <span class="w" data-s="21774" data-e="21860">did</span> <span class="w" data-s="21902" data-e="22030">not.</span></p><p class="zh">别人是来开采这座山、赚快钱的，他不是。</p></div>
+<div class="pair" data-s0="22244" data-s1="27193"><p class="en"><span class="w" data-s="22244" data-e="22798">One</span> <span class="w" data-s="22841" data-e="23097">spring</span> <span class="w" data-s="23140" data-e="23438">the</span> <span class="w" data-s="23481" data-e="23609">mine</span> <span class="w" data-s="23652" data-e="23865">had</span> <span class="w" data-s="23908" data-e="23993">to</span> <span class="w" data-s="24036" data-e="24078">be</span> <span class="w" data-s="24121" data-e="24249">opened</span> <span class="w" data-s="24292" data-e="24548">again,</span> <span class="w" data-s="24761" data-e="24974">and</span> <span class="w" data-s="25188" data-e="25486">workers</span> <span class="w" data-s="25529" data-e="25742">set</span> <span class="w" data-s="25785" data-e="25870">a</span> <span class="w" data-s="25913" data-e="26041">small</span> <span class="w target" data-s="26084" data-e="26425" title="爆炸；一阵(风)，一股(气流) v. 炸，炸掉">blast</span> <span class="w" data-s="26468" data-e="26724">at</span> <span class="w" data-s="26766" data-e="26809">the</span> <span class="w" data-s="26852" data-e="26937">far</span> <span class="w" data-s="26980" data-e="27193">end.</span></p><p class="zh">有一年春天，矿又要重新打开，工人们在最里头放了一小炮。</p></div>
+<div class="pair" data-s0="27799" data-s1="32535"><p class="en"><span class="w" data-s="27799" data-e="27927">The</span> <span class="w target" data-s="27969" data-e="28140" title="爆炸，爆裂；突然发生 n. 爆炸；突发">burst</span> <span class="w" data-s="28183" data-e="28268">of</span> <span class="w" data-s="28311" data-e="28439">sound</span> <span class="w" data-s="28481" data-e="28780">came,</span> <span class="w" data-s="28993" data-e="29207">rock</span> <span class="w target" data-s="29591" data-e="30231" title="爆炸；激增;爆发">exploded</span> <span class="w" data-s="30273" data-e="30572">outward,</span> <span class="w" data-s="30700" data-e="30913">and</span> <span class="w" data-s="31084" data-e="31212">the</span> <span class="w" data-s="31255" data-e="31468">shock</span> <span class="w" data-s="31511" data-e="31639">could</span> <span class="w target" data-s="31681" data-e="32108" title="">tear</span> <span class="w" data-s="32151" data-e="32236">a</span> <span class="w" data-s="32279" data-e="32407">coat</span> <span class="w" data-s="32449" data-e="32535">open.</span></p><p class="zh">爆响传来，岩石向外炸开，那股冲击力能把一件外套撕开。</p></div>
+<div class="pair" data-s0="32748" data-s1="37655"><p class="en"><span class="w" data-s="32748" data-e="33004">In</span> <span class="w" data-s="33687" data-e="33857">the</span> <span class="w" data-s="33900" data-e="34028">broken</span> <span class="w" data-s="34071" data-e="34284">wall</span> <span class="w" data-s="34327" data-e="34583">he</span> <span class="w" data-s="34625" data-e="34753">found</span> <span class="w" data-s="34796" data-e="34924">a</span> <span class="w target" data-s="34967" data-e="35180" title="">treasure:</span> <span class="w" data-s="35393" data-e="35820">a</span> <span class="w" data-s="35863" data-e="35991">clear</span> <span class="w target" data-s="36033" data-e="36460" title="水晶，结晶体；晶粒">crystal,</span> <span class="w" data-s="36588" data-e="36759">the</span> <span class="w" data-s="36972" data-e="37100">size</span> <span class="w" data-s="37143" data-e="37356">of</span> <span class="w" data-s="37399" data-e="37441">a</span> <span class="w" data-s="37484" data-e="37655">plum.</span></p><p class="zh">在裂开的岩壁里，他找到了一件宝贝：一块李子大小的透明水晶。</p></div>
+<div class="pair" data-s0="38301" data-s1="40435"><p class="en"><span class="w" data-s="38301" data-e="38429">It</span> <span class="w" data-s="38472" data-e="38557">was</span> <span class="w target" data-s="38600" data-e="38984" title="">precious</span> <span class="w" data-s="39027" data-e="39240">enough</span> <span class="w" data-s="39283" data-e="39453">to</span> <span class="w" data-s="39496" data-e="39624">make</span> <span class="w" data-s="39667" data-e="39795">his</span> <span class="w" data-s="39837" data-e="39965">hands</span> <span class="w" data-s="40008" data-e="40435">shake.</span></p><p class="zh">它珍贵得让他的手都抖了起来。</p></div>
+<div class="pair" data-s0="40563" data-s1="46493"><p class="en"><span class="w" data-s="40563" data-e="41288">He</span> <span class="w" data-s="41331" data-e="41459">could</span> <span class="w" data-s="41501" data-e="41629">not</span> <span class="w target" data-s="41672" data-e="42099" title="估计，估价，评估n. 估计，估价，评估">estimate</span> <span class="w" data-s="42141" data-e="42227">its</span> <span class="w" data-s="42269" data-e="42440">worth,</span> <span class="w" data-s="42653" data-e="43251">only</span> <span class="w" data-s="43293" data-e="43592">give</span> <span class="w" data-s="43635" data-e="43763">an</span> <span class="w target" data-s="43805" data-e="44275" title="大约的，近似的；接近的v.近似，接近； 估算">approximate</span> <span class="w" data-s="44317" data-e="44445">price,</span> <span class="w" data-s="44744" data-e="45128">and</span> <span class="w" data-s="45213" data-e="45640">even</span> <span class="w" data-s="45683" data-e="45896">that</span> <span class="w" data-s="45939" data-e="46195">was</span> <span class="w" data-s="46237" data-e="46365">a</span> <span class="w" data-s="46408" data-e="46493">guess.</span></p><p class="zh">他估不出它的价值，只能给一个大概的价钱，而那也只是猜的。</p></div>
+<div class="pair" data-s0="46835" data-s1="51016"><p class="en"><span class="w" data-s="46835" data-e="46963">He</span> <span class="w target" data-s="47005" data-e="47347" title="估算；计算；认为">reckoned</span> <span class="w" data-s="47389" data-e="47475">it</span> <span class="w" data-s="47517" data-e="47603">might</span> <span class="w" data-s="47645" data-e="47816">pay</span> <span class="w" data-s="47859" data-e="47987">for</span> <span class="w" data-s="48029" data-e="48157">a</span> <span class="w" data-s="48200" data-e="48243">new</span> <span class="w" data-s="48285" data-e="48541">roof,</span> <span class="w" data-s="48669" data-e="49053">but</span> <span class="w" data-s="49181" data-e="49523">selling</span> <span class="w" data-s="49565" data-e="49651">it</span> <span class="w" data-s="49693" data-e="49779">in</span> <span class="w" data-s="49821" data-e="49907">a</span> <span class="w" data-s="49949" data-e="50120">hurry</span> <span class="w" data-s="50163" data-e="50333">would</span> <span class="w target" data-s="50376" data-e="50675" title="贬值；降低……的价值">devalue</span> <span class="w" data-s="50717" data-e="51016">it.</span></p><p class="zh">他估算这够换一个新屋顶，但急着卖出去只会让它贬值。</p></div>
+<div class="pair" data-s0="51187" data-s1="53704"><p class="en"><span class="w" data-s="51187" data-e="51613">The</span> <span class="w target" data-s="51699" data-e="52040" title="最后的，最终的；极端的；最好(或坏等)的">ultimate</span> <span class="w" data-s="52083" data-e="52253">price,</span> <span class="w" data-s="52467" data-e="52552">he</span> <span class="w" data-s="52595" data-e="52723">felt,</span> <span class="w" data-s="52936" data-e="53107">was</span> <span class="w" data-s="53277" data-e="53448">not</span> <span class="w" data-s="53491" data-e="53704">money.</span></p><p class="zh">他觉得，最终的价格不在钱上。</p></div>
+<div class="pair" data-s0="54727" data-s1="59377"><p class="en"><span class="w" data-s="54727" data-e="54855">This</span> <span class="w target" data-s="54897" data-e="55239" title="水晶，结晶体；晶粒">crystal</span> <span class="w" data-s="55281" data-e="55409">had</span> <span class="w" data-s="55452" data-e="55537">its</span> <span class="w target" data-s="55580" data-e="55751" title="起源；源头；出身；起因">origin</span> <span class="w" data-s="55793" data-e="56177">deep</span> <span class="w" data-s="56220" data-e="56391">in</span> <span class="w" data-s="56433" data-e="56519">the</span> <span class="w" data-s="56561" data-e="56775">mountain;</span> <span class="w" data-s="56988" data-e="57585">such</span> <span class="w" data-s="57628" data-e="57969">stones</span> <span class="w target" data-s="58012" data-e="58524" title="(from)创建;起源">originate</span> <span class="w" data-s="58567" data-e="58695">in</span> <span class="w" data-s="58737" data-e="58823">heat</span> <span class="w" data-s="58865" data-e="59121">and</span> <span class="w" data-s="59164" data-e="59377">pressure.</span></p><p class="zh">这块水晶的源头在山的深处；这类石头是在高温和压力中生成的。</p></div>
+<div class="pair" data-s0="59676" data-s1="64711"><p class="en"><span class="w" data-s="59676" data-e="60273">From</span> <span class="w" data-s="60316" data-e="60401">the</span> <span class="w" data-s="60444" data-e="60529">same</span> <span class="w" data-s="60572" data-e="60828">rock</span> <span class="w" data-s="60871" data-e="61084">he</span> <span class="w" data-s="61127" data-e="61212">had</span> <span class="w" data-s="61255" data-e="61340">once</span> <span class="w target" data-s="61383" data-e="61809" title="追溯……的起源，源于；得到，获得">derived</span> <span class="w" data-s="61852" data-e="61895">a</span> <span class="w" data-s="61937" data-e="62065">small</span> <span class="w" data-s="62108" data-e="62279">blue</span> <span class="w" data-s="62321" data-e="62535">one,</span> <span class="w" data-s="62663" data-e="62876">and</span> <span class="w" data-s="63047" data-e="63345">the</span> <span class="w" data-s="63388" data-e="63473">mine</span> <span class="w" data-s="63516" data-e="63815">never</span> <span class="w target" data-s="63857" data-e="64284" title="剥夺；使丧失">deprived</span> <span class="w" data-s="64327" data-e="64412">him</span> <span class="w" data-s="64455" data-e="64540">of</span> <span class="w" data-s="64583" data-e="64711">work.</span></p><p class="zh">同一块岩石里，他还曾开出过一小块蓝色的，而这座矿从没让他没活干。</p></div>
+<div class="pair" data-s0="65403" data-s1="69926"><p class="en"><span class="w" data-s="65403" data-e="65617">Few</span> <span class="w" data-s="65659" data-e="65787">things</span> <span class="w target" data-s="65830" data-e="66257" title="兴旺，繁荣；茁壮成长">thrive</span> <span class="w" data-s="66299" data-e="66513">in</span> <span class="w" data-s="66555" data-e="66641">this</span> <span class="w" data-s="66683" data-e="66811">hard</span> <span class="w target" data-s="66854" data-e="67238" title="地区;(身体)部位">region,</span> <span class="w" data-s="67451" data-e="67835">yet</span> <span class="w" data-s="67878" data-e="68049">he</span> <span class="w" data-s="68091" data-e="68262">had</span> <span class="w target" data-s="68305" data-e="68689" title="兴旺，繁荣；茁壮成长">thrived</span> <span class="w" data-s="68731" data-e="69030">and</span> <span class="w" data-s="69073" data-e="69329">meant</span> <span class="w" data-s="69371" data-e="69542">to</span> <span class="w target" data-s="69585" data-e="69926" title="努力,奋斗">strive.</span></p><p class="zh">在这片贫瘠的地方，很少有东西能长得兴旺，可他却兴旺起来了，还打算一直奋斗下去。</p></div>
+<div class="pair" data-s0="70182" data-s1="72059"><p class="en"><span class="w" data-s="70182" data-e="70694">His</span> <span class="w" data-s="70779" data-e="70993">wife</span> <span class="w" data-s="71035" data-e="71249">had</span> <span class="w" data-s="71291" data-e="71419">been</span> <span class="w" data-s="71462" data-e="71590">gone</span> <span class="w" data-s="71633" data-e="71846">for</span> <span class="w" data-s="71889" data-e="72059">years.</span></p><p class="zh">他的妻子已经走了很多年。</p></div>
+<div class="pair" data-s0="72358" data-s1="76966"><p class="en"><span class="w" data-s="72358" data-e="72998">Their</span> <span class="w" data-s="73041" data-e="73126">life</span> <span class="w" data-s="73169" data-e="73382">had</span> <span class="w" data-s="73425" data-e="73510">been</span> <span class="w target" data-s="73553" data-e="73937" title="亲密的；密切的；个人隐私的 n. 密友，至交，知己">intimate</span> <span class="w" data-s="73979" data-e="74065">and</span> <span class="w" data-s="74107" data-e="74321">quiet,</span> <span class="w" data-s="74619" data-e="74790">and</span> <span class="w" data-s="75046" data-e="75302">he</span> <span class="w" data-s="75345" data-e="75473">kept</span> <span class="w" data-s="75515" data-e="75643">a</span> <span class="w target" data-s="75686" data-e="75814" title="">record</span> <span class="w" data-s="75857" data-e="76070">of</span> <span class="w" data-s="76113" data-e="76241">every</span> <span class="w" data-s="76283" data-e="76497">stone</span> <span class="w" data-s="76539" data-e="76795">he</span> <span class="w" data-s="76838" data-e="76966">cut.</span></p><p class="zh">他们的日子曾经亲密而安静，他把自己切过的每一块石头都记在本子上。</p></div>
+<div class="pair" data-s0="77613" data-s1="80301"><p class="en"><span class="w" data-s="77613" data-e="77698">He</span> <span class="w" data-s="77741" data-e="77869">did</span> <span class="w" data-s="77911" data-e="77997">not</span> <span class="w target" data-s="78039" data-e="78210" title="认为，把……看作n.致意，问候(通常是复 数 regards)">regard</span> <span class="w" data-s="78253" data-e="78509">the</span> <span class="w target" data-s="78551" data-e="78850" title="水晶，结晶体；晶粒">crystal</span> <span class="w" data-s="78893" data-e="78978">as</span> <span class="w" data-s="79021" data-e="79191">property</span> <span class="w" data-s="79234" data-e="79618">but</span> <span class="w" data-s="79874" data-e="80002">as</span> <span class="w" data-s="80045" data-e="80130">a</span> <span class="w" data-s="80173" data-e="80301">guest.</span></p><p class="zh">他不把这块水晶当成财产，而当成一位客人。</p></div>
+<div class="pair" data-s0="80514" data-s1="83842"><p class="en"><span class="w" data-s="80514" data-e="80898">His</span> <span class="w" data-s="81069" data-e="81239">work</span> <span class="w" data-s="81282" data-e="81538">did</span> <span class="w" data-s="81581" data-e="81709">not</span> <span class="w target" data-s="81751" data-e="82093" title="(与……)一致，符合；配合n. 协议，条约； 符合，一致">accord</span> <span class="w" data-s="82135" data-e="82221">with</span> <span class="w" data-s="82263" data-e="82477">fashion,</span> <span class="w" data-s="82733" data-e="82946">and</span> <span class="w" data-s="83159" data-e="83330">he</span> <span class="w" data-s="83373" data-e="83458">did</span> <span class="w" data-s="83501" data-e="83629">not</span> <span class="w" data-s="83671" data-e="83842">care.</span></p><p class="zh">他的手艺跟时髦并不合拍，他也不在乎。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">grind</span>
+          <span class="ipa">/graind/</span>
+          <span class="pos"></span>
+          <span class="cn">刺耳的摩擦声；令人疲惫的工作 v. 磨碎， 磨光；用力挤压；摩擦</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would grind a rough stone against the wheel</div>          <div class="mnem"><span class="lbl">记</span>gr(官人的首字母缩写)十in(里 面)+d(刀的拼音声母)，官人每天在家里磨刀， 准备找法海，给白娘子报仇啊→磨碎，磨光。</div>          <div class="root"><span class="lbl">根</span>gr(磨东西的拟声) + ind → 磨碎，磨光</div>          <div class="fam"><span class="lbl">族</span>grinder n. 研磨机；磨床</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">polish</span>
+          <span class="ipa">/&#x27;ppliʃ/</span>
+          <span class="pos">n.</span>
+          <span class="cn">擦光剂v.擦亮，磨光</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>polish it until it shone</div>          <div class="mnem"><span class="lbl">记</span>polish 的 po 发音似“抛(光)”， 抛光就是“擦亮，磨光”。</div>          <div class="root"><span class="lbl">根</span>pol(抛) + ish(动词后缀) → 抛光 → 擦亮</div>          <div class="zt"><span class="lbl">真题</span>A writer should polish his writing repeatedly so as to get closer to perfection. 作家应该反复 打磨他的作品，以更接近完美。</div>          <div class="fam"><span class="lbl">族</span>polished adj. 擦亮的；优雅的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">burst</span>
+          <span class="ipa">/b3:rst/</span>
+          <span class="pos">v.</span>
+          <span class="cn">爆炸，爆裂；突然发生 n. 爆炸；突发</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The burst of sound came</div>          <div class="mnem"><span class="lbl">记</span>没有(bu不，就是没有)花(r想 成花)在街上(st 想成 street)。今天情人节，别 人手里都有花，你就生气了，给你男朋友打电 话，就爆发了吧！→爆炸；突发。</div>          <div class="root"><span class="lbl">根</span>联想：没有(bu)花(r)在街上(st) → 气炸了 → 爆发</div>          <div class="zt"><span class="lbl">真题</span>We do work that gives us bursts of joy each new day. 我们所做的工作让我们每一天都 充满了喜悦。(2020)</div>          <div class="fam"><span class="lbl">族</span>bursting adj. 爆满的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">blast</span>
+          <span class="ipa">/blæst/</span>
+          <span class="pos">n.</span>
+          <span class="cn">爆炸；一阵(风)，一股(气流) v. 炸，炸掉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>workers set a small blast at the far end</div>          <div class="mnem"><span class="lbl">记</span>b(不)+last(持续)，放烟花的 时候，如果捻子比较短，点燃后烟花就立刻“爆 炸”了。爆炸不就是瞬间的事情嘛？所以该单 词引申为“一阵，一股”。</div>          <div class="root"><span class="lbl">根</span>b(不) + last(持续) → 不持续的瞬间 → 爆炸；一阵</div>          <div class="zt"><span class="lbl">真题</span>The blast hit a bus about to set off for the Ugandan capital Kampala. 一辆准备开往乌 干达首都坎帕拉的公共汽车发生了爆炸。(2015)</div>          <div class="fam"><span class="lbl">族</span>blast off 发射升空</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">explode</span>
+          <span class="ipa">/ık&#x27;spləud/</span>
+          <span class="pos">v.</span>
+          <span class="cn">爆炸；激增;爆发</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rock exploded outward</div>          <div class="mnem"><span class="lbl">记</span>ex表示“向外”，把 plo想成爆 炸的声音，de表示“往下”，想象我们放烟火，烟 火朝外爆炸后又落下来，所以该单词意思是“爆 炸；爆发”。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + plod(拟声) + e → 向外炸开</div>          <div class="zt"><span class="lbl">真题</span>Most were sold in Europe and China, where the bikes already have exploded in popularity.其中大部分在欧洲和中国销售，在 那里，这种自行车的受欢迎程度激增。(2020)</div>          <div class="fam"><span class="lbl">族</span>explosion n. 爆炸 / explosive adj. 爆炸性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">explore</span>
+          <span class="ipa">/1k&#x27;splə:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">勘查;探索;研究</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He explored the old mine alone</div>          <div class="mnem"><span class="lbl">记</span>ex表示“往外”，plo发音似汉 语“扑姥”，re字母发音似汉语“阿姨”，所以连在 一起解释就是：你姥姥和阿姨来你家做客，你朝 外扑向姥姥和阿姨，为什么呢？向她们“探索” 那过去的事情啊。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + plor(喊) + e → 出去喊一喊、看一看 → 探索</div>          <div class="zt"><span class="lbl">真题</span>Suppose we built a robot(机 器 人) to explore the planet Mars. 假设我们制造了一个 机器人来探索火星这个星球。</div>          <div class="fam"><span class="lbl">族</span>exploration n. 探索 / explorer n. 探险家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">exploit</span>
+          <span class="ipa">/ık&#x27;spləit, &#x27;ekspləit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">利用，开发，开拓；剥削n.英勇事迹，壮举</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Others came to exploit the mountain for quick money</div>          <div class="mnem"><span class="lbl">记</span>这个不是扑向姥姥了，是扑向it (它)，把它想成山或海都行，人类扑到海里、山 里，干什么？→开采，开发。</div>          <div class="root"><span class="lbl">根</span>ex(向外) + ploit(用) → 把里面的东西用出来 → 开发；利用</div>          <div class="zt"><span class="lbl">真题</span>Creating the future you want is a lot easier if you are ready to exploit the opportunities that come your way. 如果你准备好利用你遇到 的机会，创造你想要的未来就会容易得多。 (2017)</div>          <div class="fam"><span class="lbl">族</span>exploitation n. 开发；剥削</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">shed</span>
+          <span class="ipa">/∫ed/</span>
+          <span class="pos">n.</span>
+          <span class="cn">简易房；棚v.散发出光；把光照到；流，洒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small shed behind his house</div>          <div class="mnem"><span class="lbl">记</span>她(she)的(d)眼泪流了出来。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a tool shed 工具棚 → 简易房；棚</div>          <div class="fam"><span class="lbl">族</span>shed tears 流泪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">tear</span>
+          <span class="ipa">/ter, tir/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the shock could tear a coat open</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“太饿”。我太 饿了，“撕开”食物的包装盒就吃起来了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：tear a coat 撕破外套 → 撕开</div>          <div class="zt"><span class="lbl">真题</span>Cultural differences often tear apart a family built on romantic love. 文化差异常常使 建立在浪漫爱情基础上的家庭四分五裂。</div>          <div class="fam"><span class="lbl">族</span>tearful adj. 含泪的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">crystal</span>
+          <span class="ipa">/&#x27;krıstl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">水晶，结晶体；晶粒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a clear crystal, the size of a plum</div>          <div class="mnem"><span class="lbl">记</span>动漫里，一个女孩在街上(st联 想成 street)哭了(cry),眼泪变成了“水晶”在空 中飘！</div>          <div class="root"><span class="lbl">根</span>cryst(冰) + al → 像冰一样透明的石头 → 水晶</div>          <div class="zt"><span class="lbl">真题</span>For example, we have quartz crystal clocks and watches accurate to within one minute a year.例如，我们有石英水晶钟和手 表，每年精确到一分钟以内。(2017)</div>          <div class="fam"><span class="lbl">族</span>crystalline adj. 结晶的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">beard</span>
+          <span class="ipa">/brəd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">胡须</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Old Chen had a beard as white as salt</div>          <div class="mnem"><span class="lbl">记</span>结合bear这个单词来记，bear (熊)+d(的)，熊的“胡须”很长。</div>          <div class="root"><span class="lbl">根</span>联想：bear(熊) + d(的) → 熊的胡须很长</div>          <div class="fam"><span class="lbl">族</span>bearded adj. 有胡须的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">treasure</span>
+          <span class="ipa">/&#x27;trezər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In the broken wall he found a treasure</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“揣着”。不想让 外人看到，揣着的东西，一定是“宝贝”啊。</div>          <div class="root"><span class="lbl">根</span>谐音/联想：发音像「揣着」→ 揣着的东西是宝贝</div>          <div class="zt"><span class="lbl">真题</span>The destruction of these treasures was a loss for mankind that no amount of money could make up. 这些宝藏的毁灭是人类的损失， 再多的钱也无法弥补。</div>          <div class="fam"><span class="lbl">族</span>treasurer n. 财务主管</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">precious</span>
+          <span class="ipa">/&#x27;preʃəs/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was precious enough to make his hands shake</div>          <div class="mnem"><span class="lbl">记</span>这个单词来自price(价格)，是 以ious结尾的形容词，有价格的，就是“珍贵 的”。</div>          <div class="root"><span class="lbl">根</span>preci(价格) + ous(形容词后缀) → 有价钱的 → 珍贵的</div>          <div class="zt"><span class="lbl">真题</span>The brain is a seemingly endless library, whose shelves house our most precious memories as well as our lifetime&#x27;s knowledge. 大脑似乎是一个无穷无尽的图书馆，它的书架 上存放着我们最珍贵的记忆以及我们一生的知 识。(2017)</div>          <div class="fam"><span class="lbl">族</span>price n. 价格 / precious stone 宝石</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">devalue</span>
+          <span class="ipa">/di:&#x27;vælju:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">贬值；降低……的价值</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>selling it in a hurry would devalue it</div>          <div class="mnem"><span class="lbl">记</span>把价值(value)往下(de)说，就 是“贬值”。</div>          <div class="root"><span class="lbl">根</span>de(向下) + value(价值) → 把价值往下降 → 贬值</div>          <div class="fam"><span class="lbl">族</span>value n. 价值 / devaluation n. 贬值</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">estimate</span>
+          <span class="ipa">/&#x27;estimeit,&#x27;estimət/</span>
+          <span class="pos">v.</span>
+          <span class="cn">估计，估价，评估n. 估计，估价，评估</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He could not estimate its worth</div>          <div class="mnem"><span class="lbl">记</span>est(最)i(爱)mate(朋友)，假如 你有三个朋友，你最偏爱谁呢？我也不知道，只 能“评估，估计”了。</div>          <div class="root"><span class="lbl">根</span>estim(价值) + ate(动词后缀) → 定出价值 → 估计</div>          <div class="zt"><span class="lbl">真题</span>Surveys estimate that 85% of women and 73% of men report feeling better after shedding tears. 调查估计，85%的女性和73% 的男性称流泪后感觉更好。</div>          <div class="fam"><span class="lbl">族</span>estimation n. 判断 / overestimate v. 高估</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">ultimate</span>
+          <span class="ipa">/&#x27;altimət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">最后的，最终的；极端的；最好(或坏等)的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The ultimate price, he felt, was not money</div>          <div class="mnem"><span class="lbl">记</span>ulti发音类似“啊呕提”，当我们 发出“啊呕”的音时，就是一件事情到最后的时 候；mate朋友，等到“最后”才会提到朋友。</div>          <div class="root"><span class="lbl">根</span>ultim(最远) + ate → 走到最远 → 最终的</div>          <div class="zt"><span class="lbl">真题</span>The ultimate social network is still being mapped out, but Christakis says: &quot;People are interconnected, so their health is interconnected&quot;. 最终的社交网仍在规划中，但克里斯塔基斯说： “人们是相互联系的，所以他们的健康是相互联 系的”。(2010)</div>          <div class="fam"><span class="lbl">族</span>ultimately adv. 最终 / ultimatum n. 最后通牒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">intimate</span>
+          <span class="ipa">/&#x27;Intimət/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">亲密的；密切的；个人隐私的 n. 密友，至交，知己</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Their life had been intimate and quiet</div>          <div class="mnem"><span class="lbl">记</span>in(里面，即内心)，ti(读成汉语 的“提”)，mate(朋友，配偶)，连在一起就是内心 会提到的朋友，就是你的“密友”。区别：inmate (里面的朋友)，意思则是“狱友，同住者”。</div>          <div class="root"><span class="lbl">根</span>in(内) + tim(最里面) + ate → 走进内心 → 亲密的</div>          <div class="zt"><span class="lbl">真题</span>Using voice interaction feels far more intimate than surfing the net the old-fashioned way.使用语音交互比老式的上网方式感觉亲 密得多。(2023)</div>          <div class="fam"><span class="lbl">族</span>intimacy n. 亲密；私密</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">approximate</span>
+          <span class="ipa">/ə&#x27;pra:ksimət,ə&#x27;pra:ksimeit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">大约的，近似的；接近的v.近似，接近； 估算</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>only give an approximate price</div>          <div class="mnem"><span class="lbl">记</span>ap(一再地)+ pro(往前）+ xi (读成汉语的“西”)+mate(配偶)，连到一起就 是一再地朝前往西走，你就会“大概，大约”找到 你的配偶。编个故事：你35岁了，至今未婚，找 朋友倾诉，他让你多出去走走，你就会“大概，大 约”找到你的配偶，他不会说你绝对能找到吧？ 万一找不到呢？所以这个单词的意思是“大约 的，接近的”。</div>          <div class="root"><span class="lbl">根</span>ap(向) + proxim(最近) + ate → 靠得很近的 → 大约的</div>          <div class="fam"><span class="lbl">族</span>approximately adv. 大约</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">reckon</span>
+          <span class="ipa">/&#x27;rekən/</span>
+          <span class="pos">v.</span>
+          <span class="cn">估算；计算；认为</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He reckoned it might pay for a new roof</div>          <div class="mnem"><span class="lbl">记</span>reckon 可以拆分为 re(阿姨)喜 欢一个品牌的衣服，叫CK，今天买了好几件，把 手放在衣服上(on)，“估算”这得需要多少钱啊。</div>          <div class="root"><span class="lbl">根</span>re(再) + ck(想成 count 计算) + on → 再算一遍 → 估算</div>          <div class="zt"><span class="lbl">真题</span>I reckon I&#x27;m going to pass the examination smoothly. 我认为我会顺利通过这次考试。</div>          <div class="fam"><span class="lbl">族</span>reckoning n. 计算；清算</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">reckless</span>
+          <span class="ipa">/&#x27;rekləs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">鲁莽的，不顾后果的；粗心大意的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he was never reckless</div>          <div class="root"><span class="lbl">根</span>reck(留心) + less(无) → 不留心 → 鲁莽的</div>          <div class="fam"><span class="lbl">族</span>recklessly adv. 鲁莽地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">region</span>
+          <span class="ipa">/&#x27;ri:dçən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地区;(身体)部位</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had lived in this region for forty years</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“瑞金”。瑞金就 是江西的一个“地区”。</div>          <div class="root"><span class="lbl">根</span>reg(统治) + ion → 管辖的一片地 → 地区</div>          <div class="zt"><span class="lbl">真题</span>There are lots of different dishes to try and every region has its own special food. 有很 多不同的菜肴可以尝试，每个地区都有自己的 特色食物。(2018)</div>          <div class="fam"><span class="lbl">族</span>regional adj. 地区的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">origin</span>
+          <span class="ipa">/&#x27;vrıd5ın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">起源；源头；出身；起因</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>This crystal had its origin deep in the mountain</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“啊瑞金”。江西 瑞金是长征精神的发源地，所以其意思为“起 源；源头”。</div>          <div class="root"><span class="lbl">根</span>ori(升起) + gin → 太阳升起的地方 → 起源</div>          <div class="zt"><span class="lbl">真题</span>Yuka Sasaki and her colleagues at Brown University set out to investigate the origins of this effect. 布朗大学的佐佐木优香和她的同事 开始调查这种效应的起源。(2017)</div>          <div class="fam"><span class="lbl">族</span>original adj. 最初的 / originality n. 独创性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">originate</span>
+          <span class="ipa">/ə&#x27;rıd3ınert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(from)创建;起源</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>such stones originate in heat and pressure</div>          <div class="root"><span class="lbl">根</span>origin(起源) + ate(动词后缀) → 起源，发源</div>          <div class="zt"><span class="lbl">真题</span>She doesn&#x27;t really know where they originated.她不知道它们的起源。</div>          <div class="fam"><span class="lbl">族</span>origin n. 起源 / original adj. 最初的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">derive</span>
+          <span class="ipa">/dı&#x27;raiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">追溯……的起源，源于；得到，获得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From the same rock he had once derived a small blue one</div>          <div class="mnem"><span class="lbl">记</span>de想成“弟弟”，rive类似“river (河)”。derive就解释为：弟弟沿着河走，去寻 找河的源头。</div>          <div class="root"><span class="lbl">根</span>de(从…来) + riv(河) + e → 从河里引出水 → 源于；得到</div>          <div class="zt"><span class="lbl">真题</span>She always derives great pleasure from designing something new. 她总是从设计新东 西中获得极大的乐趣。(2017)</div>          <div class="fam"><span class="lbl">族</span>derivation n. 起源 / derivative n. 衍生物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">deprive</span>
+          <span class="ipa">/dı&#x27;praiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">剥夺；使丧失</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mine never deprived him of work</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)扑到(p)河(rive想成 river)里去抓鱼？挖掘河里的矿藏？无论干什 么，都是要从河里拿出来点东西→剥夺，掠夺。</div>          <div class="root"><span class="lbl">根</span>de(去掉) + priv(私有) + e → 把私有的拿走 → 剥夺</div>          <div class="zt"><span class="lbl">真题</span>Online systems may deprive teachers of opportunities to make the best use of their expertise for their students. 在线系统可能会剥 夺教师们为学生充分利用其专业知识的机会。</div>          <div class="fam"><span class="lbl">族</span>deprivation n. 剥夺；贫困</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">thrive</span>
+          <span class="ipa">/θratv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">兴旺，繁荣；茁壮成长</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Few things thrive in this hard region</div>          <div class="mnem"><span class="lbl">记</span>thr 想成 three(三)，rive 想成 river(河)，那连在一起就是：三河交汇处。三河 交汇的地方是不是经济发展得比较好？意思就 是“繁荣，兴旺”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：thrive on 靠…兴旺 → 兴旺，茁壮成长</div>          <div class="zt"><span class="lbl">真题</span>Although in-flight infections thrive in dry environments like airplanes, your risk of getting sick from an airplane is actually low because of the air filters used. 虽然飞机上的感 染在干燥的环境中很常见，但由于使用了空气 过滤器，你在飞机上生病的风险实际上很低。 (2019)</div>          <div class="fam"><span class="lbl">族</span>thriving adj. 兴旺的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">strive</span>
+          <span class="ipa">/straiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">努力,奋斗</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he had thrived and meant to strive</div>          <div class="mnem"><span class="lbl">记</span>st 想成 street(街道),rive 想成 river(河)，连在一起就是：你有一个大胆的想 法，在街上挖条河，这很具有挑战性，你再“努 力，奋斗”也不一定能成功啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：strive to do 努力做某事 → 努力，奋斗</div>          <div class="zt"><span class="lbl">真题</span>But the new paper suggests that if you want long life, you should strive to be as outgoing as possible. 但这篇新文章建议，如果 你想长寿，你应该尽可能地外向。(2016)</div>          <div class="fam"><span class="lbl">族</span>striving n. 努力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">accord</span>
+          <span class="ipa">/ə&#x27;kə:rd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(与……)一致，符合；配合n. 协议，条约； 符合，一致</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His work did not accord with fashion</div>          <div class="mnem"><span class="lbl">记</span>一再地（ac）靠的（cord的谐 音)，一再地靠着一个人，那你的行为就得和他 “一致”啊。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + cord(心) → 心往一处想 → 一致，符合</div>          <div class="zt"><span class="lbl">真题</span>Apple&#x27;s products were designed to accord with the boss&#x27;s tastes and to meet his extremely high standards. 苹果的产品是为了 符合老板的品位和满足他极高的标准而设 计的。 (056)</div>          <div class="fam"><span class="lbl">族</span>accordance n. 一致 / according to 根据</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">record</span>
+          <span class="ipa">/&#x27;rekərd, rı&#x27;kərd/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he kept a record of every stone he cut</div>          <div class="mnem"><span class="lbl">记</span>阿姨(re)拷的(cord)，阿姨拷的 是什么？→录音，录像。</div>          <div class="root"><span class="lbl">根</span>re(再) + cord(心) → 再记到心里 → 记录</div>          <div class="zt"><span class="lbl">真题</span>Nobody flourishes in a gloomy environment with irresponsible staff and a poor safety record.在一个员工不负责任、安全记录不好的 阴郁环境中，没有人能有所成就。(2016)</div>          <div class="fam"><span class="lbl">族</span>recorder n. 录音机 / recording n. 录音</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">regard</span>
+          <span class="ipa">/rı&#x27;ga:rd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">认为，把……看作n.致意，问候(通常是复 数 regards)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He did not regard the crystal as property but as a guest</div>          <div class="mnem"><span class="lbl">记</span>阿姨（re）向士兵（gard想成 guard)“致意”。</div>          <div class="root"><span class="lbl">根</span>re(再) + gard(看) → 再看一眼 → 认为，把…看作</div>          <div class="zt"><span class="lbl">真题</span>Some people regard professional change as an unpleasant experience that disturbs their stable careers. 有些人认为转行是一种不愉快 的经历，会扰乱他们稳定的职业生涯。(2017)</div>          <div class="fam"><span class="lbl">族</span>regarding prep. 关于 / regardless adv. 不管怎样</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 2 · Day 14</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
