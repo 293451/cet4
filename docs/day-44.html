@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 44 · The Last Story at Gull&#x27;s Point</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 44 · 11/25 · Unit 7 第 1291-1320 词</div>
+  <h1>The Last Story at Gull&#x27;s Point<span class="cn">海鸥角的最后一个故事</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-44.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="6784"><p class="en"><span class="w" data-s="43" data-e="213">Every</span> <span class="w" data-s="256" data-e="469">spring,</span> <span class="w" data-s="725" data-e="939">the</span> <span class="w" data-s="1237" data-e="1408">same</span> <span class="w" data-s="1451" data-e="1664">thing</span> <span class="w target" data-s="1707" data-e="2048" title="发生；出现，存在">occurs</span> <span class="w" data-s="2091" data-e="2219">on</span> <span class="w" data-s="2261" data-e="2304">the</span> <span class="w" data-s="2347" data-e="2475">mud</span> <span class="w" data-s="2517" data-e="2859">beside</span> <span class="w" data-s="2901" data-e="3029">the</span> <span class="w" data-s="3072" data-e="3328">harbour</span> <span class="w" data-s="3371" data-e="3456">of</span> <span class="w" data-s="3499" data-e="3755">Gull&#x27;s</span> <span class="w" data-s="3797" data-e="3968">Point:</span> <span class="w" data-s="4139" data-e="4693">deep</span> <span class="w" data-s="4736" data-e="5077">marks</span> <span class="w target" data-s="5120" data-e="5461" title="再出现；反复出现；一再发生">recur</span> <span class="w" data-s="5504" data-e="5717">in</span> <span class="w" data-s="5760" data-e="5973">exactly</span> <span class="w" data-s="6016" data-e="6357">the</span> <span class="w" data-s="6400" data-e="6528">same</span> <span class="w" data-s="6571" data-e="6784">place.</span></p><p class="zh">每年春天，海鸥角港口旁的泥滩上都会发生同一件事：同一个地方会一再出现深深的印痕。</p></div>
+<div class="pair" data-s0="7040" data-s1="8491"><p class="en"><span class="w" data-s="7040" data-e="7936">Nobody</span> <span class="w" data-s="7979" data-e="8064">can</span> <span class="w target" data-s="8107" data-e="8277" title="痕迹；遗迹；踪迹；微量；少许 v. 追溯；追究">trace</span> <span class="w" data-s="8320" data-e="8491">them.</span></p><p class="zh">谁也追查不出它们的来历。</p></div>
+<div class="pair" data-s0="9094" data-s1="15281"><p class="en"><span class="w" data-s="9094" data-e="9265">A</span> <span class="w" data-s="9307" data-e="9435">boy</span> <span class="w" data-s="9478" data-e="9691">named</span> <span class="w" data-s="9734" data-e="9905">Tom</span> <span class="w" data-s="9947" data-e="10246">once</span> <span class="w" data-s="10289" data-e="10502">followed</span> <span class="w" data-s="10545" data-e="10758">the</span> <span class="w target" data-s="10801" data-e="10843" title="痕迹；踪迹；小径；路线v.跟踪；拖；疲惫 地走">trail</span> <span class="w" data-s="10886" data-e="11142">for</span> <span class="w" data-s="11185" data-e="11270">a</span> <span class="w" data-s="11313" data-e="11398">mile</span> <span class="w" data-s="11441" data-e="11739">and</span> <span class="w" data-s="11995" data-e="12123">tried</span> <span class="w" data-s="12166" data-e="12294">to</span> <span class="w target" data-s="12337" data-e="12422" title="跟踪；追踪 n. 轨道；踪迹，(人、动物或车辆 留下的)足迹">track</span> <span class="w" data-s="12465" data-e="12635">the</span> <span class="w" data-s="12678" data-e="12934">animal</span> <span class="w" data-s="12977" data-e="13062">that</span> <span class="w" data-s="13105" data-e="13233">left</span> <span class="w" data-s="13275" data-e="13403">it,</span> <span class="w" data-s="13531" data-e="13745">but</span> <span class="w" data-s="13873" data-e="14001">the</span> <span class="w" data-s="14043" data-e="14171">tide</span> <span class="w" data-s="14214" data-e="14513">washed</span> <span class="w" data-s="14555" data-e="14683">every</span> <span class="w target" data-s="14726" data-e="14982" title="跟踪；追踪 n. 轨道；踪迹，(人、动物或车辆 留下的)足迹">track</span> <span class="w" data-s="15025" data-e="15281">away.</span></p><p class="zh">一个叫汤姆的男孩曾沿着那道踪迹走了一英里，想追踪留下它的那只动物，可潮水把每个足迹都冲掉了。</p></div>
+<div class="pair" data-s0="15963" data-s1="18566"><p class="en"><span class="w" data-s="15963" data-e="16006">&quot;We</span> <span class="w" data-s="16049" data-e="16219">must</span> <span class="w target" data-s="16262" data-e="16603" title="控制，抑制；限定，约束(不好的事物) n. 控制；限制">curb</span> <span class="w" data-s="16646" data-e="16774">such</span> <span class="w" data-s="16817" data-e="17030">wild</span> <span class="w" data-s="17073" data-e="17414">stories,&quot;</span> <span class="w" data-s="18011" data-e="18097">said</span> <span class="w" data-s="18139" data-e="18310">the</span> <span class="w" data-s="18353" data-e="18566">mayor.</span></p><p class="zh">“我们得管住这些胡编的故事，”镇长说。</p></div>
+<div class="pair" data-s0="18737" data-s1="19889"><p class="en"><span class="w" data-s="18737" data-e="18865">The</span> <span class="w" data-s="18907" data-e="19078">stories</span> <span class="w" data-s="19121" data-e="19377">came</span> <span class="w" data-s="19419" data-e="19590">back</span> <span class="w" data-s="19633" data-e="19889">anyway.</span></p><p class="zh">可故事还是照样回来。</p></div>
+<div class="pair" data-s0="20102" data-s1="23302"><p class="en"><span class="w" data-s="20102" data-e="20955">Tom&#x27;s</span> <span class="w" data-s="20998" data-e="21083">little</span> <span class="w" data-s="21126" data-e="21297">sister</span> <span class="w" data-s="21339" data-e="21766">Amy</span> <span class="w" data-s="21809" data-e="21937">liked</span> <span class="w" data-s="21979" data-e="22107">to</span> <span class="w target" data-s="22150" data-e="22406" title="落水声；溅洒后留下的污渍v. 把(水、泥 等)泼在……上，溅在……上">splash</span> <span class="w" data-s="22449" data-e="22662">through</span> <span class="w" data-s="22705" data-e="22790">the</span> <span class="w" data-s="22833" data-e="23131">shallow</span> <span class="w" data-s="23174" data-e="23302">water.</span></p><p class="zh">汤姆的小妹妹艾米喜欢在浅水里哗啦哗啦地蹚水。</p></div>
+<div class="pair" data-s0="24163" data-s1="28301"><p class="en"><span class="w" data-s="24163" data-e="24291">Her</span> <span class="w" data-s="24333" data-e="24461">face</span> <span class="w" data-s="24504" data-e="24675">would</span> <span class="w target" data-s="24717" data-e="25016" title="脸红；冲洗 v. 脸红；冲洗">flush</span> <span class="w" data-s="25059" data-e="25144">with</span> <span class="w" data-s="25187" data-e="25400">joy,</span> <span class="w" data-s="25699" data-e="25869">and</span> <span class="w" data-s="26211" data-e="26381">she</span> <span class="w" data-s="26424" data-e="26509">would</span> <span class="w target" data-s="26552" data-e="26808" title="&amp; v. 脸红">blush</span> <span class="w" data-s="26851" data-e="27064">when</span> <span class="w" data-s="27107" data-e="27235">the</span> <span class="w" data-s="27277" data-e="27320">other</span> <span class="w" data-s="27363" data-e="27533">children</span> <span class="w" data-s="27576" data-e="27917">turned</span> <span class="w" data-s="27960" data-e="28173">to</span> <span class="w" data-s="28216" data-e="28301">look.</span></p><p class="zh">她高兴得满脸通红，别的孩子一看她，她就脸红。</p></div>
+<div class="pair" data-s0="28515" data-s1="32269"><p class="en"><span class="w" data-s="28515" data-e="29283">Nearly</span> <span class="w" data-s="29325" data-e="29539">everyone</span> <span class="w" data-s="29581" data-e="29795">in</span> <span class="w" data-s="29837" data-e="29880">the</span> <span class="w" data-s="29923" data-e="30008">town</span> <span class="w" data-s="30051" data-e="30520">shared</span> <span class="w" data-s="30563" data-e="30691">one</span> <span class="w target" data-s="30733" data-e="31160" title="姓">surname,</span> <span class="w target" data-s="31416" data-e="32013" title="即；也就是">namely</span> <span class="w" data-s="32056" data-e="32269">Lin.</span></p><p class="zh">镇上几乎所有人都同一个姓，也就是姓林。</p></div>
+<div class="pair" data-s0="33005" data-s1="40173"><p class="en"><span class="w" data-s="33005" data-e="33176">In</span> <span class="w" data-s="33218" data-e="33304">the</span> <span class="w" data-s="33346" data-e="33474">old</span> <span class="w" data-s="33517" data-e="33645">house</span> <span class="w" data-s="33688" data-e="33901">by</span> <span class="w" data-s="33944" data-e="34072">the</span> <span class="w" data-s="34114" data-e="34200">water,</span> <span class="w" data-s="34456" data-e="34840">an</span> <span class="w target" data-s="34882" data-e="35181" title="婴儿；幼儿；四岁到七岁之间的学童">infant</span> <span class="w" data-s="35224" data-e="35608">slept,</span> <span class="w target" data-s="35736" data-e="36546" title="">adolescents</span> <span class="w target" data-s="36589" data-e="36930" title="无所事事，虚度；闲荡 adj.懒惰的，无所事 事的">idled</span> <span class="w" data-s="36973" data-e="37058">on</span> <span class="w" data-s="37101" data-e="37186">the</span> <span class="w" data-s="37229" data-e="37357">stone</span> <span class="w" data-s="37400" data-e="37656">steps,</span> <span class="w" data-s="37954" data-e="38338">and</span> <span class="w" data-s="38381" data-e="38466">a</span> <span class="w target" data-s="38509" data-e="38765" title="年轻人;少年；儿童">youngster</span> <span class="w" data-s="38808" data-e="39021">ran</span> <span class="w" data-s="39064" data-e="39234">along</span> <span class="w" data-s="39277" data-e="39448">the</span> <span class="w" data-s="39490" data-e="39704">shore</span> <span class="w" data-s="39746" data-e="39917">with</span> <span class="w" data-s="39960" data-e="40045">a</span> <span class="w" data-s="40088" data-e="40173">dog.</span></p><p class="zh">水边的老屋里，一个婴儿在睡觉，几个青少年在石阶上闲坐着，一个少年带着狗沿着岸边跑。</p></div>
+<div class="pair" data-s0="40429" data-s1="44226"><p class="en"><span class="w" data-s="40429" data-e="41154">Only</span> <span class="w" data-s="41197" data-e="41282">the</span> <span class="w target" data-s="41325" data-e="41581" title="年纪较长的 n. 长者；长辈；元老；(某些 基督教会中的)长老">elder</span> <span class="w" data-s="41624" data-e="41709">of</span> <span class="w" data-s="41752" data-e="41794">the</span> <span class="w" data-s="41837" data-e="42008">family,</span> <span class="w" data-s="42264" data-e="42904">Grandmother</span> <span class="w" data-s="42946" data-e="43245">Lin,</span> <span class="w" data-s="43416" data-e="43757">still</span> <span class="w" data-s="43800" data-e="44013">worked</span> <span class="w" data-s="44056" data-e="44226">hard.</span></p><p class="zh">只有家里的长辈林奶奶还在辛苦地干活。</p></div>
+<div class="pair" data-s0="44959" data-s1="50377"><p class="en"><span class="w" data-s="44959" data-e="45215">Years</span> <span class="w" data-s="45257" data-e="45428">before,</span> <span class="w" data-s="45727" data-e="45897">her</span> <span class="w" data-s="45940" data-e="46068">two</span> <span class="w" data-s="46111" data-e="46452">sons</span> <span class="w" data-s="46495" data-e="46623">had</span> <span class="w target" data-s="46665" data-e="47007" title="移居国外；移民">emigrated</span> <span class="w" data-s="47049" data-e="47177">to</span> <span class="w" data-s="47220" data-e="47561">Canada,</span> <span class="w" data-s="47689" data-e="47860">and</span> <span class="w" data-s="47988" data-e="48329">a</span> <span class="w" data-s="48372" data-e="48415">new</span> <span class="w" data-s="48457" data-e="48756">teacher</span> <span class="w" data-s="48799" data-e="48927">from</span> <span class="w" data-s="48969" data-e="49055">the</span> <span class="w" data-s="49097" data-e="49225">north</span> <span class="w" data-s="49268" data-e="49481">had</span> <span class="w target" data-s="49524" data-e="49908" title="(从外地)移居；移民">immigrated</span> <span class="w" data-s="49951" data-e="50121">to</span> <span class="w" data-s="50164" data-e="50249">the</span> <span class="w" data-s="50292" data-e="50377">town.</span></p><p class="zh">多年前，她的两个儿子移居去了加拿大，而一位从北方来的新教师移居到了这个镇上。</p></div>
+<div class="pair" data-s0="50676" data-s1="53791"><p class="en"><span class="w" data-s="50676" data-e="51231">Every</span> <span class="w" data-s="51273" data-e="51785">autumn,</span> <span class="w" data-s="51913" data-e="52041">wild</span> <span class="w" data-s="52127" data-e="52553">birds</span> <span class="w target" data-s="52596" data-e="53065" title="(随季节变化)迁徙；移居；迁移；移动；转移">migrated</span> <span class="w" data-s="53108" data-e="53279">over</span> <span class="w" data-s="53321" data-e="53449">the</span> <span class="w" data-s="53492" data-e="53791">harbour.</span></p><p class="zh">每年秋天，野鸟都会从港口上空迁徙而过。</p></div>
+<div class="pair" data-s0="54295" data-s1="56428"><p class="en"><span class="w" data-s="54295" data-e="54551">Tonight</span> <span class="w" data-s="54593" data-e="54721">the</span> <span class="w" data-s="54764" data-e="54892">town</span> <span class="w" data-s="54935" data-e="55191">held</span> <span class="w" data-s="55233" data-e="55404">its</span> <span class="w" data-s="55447" data-e="55916">storytelling</span> <span class="w target" data-s="55959" data-e="56428" title="竞争；比赛 v. 争取赢得">contest.</span></p><p class="zh">今晚，镇上要举办讲故事比赛。</p></div>
+<div class="pair" data-s0="56684" data-s1="61164"><p class="en"><span class="w" data-s="56684" data-e="56897">The</span> <span class="w target" data-s="57068" data-e="57196" title="环境；背景；挡位">setting</span> <span class="w" data-s="57239" data-e="57452">was</span> <span class="w" data-s="57495" data-e="57665">simple:</span> <span class="w" data-s="57921" data-e="58263">a</span> <span class="w" data-s="58305" data-e="58561">lamp,</span> <span class="w" data-s="58732" data-e="58903">a</span> <span class="w target" data-s="58988" data-e="59287" title="地毯，毡毯，毛毯">carpet</span> <span class="w" data-s="59329" data-e="59415">on</span> <span class="w" data-s="59457" data-e="59500">the</span> <span class="w" data-s="59543" data-e="59671">floor,</span> <span class="w" data-s="59927" data-e="60097">and</span> <span class="w" data-s="60225" data-e="60396">the</span> <span class="w target" data-s="60439" data-e="60524" title="月球">moon</span> <span class="w" data-s="60567" data-e="60823">above</span> <span class="w" data-s="60865" data-e="61036">the</span> <span class="w" data-s="61079" data-e="61164">water.</span></p><p class="zh">场地很简陋：一盏灯、地上一块地毯，还有水面上方的月亮。</p></div>
+<div class="pair" data-s0="61463" data-s1="65089"><p class="en"><span class="w" data-s="61463" data-e="61591">In</span> <span class="w" data-s="61633" data-e="61719">that</span> <span class="w target" data-s="61761" data-e="62145" title="背景，上下文">context,</span> <span class="w" data-s="62401" data-e="62700">the</span> <span class="w" data-s="62743" data-e="62913">children</span> <span class="w" data-s="62956" data-e="63212">who</span> <span class="w" data-s="63255" data-e="63468">usually</span> <span class="w target" data-s="63511" data-e="64023" title="厌恶，讨厌">detested</span> <span class="w" data-s="64065" data-e="64236">reading</span> <span class="w" data-s="64279" data-e="64577">stood</span> <span class="w" data-s="64620" data-e="64748">up</span> <span class="w" data-s="64791" data-e="64919">and</span> <span class="w" data-s="64961" data-e="65089">spoke.</span></p><p class="zh">在这样的背景下，那些平时讨厌读书的孩子都站起来开了口。</p></div>
+<div class="pair" data-s0="65345" data-s1="69313"><p class="en"><span class="w" data-s="65345" data-e="65985">When</span> <span class="w" data-s="66028" data-e="66156">the</span> <span class="w" data-s="66199" data-e="66369">mayor</span> <span class="w" data-s="66412" data-e="66497">tried</span> <span class="w" data-s="66540" data-e="66668">to</span> <span class="w" data-s="66711" data-e="66967">cancel</span> <span class="w" data-s="67009" data-e="67095">the</span> <span class="w target" data-s="67137" data-e="67436" title="竞争；比赛 v. 争取赢得">contest,</span> <span class="w" data-s="67692" data-e="67948">the</span> <span class="w" data-s="67991" data-e="68161">parents</span> <span class="w target" data-s="68204" data-e="68887" title="&amp; v. 抗议；反对">protested</span> <span class="w" data-s="68929" data-e="69313">loudly.</span></p><p class="zh">镇长想取消比赛时，家长们大声抗议。</p></div>
+<div class="pair" data-s0="70219" data-s1="76022"><p class="en"><span class="w" data-s="70219" data-e="70560">Grandmother</span> <span class="w" data-s="70603" data-e="70859">Lin</span> <span class="w" data-s="70902" data-e="71115">told</span> <span class="w" data-s="71158" data-e="71328">the</span> <span class="w" data-s="71371" data-e="71456">last</span> <span class="w" data-s="71499" data-e="71798">story,</span> <span class="w" data-s="72054" data-e="72438">about</span> <span class="w" data-s="72480" data-e="72651">a</span> <span class="w target" data-s="72694" data-e="72950" title="(船或飞机装载的)货物">cargo</span> <span class="w" data-s="72992" data-e="73163">ship,</span> <span class="w" data-s="73419" data-e="73547">a</span> <span class="w" data-s="73718" data-e="73846">long</span> <span class="w target" data-s="73888" data-e="74144" title="生涯；职业；经历；事业">career</span> <span class="w" data-s="74187" data-e="74400">at</span> <span class="w" data-s="74443" data-e="74571">sea,</span> <span class="w" data-s="74827" data-e="74955">and</span> <span class="w" data-s="75126" data-e="75211">the</span> <span class="w target" data-s="75254" data-e="75382" title="疤 v. 使结疤；使……破损">scar</span> <span class="w" data-s="75424" data-e="75680">on</span> <span class="w" data-s="75723" data-e="75808">her</span> <span class="w" data-s="75851" data-e="76022">hand.</span></p><p class="zh">林奶奶讲了最后一个故事，关于一艘货船、一段漫长的海上生涯，和她手上的那道疤。</p></div>
+<div class="pair" data-s0="76278" data-s1="79307"><p class="en"><span class="w" data-s="76278" data-e="77088">Everyone</span> <span class="w" data-s="77131" data-e="77430">forgot</span> <span class="w" data-s="77472" data-e="77600">their</span> <span class="w target" data-s="77643" data-e="77984" title="胃口；爱好">appetite</span> <span class="w" data-s="78027" data-e="78155">for</span> <span class="w" data-s="78198" data-e="78496">supper</span> <span class="w" data-s="78539" data-e="78710">and</span> <span class="w" data-s="78752" data-e="79307">listened.</span></p><p class="zh">大家都忘了吃晚饭的胃口，只顾听着。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">occur</span>
+          <span class="ipa">/ə&#x27;k3ir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发生；出现，存在</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the same thing occurs on the mud beside the harbour</div>          <div class="mnem"><span class="lbl">记</span>发音类似：我（o的发音类似 “我”)卡(ccur的谐音)住了，就是“发生”了意 外啊。</div>          <div class="root"><span class="lbl">根</span>oc(向) + cur(跑) → 跑到眼前来</div>          <div class="zt"><span class="lbl">真题</span>It occurs when people are doing a repetitive activity.当人们在做重复的活动时， 它就会发生。</div>          <div class="fam"><span class="lbl">族</span>occurrence n. 发生；发生的事</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">recur</span>
+          <span class="ipa">/rı&#x27;k3:r/</span>
+          <span class="pos">v.</span>
+          <span class="cn">再出现；反复出现；一再发生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>deep marks recur in exactly the same place</div>          <div class="mnem"><span class="lbl">记</span>re这个前缀有“一而再，再而 三”的意思；cur的发音是不是很像“卡”？在拍 电影的时候，一个镜头拍得不好，导演要喊 “卡”，意思是停下来，重新拍摄，一再地喊“卡”， 可以记为“反复出现，一再发生”。</div>          <div class="root"><span class="lbl">根</span>re(再) + cur(跑) → 又跑回来</div>          <div class="fam"><span class="lbl">族</span>recurrence n. 再次发生 / recurring adj. 反复出现的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">curb</span>
+          <span class="ipa">/k3:rb/</span>
+          <span class="pos">v.</span>
+          <span class="cn">控制，抑制；限定，约束(不好的事物) n. 控制；限制</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>We must curb such wild stories</div>          <div class="mnem"><span class="lbl">记</span>cur 想象成 occur(发生)； b 想 象成“不”，连到一起就是“不发生”。让一件事 情不发生，就要“限制，抑制”这件事情的发生。</div>          <div class="root"><span class="lbl">根</span>cur(弯) + b → 把马拉弯回来 → 勒住</div>          <div class="zt"><span class="lbl">真题</span>Find more ways to curb students&#x27; unethical acts. 找到更多的方法来遏制学生的不道德行 为。(2022)</div>          <div class="fam"><span class="lbl">族</span>curb n. 抑制；路缘</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">trace</span>
+          <span class="ipa">/treis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">痕迹；遗迹；踪迹；微量；少许 v. 追溯；追究</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody can trace them</div>          <div class="mnem"><span class="lbl">记</span>race是“跑”，人在前面跑，后面 就有痕迹，可以被追踪到，trace就是“痕迹，追 踪”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：race(跑) → 跑过之后留下的</div>          <div class="zt"><span class="lbl">真题</span>Each time this initial memory trace is “replayed”,it becomes even stronger. 每次这 种最初的记忆痕迹被“重播”时，它就会变得更 加强烈。(2017)</div>          <div class="fam"><span class="lbl">族</span>traceable adj. 可追踪的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">trail</span>
+          <span class="ipa">/trerl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">痕迹；踪迹；小径；路线v.跟踪；拖；疲惫 地走</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>followed the trail for a mile</div>          <div class="mnem"><span class="lbl">记</span>rail 想成 railway(铁路);t 想成 他。那就是他沿着铁路走，留下了很长的一串 脚印，也就是“踪迹，痕迹”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：follow the trail 跟着踪迹走</div>          <div class="zt"><span class="lbl">真题</span>But mostly saboteurs interfere with the hunt by misleading riders and disturbing the trail of the fox&#x27;s smell. 但大多数破坏者会通过 误导骑手和扰乱狐狸气味的踪迹来干扰狩猎。</div>          <div class="fam"><span class="lbl">族</span>trailer n. 拖车 / trail v. 拖在后面</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">track</span>
+          <span class="ipa">/træk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">跟踪；追踪 n. 轨道；踪迹，(人、动物或车辆 留下的)足迹</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tried to track the animal that left it</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“踹开”。设想一 个玩具小火车正在“轨道”上跑，被一个小朋友 一脚踹开了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：踹开(track) → 被踹开的轨道</div>          <div class="zt"><span class="lbl">真题</span>Keep track of left-handed children&#x27;s school performance.跟踪左撇子孩子在学校的表现。 (2021)</div>          <div class="fam"><span class="lbl">族</span>tracker n. 追踪器 / tracking n. 追踪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">blush</span>
+          <span class="ipa">/bla∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 脸红</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she would blush when the other children turned to look</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“不辣死”。我 尝过四川的辣椒，“满脸通红”地对身边人说： “谁说四川辣椒不辣的？不，辣死了！”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：不辣死 → 吃辣吃得满脸通红</div>          <div class="fam"><span class="lbl">族</span>blushing adj. 脸红的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">flush</span>
+          <span class="ipa">/fls∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">脸红；冲洗 v. 脸红；冲洗</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her face would flush with joy</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“服了 师”。上课不听话，被老师批评了一顿，服了老 师，并且羞愧地“脸红”了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：服了师 → 挨批后羞愧脸红</div>          <div class="fam"><span class="lbl">族</span>flushed adj. 脸红的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">splash</span>
+          <span class="ipa">/splæ∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">落水声；溅洒后留下的污渍v. 把(水、泥 等)泼在……上，溅在……上</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>liked to splash through the shallow water</div>          <div class="mnem"><span class="lbl">记</span>有一部电影叫Splash，讲的是 美人鱼的故事。美人鱼扑通一声跳进海里，海 水飞溅→落水声。</div>          <div class="root"><span class="lbl">根</span>联想：电影《美人鱼》扑通跳进水里</div>          <div class="zt"><span class="lbl">真题</span>Without any hesitation, she took off her shoes, tucked up her skirt and splashed across the stream. 她毫不犹豫地脱下鞋子，挽起裙子， 哗啦哗啦地溅着水花从小溪里蹚过。</div>          <div class="fam"><span class="lbl">族</span>splash n. 落水声；溅起的水花</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">surname</span>
+          <span class="ipa">/&#x27;s3:rneim/</span>
+          <span class="pos">n.</span>
+          <span class="cn">姓</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>shared one surname, namely Lin</div>          <div class="mnem"><span class="lbl">记</span>sur表示上面，name名字。你 名字上面的不就是你的“姓”吗？比如王铁锤， 铁锤上面就是王啊。</div>          <div class="root"><span class="lbl">根</span>sur(在上面) + name(名字) → 名字上面的字</div>          <div class="zt"><span class="lbl">真题</span>The full name of China&#x27;s Han ethnic group(people) is composed of family name (surname) and given name. 中国汉族人的全名 由姓和名组成。</div>          <div class="fam"><span class="lbl">族</span>nickname n. 昵称 / given name n. 名</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">namely</span>
+          <span class="ipa">/&#x27;neimli/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">即；也就是</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one surname, namely Lin</div>          <div class="root"><span class="lbl">根</span>name(名字) + ly → 把名字点出来</div>          <div class="zt"><span class="lbl">真题</span>Sure, in the past electric vehicles have their problems, namely, a limited driving range.当然，在过去电动汽车也有它们存在的 问题，即驾驶范围有限。</div>          <div class="fam"><span class="lbl">族</span>name n. 名字 / nameless adj. 无名的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">infant</span>
+          <span class="ipa">/&#x27;infənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">婴儿；幼儿；四岁到七岁之间的学童</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an infant slept</div>          <div class="mnem"><span class="lbl">记</span>该单词可拆分为里面(in)粉粉 (166) 的(fant谐音)，谁衣服里面的皮肤粉粉的？“婴 儿，幼儿”啊。</div>          <div class="root"><span class="lbl">根</span>in(不) + fant(说) → 还不会说话的人</div>          <div class="zt"><span class="lbl">真题</span>Hundreds of studies show that infants prefer novelty. 数百项研究表明，婴儿更喜欢新 鲜事物。(2021)</div>          <div class="fam"><span class="lbl">族</span>infancy n. 婴儿期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">adolescent</span>
+          <span class="ipa">/iædə&#x27;lesnt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an infant slept, adolescents idled on the stone steps</div>          <div class="mnem"><span class="lbl">记</span>该单词的前半部分 adole，发音 似 idol(偶像，崇拜物);les 想成 lesson; cent(美 分，引申为“钱”)。那就是一群崇拜偶像，但是 还需要上课的人，花钱去追星，明显是“青少 年”。</div>          <div class="root"><span class="lbl">根</span>联想：崇拜(adore)偶像、上课(lesson)、花钱(cent)的人</div>          <div class="zt"><span class="lbl">真题</span>In one recent study, we examined 360 adolescents&#x27; beliefs about the nature of “smartness”，在最近的一项研究中，我们调查 了360名青少年对“聪明”本质的看法。</div>          <div class="fam"><span class="lbl">族</span>adolescence n. 青春期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">idle</span>
+          <span class="ipa">/&#x27;aidl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">无所事事，虚度；闲荡 adj.懒惰的，无所事 事的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>adolescents idled on the stone steps</div>          <div class="mnem"><span class="lbl">记</span>该单词读音特别像汉语的“爱 逗”。哪些人最爱逗鸡逗狗？或逗留呢？没事 干的人呀，所以该单词意为“空闲的，无所事事 的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：爱逗 → 没事干才爱逗猫逗狗</div>          <div class="zt"><span class="lbl">真题</span>But the notion of a sharp division between the working young and the idle old misses a new trend, the growing gap between the skilled and the unskilled.但是，将有工作的 年轻人和无工作的老年人之间划分明显界线的 观点忽略了一个新趋势，即有技能的人和无技 能的人之间的差距越来越大。(2015)</div>          <div class="fam"><span class="lbl">族</span>idleness n. 闲散 / idly adv. 闲散地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">youngster</span>
+          <span class="ipa">/&#x27;janstər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">年轻人;少年；儿童</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a youngster ran along the shore with a dog</div>          <div class="root"><span class="lbl">根</span>young(年轻) + ster(人) → 年轻人</div>          <div class="zt"><span class="lbl">真题</span>The New York dance club also serves as a place for entertainment where youngsters can enjoy themselves safely. 纽约的舞蹈俱乐部也 是一个娱乐场所，年轻人可以安全地享受自己。 (2023) 第七单元</div>          <div class="fam"><span class="lbl">族</span>young adj. 年轻的 / youth n. 青年</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">elder</span>
+          <span class="ipa">/&#x27;eldər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">年纪较长的 n. 长者；长辈；元老；(某些 基督教会中的)长老</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Only the elder of the family, Grandmother Lin</div>          <div class="root"><span class="lbl">根</span>词源上就是 old 的比较级 → 更年长的</div>          <div class="zt"><span class="lbl">真题</span>Lawyers can specialize in “elder law&quot;.律 师可以专攻“老年法”。</div>          <div class="fam"><span class="lbl">族</span>elderly adj. 年迈的 / eldest adj. 最年长的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">immigrate</span>
+          <span class="ipa">/&#x27;ımigreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(从外地)移居；移民</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a new teacher from the north had immigrated to the town</div>          <div class="mnem"><span class="lbl">记</span>immi的发音类似“移民”；grate 的发音同 great(好)一样。连起来就是移民真 好。既然如此，你就“移民”呗。</div>          <div class="root"><span class="lbl">根</span>im(进入) + migr(迁移) + ate → 迁进来</div>          <div class="zt"><span class="lbl">真题</span>Her parents immigrated to America. 她 的父母移民到了美国。</div>          <div class="fam"><span class="lbl">族</span>immigrant n. 移入的移民 / immigration n. 移入</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">emigrate</span>
+          <span class="ipa">/&#x27;emigreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">移居国外；移民</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her two sons had emigrated to Canada</div>          <div class="root"><span class="lbl">根</span>e(向外) + migr(迁移) + ate → 迁出去</div>          <div class="zt"><span class="lbl">真题</span>Immigrant parents could talk about their country of origin and why they emigrated to the United States. 移民父母可以谈论他们的原 籍国以及他们为什么移民到美国。(2015)</div>          <div class="fam"><span class="lbl">族</span>emigrant n. 移居国外者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">migrate</span>
+          <span class="ipa">/&#x27;maigreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(随季节变化)迁徙；移居；迁移；移动；转移</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wild birds migrated over the harbour</div>          <div class="root"><span class="lbl">根</span>migr(迁移) + ate → 迁来迁去</div>          <div class="zt"><span class="lbl">真题</span>Most of the colored people migrated to Piedmont at the turn of the 20th century. 大多 数有色人种在20世纪初移民到皮埃蒙特。</div>          <div class="fam"><span class="lbl">族</span>migration n. 迁徙 / migratory adj. 迁徙的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">setting</span>
+          <span class="ipa">/&#x27;setin/</span>
+          <span class="pos">n.</span>
+          <span class="cn">环境；背景；挡位</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The setting was simple</div>          <div class="mnem"><span class="lbl">记</span>set 布置，设置;setting 布置、设 置的东西，就是“背景，环境”。 (167)</div>          <div class="root"><span class="lbl">根</span>set(放置) + ting → 东西被摆放在哪儿</div>          <div class="zt"><span class="lbl">真题</span>The technology—though imperfect—has a place in educational settings. 这项技术虽然不 完美，但在教育环境中占有一席之地。(2015)</div>          <div class="fam"><span class="lbl">族</span>set v. 放置 / settle v. 安顿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">context</span>
+          <span class="ipa">/&#x27;ka:ntekst/</span>
+          <span class="pos"></span>
+          <span class="cn">背景，上下文</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In that context</div>          <div class="mnem"><span class="lbl">记</span>所有的(con)课本(text)，也就 是我们都要了解语文课本的所有文章的“背景” 和来龙去脉啊。</div>          <div class="root"><span class="lbl">根</span>con(一起) + text(文本) → 和文本连在一起的部分</div>          <div class="zt"><span class="lbl">真题</span>It is heavily dependent on the context. 它 严重依赖于上下文。</div>          <div class="fam"><span class="lbl">族</span>contextual adj. 上下文的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">contest</span>
+          <span class="ipa">/&#x27;kontest, kən&#x27;test/</span>
+          <span class="pos">n.</span>
+          <span class="cn">竞争；比赛 v. 争取赢得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the town held its storytelling contest</div>          <div class="mnem"><span class="lbl">记</span>con(所有的)十test(考试)→都 考试。当我们都考试的时候，我们之间的关系 就是“竞争”。</div>          <div class="root"><span class="lbl">根</span>con(一起) + test(比试) → 一起比试</div>          <div class="zt"><span class="lbl">真题</span>I&#x27;m preparing for the speech contest. 我 正在为演讲比赛做准备。(2012)</div>          <div class="fam"><span class="lbl">族</span>contestant n. 参赛者 / contest v. 争夺</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">detest</span>
+          <span class="ipa">/dr&#x27;test/</span>
+          <span class="pos">v.</span>
+          <span class="cn">厌恶，讨厌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the children who usually detested reading</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)对考试(test)是什么 态度？→厌恶，讨厌。</div>          <div class="root"><span class="lbl">根</span>de(否定) + test(试) → 根本不想试</div>          <div class="fam"><span class="lbl">族</span>detestable adj. 可憎的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">protest</span>
+          <span class="ipa">/&#x27;prəutest, prə&#x27;test/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 抗议；反对</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the parents protested loudly</div>          <div class="mnem"><span class="lbl">记</span>pro(提前)十 test(考试)，老师 把考试时间提前了，我们要“抗议”。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + test → 当着人面把话说出来</div>          <div class="zt"><span class="lbl">真题</span>It kept sending letters of protest to the media. 它不断向媒体发抗议信。(2019)</div>          <div class="fam"><span class="lbl">族</span>protester n. 抗议者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">moon</span>
+          <span class="ipa">/mu:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">月球</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the moon above the water</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠 night / sun 记 → 晚上挂在天上</div>          <div class="zt"><span class="lbl">真题</span>It makes us wonder if scientists can send a man to the moon. 这使我们怀疑科学家是否 能把人送上月球。</div>          <div class="fam"><span class="lbl">族</span>moonlight n. 月光 / moonless adj. 无月的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">appetite</span>
+          <span class="ipa">/&#x27;æpitait/</span>
+          <span class="pos">n.</span>
+          <span class="cn">胃口；爱好</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>forgot their appetite for supper</div>          <div class="mnem"><span class="lbl">记</span>ap一再地；pet 宠物。那就是 一再地提到你家的宠物，说明你很“喜欢”它啊。</div>          <div class="root"><span class="lbl">根</span>ap(一再) + pet(追求) + ite → 一再想要的东西</div>          <div class="zt"><span class="lbl">真题</span>Leslie worries that the rise of the Internet, among other social and technological changes, has reduced our appetite for aimless adventures. 莱斯利担心，互联网的兴起，以及其他社会和技 术变革，已经减少了我们对漫无目的冒险的兴 趣。(2017)</div>          <div class="fam"><span class="lbl">族</span>appetizing adj. 开胃的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">carpet</span>
+          <span class="ipa">/&#x27;ka:rpit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地毯，毡毯，毛毯</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a carpet on the floor</div>          <div class="mnem"><span class="lbl">记</span>汽车(car)上铺的脚垫(地毯)很 有特色，上面有一些宠物(pet)形象的图案→ 地毯。</div>          <div class="root"><span class="lbl">根</span>car(车) + pet(宠物) → 车上铺的宠物图案垫子</div>          <div class="zt"><span class="lbl">真题</span>To find out, we introduced bacteria to squares of tile，carpet or wood. 为了找到答案， 我们将细菌引入了瓷砖、地毯或木材中。</div>          <div class="fam"><span class="lbl">族</span>carpet v. 铺地毯 / rug n. 小地毯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">career</span>
+          <span class="ipa">/kə&#x27;rır/</span>
+          <span class="pos">n.</span>
+          <span class="cn">生涯；职业；经历；事业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a long career at sea</div>          <div class="root"><span class="lbl">根</span>car(车、路) + eer → 人生走的那条路</div>          <div class="zt"><span class="lbl">真题</span>In the process, she built a radically new life and career. 在这个过程中，她建立了一个全 新的生活和事业。(2017)</div>          <div class="fam"><span class="lbl">族</span>career n. 生涯 / careerism n. 追名逐利</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">cargo</span>
+          <span class="ipa">/&#x27;ka:rgəu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(船或飞机装载的)货物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>about a cargo ship</div>          <div class="mnem"><span class="lbl">记</span>车(car)走了(go)，为什么不在 那儿停着等拉货呢？因为它已经装满了“货 物”，出发了。</div>          <div class="root"><span class="lbl">根</span>car(车) + go(走) → 装满货才走的车</div>          <div class="zt"><span class="lbl">真题</span>It had one of its cargo planes land at a wrong airport.它使一架货机降落在了一个错 误的机场。</div>          <div class="fam"><span class="lbl">族</span>cargo n. 货物（复数 cargos）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">scar</span>
+          <span class="ipa">/ska:r/</span>
+          <span class="pos">n.</span>
+          <span class="cn">疤 v. 使结疤；使……破损</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the scar on her hand</div>          <div class="mnem"><span class="lbl">记</span>铁锤开着车(car)出去玩，结果 (168) 车翻了，把他的腿轧伤了并留下了“伤疤”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：死(s)车(car) → 车祸留下伤疤</div>          <div class="zt"><span class="lbl">真题</span>So many of our own past scars and dashed hopes can surface. 我们自己过去的许多 伤疤和破灭的希望都可能出现。 例 I got scarred due to that crash. 我因那次车 祸而伤痕累累。</div>          <div class="fam"><span class="lbl">族</span>scarred adj. 有伤疤的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 44</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

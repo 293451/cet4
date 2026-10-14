@@ -1,0 +1,695 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 40 · The Shop on the Frontier</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 40 · 11/21 · Unit 6 第 1171-1200 词</div>
+  <h1>The Shop on the Frontier<span class="cn">边境上的铺子</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-40.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3413"><p class="en"><span class="w" data-s="43" data-e="384">Marlow</span> <span class="w" data-s="427" data-e="597">is</span> <span class="w" data-s="640" data-e="725">a</span> <span class="w" data-s="768" data-e="896">small</span> <span class="w" data-s="939" data-e="1152">town</span> <span class="w" data-s="1195" data-e="1451">on</span> <span class="w" data-s="1493" data-e="1579">the</span> <span class="w target" data-s="1621" data-e="1963" title="边境；边疆；新领域">frontier,</span> <span class="w" data-s="2176" data-e="2389">right</span> <span class="w" data-s="2517" data-e="2773">on</span> <span class="w" data-s="2816" data-e="2901">the</span> <span class="w target" data-s="2944" data-e="3029" title="(圆形物体的)边沿">rim</span> <span class="w" data-s="3072" data-e="3157">of</span> <span class="w" data-s="3200" data-e="3243">the</span> <span class="w" data-s="3285" data-e="3413">sea.</span></p><p class="zh">马洛是一座边境上的小镇，就坐落在海边。</p></div>
+<div class="pair" data-s0="3627" data-s1="8533"><p class="en"><span class="w" data-s="3627" data-e="4096">A</span> <span class="w" data-s="4139" data-e="4480">low</span> <span class="w target" data-s="4523" data-e="4864" title="树篱；防范措施">hedge</span> <span class="w" data-s="4907" data-e="5205">runs</span> <span class="w" data-s="5248" data-e="5333">along</span> <span class="w" data-s="5376" data-e="5589">the</span> <span class="w target" data-s="5632" data-e="5888" title="边界；界限；分界线">boundary</span> <span class="w" data-s="5931" data-e="6059">of</span> <span class="w" data-s="6101" data-e="6187">the</span> <span class="w" data-s="6229" data-e="6357">square,</span> <span class="w" data-s="6613" data-e="6827">and</span> <span class="w" data-s="6869" data-e="7125">the</span> <span class="w" data-s="7168" data-e="7467">fields</span> <span class="w" data-s="7509" data-e="7851">stretch</span> <span class="w" data-s="7893" data-e="8021">to</span> <span class="w" data-s="8064" data-e="8107">the</span> <span class="w target" data-s="8149" data-e="8533" title="地平线；范围；眼界">horizon.</span></p><p class="zh">一道矮树篱沿着广场的边界延伸，篱笆那边，田野一直铺到地平线。</p></div>
+<div class="pair" data-s0="8789" data-s1="10965"><p class="en"><span class="w" data-s="8789" data-e="8917">From</span> <span class="w" data-s="8960" data-e="9003">the</span> <span class="w target" data-s="9045" data-e="9173" title="刀口，利刃，边缘，优势">edge</span> <span class="w" data-s="9216" data-e="9344">of</span> <span class="w" data-s="9387" data-e="9429">the</span> <span class="w" data-s="9472" data-e="9600">square</span> <span class="w" data-s="9643" data-e="9941">you</span> <span class="w" data-s="9984" data-e="10112">can</span> <span class="w" data-s="10155" data-e="10240">see</span> <span class="w" data-s="10283" data-e="10411">the</span> <span class="w target" data-s="10453" data-e="10539" title="批发的 adv. 批量地">whole</span> <span class="w" data-s="10581" data-e="10965">harbour.</span></p><p class="zh">从广场边上望出去，整个港口尽收眼底。</p></div>
+<div class="pair" data-s0="11093" data-s1="13824"><p class="en"><span class="w" data-s="11093" data-e="11648">Old</span> <span class="w" data-s="11691" data-e="11861">Mr.</span> <span class="w" data-s="11989" data-e="12203">Bai</span> <span class="w" data-s="12245" data-e="12459">had</span> <span class="w" data-s="12501" data-e="12587">kept</span> <span class="w" data-s="12629" data-e="12800">a</span> <span class="w" data-s="12843" data-e="12928">shop</span> <span class="w" data-s="12971" data-e="13141">there</span> <span class="w" data-s="13184" data-e="13355">for</span> <span class="w" data-s="13397" data-e="13653">forty</span> <span class="w" data-s="13696" data-e="13824">years.</span></p><p class="zh">老白先生在那儿开了四十年的铺子。</p></div>
+<div class="pair" data-s0="14818" data-s1="18914"><p class="en"><span class="w" data-s="14818" data-e="15031">Every</span> <span class="w" data-s="15074" data-e="15330">morning</span> <span class="w" data-s="15372" data-e="15586">he</span> <span class="w" data-s="15628" data-e="15884">carried</span> <span class="w" data-s="15927" data-e="16055">his</span> <span class="w target" data-s="16098" data-e="16524" title="望远镜">telescope</span> <span class="w" data-s="16567" data-e="16780">up</span> <span class="w" data-s="16823" data-e="16908">to</span> <span class="w" data-s="16951" data-e="17036">the</span> <span class="w" data-s="17079" data-e="17250">roof</span> <span class="w" data-s="17292" data-e="17548">and</span> <span class="w" data-s="17804" data-e="17975">watched</span> <span class="w" data-s="18018" data-e="18274">the</span> <span class="w" data-s="18316" data-e="18402">ships</span> <span class="w" data-s="18444" data-e="18700">come</span> <span class="w" data-s="18743" data-e="18914">in.</span></p><p class="zh">每天早上他都把望远镜搬上屋顶，看着进港的船。</p></div>
+<div class="pair" data-s0="19511" data-s1="23010"><p class="en"><span class="w" data-s="19511" data-e="19554">&quot;I</span> <span class="w" data-s="19596" data-e="19682">can</span> <span class="w" data-s="19724" data-e="19810">only</span> <span class="w target" data-s="19852" data-e="20407" title="推测，推断；投机">speculate,&quot;</span> <span class="w" data-s="20706" data-e="20748">he</span> <span class="w" data-s="20791" data-e="20876">said,</span> <span class="w" data-s="21175" data-e="21218">&quot;but</span> <span class="w" data-s="21858" data-e="22028">that</span> <span class="w" data-s="22071" data-e="22242">one</span> <span class="w" data-s="22284" data-e="22370">is</span> <span class="w target" data-s="22412" data-e="22498" title="一定会；很可能会，有义务(做某事)；准备 前往(某地)v.跳跃着跑；形成……的边界(或 界限）">bound</span> <span class="w" data-s="22540" data-e="22711">for</span> <span class="w" data-s="22754" data-e="22839">the</span> <span class="w" data-s="22882" data-e="23010">north.&quot;</span></p><p class="zh">“我只能推测，”他说，“不过那艘船是往北去的。”</p></div>
+<div class="pair" data-s0="23692" data-s1="26594"><p class="en"><span class="w" data-s="23692" data-e="24204">From</span> <span class="w" data-s="24247" data-e="24375">his</span> <span class="w target" data-s="24418" data-e="24844" title="看法，观点">perspective,</span> <span class="w" data-s="25100" data-e="25356">nothing</span> <span class="w" data-s="25442" data-e="25740">in</span> <span class="w" data-s="25783" data-e="25826">the</span> <span class="w" data-s="25868" data-e="25996">square</span> <span class="w" data-s="26039" data-e="26295">was</span> <span class="w" data-s="26338" data-e="26594">hidden.</span></p><p class="zh">从他的角度看，广场上没有什么藏得住的东西。</p></div>
+<div class="pair" data-s0="27331" data-s1="30061"><p class="en"><span class="w" data-s="27331" data-e="27459">The</span> <span class="w" data-s="27501" data-e="27587">red</span> <span class="w" data-s="27629" data-e="27885">roof</span> <span class="w" data-s="27928" data-e="27971">of</span> <span class="w" data-s="28013" data-e="28056">his</span> <span class="w" data-s="28099" data-e="28227">shop</span> <span class="w" data-s="28269" data-e="28568">was</span> <span class="w" data-s="28611" data-e="28696">the</span> <span class="w" data-s="28739" data-e="28867">most</span> <span class="w target" data-s="28909" data-e="29592" title="显著的，引人注目的">conspicuous</span> <span class="w" data-s="29635" data-e="29763">thing</span> <span class="w" data-s="29805" data-e="29933">in</span> <span class="w" data-s="29976" data-e="30061">town.</span></p><p class="zh">他那红屋顶是全镇最引人注目的东西。</p></div>
+<div class="pair" data-s0="30403" data-s1="32749"><p class="en"><span class="w" data-s="30403" data-e="30787">He</span> <span class="w target" data-s="31000" data-e="31384" title="进口；输入 n. 进口，进口货；重要性">imported</span> <span class="w" data-s="31427" data-e="31725">cloth</span> <span class="w" data-s="31768" data-e="31981">and</span> <span class="w target" data-s="32024" data-e="32451" title="输出，出口 n. 输出(物),出口(物)">exported</span> <span class="w" data-s="32493" data-e="32749">tea.</span></p><p class="zh">他进口布匹，出口茶叶。</p></div>
+<div class="pair" data-s0="33005" data-s1="38979"><p class="en"><span class="w" data-s="33005" data-e="33603">Half</span> <span class="w" data-s="33645" data-e="33731">his</span> <span class="w" data-s="33773" data-e="34072">goods</span> <span class="w" data-s="34115" data-e="34243">he</span> <span class="w" data-s="34285" data-e="34371">sold</span> <span class="w target" data-s="34413" data-e="34883" title="批发的 adv. 批量地">wholesale,</span> <span class="w" data-s="35181" data-e="35352">half</span> <span class="w" data-s="35437" data-e="35651">at</span> <span class="w target" data-s="35693" data-e="35949" title="零售v. 零售，详说，述说(尤指别人的事)">retail,</span> <span class="w" data-s="36163" data-e="36333">and</span> <span class="w" data-s="36461" data-e="36803">he</span> <span class="w" data-s="36845" data-e="36931">was</span> <span class="w" data-s="36973" data-e="37016">the</span> <span class="w" data-s="37059" data-e="37187">only</span> <span class="w target" data-s="37229" data-e="37656" title="卖者；销售者；卖方；(畅销、滞销等的)商品">seller</span> <span class="w" data-s="37699" data-e="37784">of</span> <span class="w" data-s="37827" data-e="37955">English</span> <span class="w" data-s="37997" data-e="38381">thread</span> <span class="w" data-s="38424" data-e="38595">in</span> <span class="w" data-s="38637" data-e="38680">the</span> <span class="w" data-s="38723" data-e="38979">county.</span></p><p class="zh">他的货一半批发，一半零售，而且他是全县唯一卖英国线的人。</p></div>
+<div class="pair" data-s0="39192" data-s1="41240"><p class="en"><span class="w" data-s="39192" data-e="39277">He</span> <span class="w target" data-s="39320" data-e="39789" title="(为……)做广告；登广告；宣传">advertised</span> <span class="w" data-s="39832" data-e="40259">nothing</span> <span class="w" data-s="40472" data-e="40941">at</span> <span class="w" data-s="40984" data-e="41240">all.</span></p><p class="zh">他从不做广告。</p></div>
+<div class="pair" data-s0="42008" data-s1="44753"><p class="en"><span class="w" data-s="42008" data-e="42349">&quot;My</span> <span class="w" data-s="42392" data-e="42776">prices</span> <span class="w" data-s="42819" data-e="43117">speak</span> <span class="w" data-s="43160" data-e="43373">for</span> <span class="w" data-s="43416" data-e="43587">me,&quot;</span> <span class="w" data-s="44583" data-e="44625">he</span> <span class="w" data-s="44668" data-e="44753">said.</span></p><p class="zh">“我的价钱会替我说话，”他说。</p></div>
+<div class="pair" data-s0="45052" data-s1="47697"><p class="en"><span class="w" data-s="45052" data-e="45137">&quot;This</span> <span class="w" data-s="45863" data-e="46076">town</span> <span class="w" data-s="46119" data-e="46332">has</span> <span class="w target" data-s="46375" data-e="46887" title="繁荣，昌盛">prospered</span> <span class="w" data-s="46929" data-e="47057">for</span> <span class="w" data-s="47100" data-e="47228">a</span> <span class="w" data-s="47271" data-e="47356">hundred</span> <span class="w" data-s="47399" data-e="47697">years.&quot;</span></p><p class="zh">“这座镇子已经繁荣了一百年。”</p></div>
+<div class="pair" data-s0="48295" data-s1="53841"><p class="en"><span class="w" data-s="48295" data-e="48807">A</span> <span class="w" data-s="48849" data-e="49020">young</span> <span class="w target" data-s="49063" data-e="49447" title="行李员，搬运工；护工；列车服务员；门卫； 门房">porter</span> <span class="w" data-s="49489" data-e="49788">carried</span> <span class="w" data-s="49831" data-e="49916">the</span> <span class="w" data-s="49959" data-e="50257">bags</span> <span class="w" data-s="50300" data-e="50385">from</span> <span class="w" data-s="50428" data-e="50556">the</span> <span class="w" data-s="50599" data-e="50897">ferry,</span> <span class="w" data-s="51025" data-e="51196">and</span> <span class="w" data-s="51324" data-e="51751">a</span> <span class="w target" data-s="51793" data-e="52049" title="裁缝 v. 专门制作；定做">tailor</span> <span class="w" data-s="52092" data-e="52220">knew</span> <span class="w" data-s="52263" data-e="52519">every</span> <span class="w target" data-s="52561" data-e="52817" title="细节,详情">detail</span> <span class="w" data-s="52860" data-e="53244">of</span> <span class="w" data-s="53287" data-e="53415">every</span> <span class="w" data-s="53457" data-e="53841">coat.</span></p><p class="zh">一个年轻的搬运工把行李从渡轮上扛下来，裁缝清楚每一件外套的每一个细节。</p></div>
+<div class="pair" data-s0="54012" data-s1="57127"><p class="en"><span class="w" data-s="54012" data-e="54396">Travelers</span> <span class="w" data-s="54439" data-e="54567">showed</span> <span class="w" data-s="54609" data-e="54780">their</span> <span class="w target" data-s="54823" data-e="55164" title="护照；途径；路子；手段">passports</span> <span class="w" data-s="55207" data-e="55420">at</span> <span class="w" data-s="55463" data-e="55548">the</span> <span class="w" data-s="55591" data-e="55676">gate</span> <span class="w" data-s="55719" data-e="55975">and</span> <span class="w" data-s="56188" data-e="56316">then</span> <span class="w" data-s="56359" data-e="56487">walked</span> <span class="w" data-s="56529" data-e="56785">into</span> <span class="w" data-s="56828" data-e="56913">the</span> <span class="w" data-s="56956" data-e="57127">square.</span></p><p class="zh">旅客在门口出示护照，然后走进广场。</p></div>
+<div class="pair" data-s0="58039" data-s1="59873"><p class="en"><span class="w" data-s="58039" data-e="58209">That</span> <span class="w" data-s="58252" data-e="58508">spring</span> <span class="w" data-s="58551" data-e="58849">the</span> <span class="w" data-s="58892" data-e="59020">market</span> <span class="w" data-s="59063" data-e="59319">began</span> <span class="w" data-s="59361" data-e="59575">to</span> <span class="w target" data-s="59617" data-e="59873" title="(销售量、价格、价值等的)骤降，猛跌，萧条期 v.(价格、价值、数量等)骤降，锐减">slump.</span></p><p class="zh">那年春天，市场开始萧条。</p></div>
+<div class="pair" data-s0="60044" data-s1="64695"><p class="en"><span class="w" data-s="60044" data-e="60471">The</span> <span class="w target" data-s="60513" data-e="60769" title="(汽车头尾的)保险杠">bumper</span> <span class="w" data-s="60812" data-e="60940">of</span> <span class="w" data-s="60983" data-e="61025">a</span> <span class="w" data-s="61068" data-e="61324">delivery</span> <span class="w" data-s="61367" data-e="61537">truck</span> <span class="w target" data-s="61580" data-e="62007" title="碰撞(声)；撞击(声)；隆起，凸块 v. (无意 地)碰；撞">bumped</span> <span class="w" data-s="62049" data-e="62092">the</span> <span class="w target" data-s="62135" data-e="62391" title="树篱；防范措施">hedge,</span> <span class="w" data-s="62561" data-e="62817">and</span> <span class="w" data-s="62860" data-e="63073">a</span> <span class="w target" data-s="63116" data-e="63201" title="块；方糖；肿块；笨重的人">lump</span> <span class="w" data-s="63244" data-e="63372">of</span> <span class="w" data-s="63415" data-e="63585">wet</span> <span class="w" data-s="63628" data-e="63841">clay</span> <span class="w" data-s="63884" data-e="64140">fell</span> <span class="w" data-s="64183" data-e="64396">into</span> <span class="w" data-s="64439" data-e="64524">the</span> <span class="w" data-s="64567" data-e="64695">road.</span></p><p class="zh">一辆送货车的保险杠撞上了树篱，一块湿泥巴掉到了路上。</p></div>
+<div class="pair" data-s0="64951" data-s1="67809"><p class="en"><span class="w" data-s="64951" data-e="65676">Apples</span> <span class="w target" data-s="65719" data-e="66017" title="">bounced</span> <span class="w" data-s="66060" data-e="66231">out</span> <span class="w" data-s="66273" data-e="66316">of</span> <span class="w" data-s="66359" data-e="66444">a</span> <span class="w" data-s="66487" data-e="66572">box</span> <span class="w" data-s="66615" data-e="66871">and</span> <span class="w" data-s="66913" data-e="67127">rolled</span> <span class="w" data-s="67169" data-e="67340">across</span> <span class="w" data-s="67383" data-e="67596">the</span> <span class="w" data-s="67639" data-e="67809">square.</span></p><p class="zh">苹果从箱子里弹出来，滚过广场。</p></div>
+<div class="pair" data-s0="68506" data-s1="71365"><p class="en"><span class="w" data-s="68506" data-e="68592">In</span> <span class="w" data-s="68634" data-e="68720">the</span> <span class="w" data-s="68762" data-e="68976">afternoon</span> <span class="w" data-s="69018" data-e="69360">the</span> <span class="w" data-s="69402" data-e="69573">old</span> <span class="w" data-s="69616" data-e="69744">man</span> <span class="w" data-s="69786" data-e="70000">found</span> <span class="w" data-s="70042" data-e="70170">a</span> <span class="w" data-s="70213" data-e="70298">small</span> <span class="w target" data-s="70341" data-e="70725" title="炸弹 v. 轰炸">bomb</span> <span class="w" data-s="70768" data-e="71066">beside</span> <span class="w" data-s="71109" data-e="71237">the</span> <span class="w" data-s="71280" data-e="71365">well.</span></p><p class="zh">下午，老人在井边发现了一枚小炸弹。</p></div>
+<div class="pair" data-s0="71834" data-s1="73754"><p class="en"><span class="w" data-s="71834" data-e="71877">&quot;It</span> <span class="w" data-s="72133" data-e="72304">is</span> <span class="w" data-s="72346" data-e="72474">only</span> <span class="w" data-s="72517" data-e="72645">a</span> <span class="w" data-s="72688" data-e="72901">joke,&quot;</span> <span class="w" data-s="73328" data-e="73541">someone</span> <span class="w" data-s="73584" data-e="73754">said.</span></p><p class="zh">“只是个玩笑，”有人说。</p></div>
+<div class="pair" data-s0="74010" data-s1="75162"><p class="en"><span class="w" data-s="74010" data-e="74138">He</span> <span class="w" data-s="74437" data-e="74778">did</span> <span class="w" data-s="74821" data-e="74906">not</span> <span class="w" data-s="74949" data-e="75162">laugh.</span></p><p class="zh">他没有笑。</p></div>
+<div class="pair" data-s0="75546" data-s1="79344"><p class="en"><span class="w" data-s="75546" data-e="75632">He</span> <span class="w" data-s="75674" data-e="75845">asked</span> <span class="w" data-s="75888" data-e="76058">two</span> <span class="w" data-s="76101" data-e="76229">men</span> <span class="w" data-s="76272" data-e="76400">to</span> <span class="w target" data-s="76442" data-e="76613" title="箍子；夹子；支架 v. 加强；使做准备">brace</span> <span class="w" data-s="76656" data-e="76741">the</span> <span class="w" data-s="76784" data-e="76869">shop</span> <span class="w" data-s="76912" data-e="77168">wall,</span> <span class="w" data-s="77381" data-e="77594">and</span> <span class="w" data-s="77936" data-e="78106">then</span> <span class="w" data-s="78149" data-e="78234">he</span> <span class="w" data-s="78277" data-e="78362">stood</span> <span class="w" data-s="78405" data-e="78576">at</span> <span class="w" data-s="78618" data-e="78661">the</span> <span class="w target" data-s="78704" data-e="78917" title="边缘，页边空白；白边；利润，盈余">margin</span> <span class="w" data-s="78960" data-e="79088">of</span> <span class="w" data-s="79130" data-e="79173">the</span> <span class="w" data-s="79216" data-e="79344">square.</span></p><p class="zh">他叫两个人用木头撑住铺子的墙，然后站在广场边缘。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">speculate</span>
+          <span class="ipa">/&#x27;spekjulert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">推测，推断；投机</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;I can only speculate,&quot; he said</div>          <div class="mnem"><span class="lbl">记</span>spec 表示“看”；ul 发音类似 “you(你)”;ate 动词后缀。因此，speculate 可以 理解为“你看的动作”，从而引发“思考或推测”。</div>          <div class="root"><span class="lbl">根</span>spec(看) + ulate → 看来看去 → 推测</div>          <div class="zt"><span class="lbl">真题</span>The researchers speculate that craft activities promote the development of nerve pathways in the brain. 研究人员推测，手工艺 活动促进了大脑神经通路的发展。</div>          <div class="fam"><span class="lbl">族</span>speculation n. 推测 / spectator n. 观众</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">perspective</span>
+          <span class="ipa">/pə&#x27;spektiv/</span>
+          <span class="pos"></span>
+          <span class="cn">看法，观点</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From his perspective, nothing in the square was hidden</div>          <div class="mnem"><span class="lbl">记</span>per表示“每一个”；spect 表示 “看”;ive名词后缀，每一个都看到了。只有当 你把事物的每一面都看到时，你才能得出对这 个事物的“看法，观点”。</div>          <div class="root"><span class="lbl">根</span>per(每一个) + spect(看) + ive → 每一面都看到 → 观点</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s nice to have people agree, but you need conflicting perspectives to dig out the truth.人们意见一致是件好事，但你需要相互 矛盾的观点来挖掘真相。(2015)</div>          <div class="fam"><span class="lbl">族</span>spectacle n. 景象 / spectator n. 观众</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">prosper</span>
+          <span class="ipa">/&#x27;prpspə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">繁荣，昌盛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>This town has prospered for a hundred years</div>          <div class="mnem"><span class="lbl">记</span>pro表示“向前”；sper 表示“希 望”，向前的希望→繁荣，昌盛。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + sper(希望) → 前面有希望 → 繁荣</div>          <div class="fam"><span class="lbl">族</span>prosperity n. 繁荣 / prosperous adj. 繁荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">conspicuous</span>
+          <span class="ipa">/kən&#x27;spikjuəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">显著的，引人注目的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The red roof of his shop was the most conspicuous thing in town</div>          <div class="mnem"><span class="lbl">记</span>con 表示“所有人”；spic 表示 “看”；uous是形容词后缀。所有人都看得到的 →显著的，引人注目的。</div>          <div class="root"><span class="lbl">根</span>con(全) + spic(看) + uous → 所有人都看得见</div>          <div class="fam"><span class="lbl">族</span>conspicuously adv. 显著地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">telescope</span>
+          <span class="ipa">/&#x27;teliskəup/</span>
+          <span class="pos"></span>
+          <span class="cn">望远镜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every morning he carried his telescope up to the roof</div>          <div class="mnem"><span class="lbl">记</span>tele 表示“远的”，比如 television， 电视就是把远的图像(vision)传到你的眼前； telephone，电话就是把远处的声音(phone)传到 你耳边；telescope，望远镜就是把远的视野 (scope)传到你的眼前。</div>          <div class="root"><span class="lbl">根</span>tele(远) + scope(看) → 看远处的东西</div>          <div class="zt"><span class="lbl">真题</span>Buy $ 50 million worth of new telescopes right now.现在就购买价值 5 000万美元的新 望远镜。</div>          <div class="fam"><span class="lbl">族</span>microscope n. 显微镜 / scope n. 范围</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">margin</span>
+          <span class="ipa">/&#x27;ma:rd3ın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">边缘，页边空白；白边；利润，盈余</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he stood at the margin of the square</div>          <div class="mnem"><span class="lbl">记</span>Mar（火星），gin（想成汉字 “进”)。设想一下：我们去了火星。进火星是不 是得从火星的边缘进去？所以该单词意为“边 缘”。</div>          <div class="root"><span class="lbl">根</span>marg(边) + in → 边上的地方 → 边缘</div>          <div class="zt"><span class="lbl">真题</span>Most students write questions or short notes in the margins. 大多数学生在页边空白处 写问题或简短的笔记。(2014)</div>          <div class="fam"><span class="lbl">族</span>marginal adj. 边缘的；微小的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">horizon</span>
+          <span class="ipa">/hə&#x27;raizn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地平线；范围；眼界</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the fields stretch to the horizon</div>          <div class="root"><span class="lbl">根</span>horiz(界限) + on → 天和地的分界线</div>          <div class="zt"><span class="lbl">真题</span>You told me to look over the horizons and to pursue my own dreams without hesitation. 你告诉我要放眼未来，毫不犹豫地追 求自己的梦想。(2016)</div>          <div class="fam"><span class="lbl">族</span>horizontal adj. 水平的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">boundary</span>
+          <span class="ipa">/&#x27;baundri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">边界；界限；分界线</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A low hedge runs along the boundary of the square</div>          <div class="mnem"><span class="lbl">记</span>James Bound 詹姆斯·邦德是 电影《007》的主角，Bound可是界限感很强的 (150) 人，惩恶扬善，完成危险任务，因此看到bound 十ary可以记忆为“分界线”。</div>          <div class="root"><span class="lbl">根</span>bound(界限) + ary(名词后缀) → 分界线</div>          <div class="zt"><span class="lbl">真题</span>The left boundary of this plate is the west coast of North America. 这个板块的左边 界是北美的西海岸。</div>          <div class="fam"><span class="lbl">族</span>bound n. 界限 / boundless adj. 无边无际的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">bound</span>
+          <span class="ipa">/baund/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">一定会；很可能会，有义务(做某事)；准备 前往(某地)v.跳跃着跑；形成……的边界(或 界限）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that one is bound for the north</div>          <div class="root"><span class="lbl">根</span>靠搭配记：be bound for 前往 / be bound to 一定</div>          <div class="zt"><span class="lbl">真题</span>It is bound to help us achieve greater success. 它一定会帮助我们取得更大的成功。(2022)</div>          <div class="fam"><span class="lbl">族</span>boundary n. 边界 / boundless adj. 无限的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">bounce</span>
+          <span class="ipa">/bauns/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Apples bounced out of a box and rolled across the square</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“蹦死”，为了 练习“弹跳”，在拼命地蹦。</div>          <div class="root"><span class="lbl">根</span>谐音联想：蹦死 → 使劲地蹦 → 弹跳</div>          <div class="zt"><span class="lbl">真题</span>The value of listed shares in American firms collapsed by 57%, though it has since bounced back somewhat. 美国上市公司股票的 价值暴跌了57%，尽管此后有所反弹。</div>          <div class="fam"><span class="lbl">族</span>bouncy adj. 有弹性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">edge</span>
+          <span class="ipa">/ed3/</span>
+          <span class="pos"></span>
+          <span class="cn">刀口，利刃，边缘，优势</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From the edge of the square you can see the whole harbour</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“挨挤（挨着、 挤着)”。是不是“边缘”的地方人最多？</div>          <div class="root"><span class="lbl">根</span>本义「刀刃」→ 刀刃那一线 → 边缘</div>          <div class="zt"><span class="lbl">真题</span>The brown animal was spotted stuck on a narrow window edge of the office tower. 这只 棕色的动物被发现卡在办公大楼的一个狭窄的 窗户边上。(2019)</div>          <div class="fam"><span class="lbl">族</span>edgy adj. 紧张不安的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">hedge</span>
+          <span class="ipa">/hed3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">树篱；防范措施</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A low hedge runs along the boundary</div>          <div class="mnem"><span class="lbl">记</span>他(he)在家的边沿(edge)上修 了一个“篱笆”。</div>          <div class="root"><span class="lbl">根</span>联想：他(he)在边(edge)上修了一道篱笆</div>          <div class="zt"><span class="lbl">真题</span>The cottage was surrounded by a hedge. 小屋被一道树篱包围着。</div>          <div class="fam"><span class="lbl">族</span>hedge v. 回避；防备</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">frontier</span>
+          <span class="ipa">/fran&#x27;tur/</span>
+          <span class="pos">n.</span>
+          <span class="cn">边境；边疆；新领域</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Marlow is a small town on the frontier</div>          <div class="mnem"><span class="lbl">记</span>front 表示“前面”，一个国家的 最前面就是“边境”。</div>          <div class="root"><span class="lbl">根</span>front(前面) + ier → 国家最前面的地方</div>          <div class="zt"><span class="lbl">真题</span>For many scientists, public debate is a new frontier. 对许多科学家来说，公众辩论是 一个新的研究领域。(2022) (151) 第六单元</div>          <div class="fam"><span class="lbl">族</span>front n. 前面 / front-line adj. 前线的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">rim</span>
+          <span class="ipa">/rım/</span>
+          <span class="pos"></span>
+          <span class="cn">(圆形物体的)边沿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>right on the rim of the sea</div>          <div class="mnem"><span class="lbl">记</span>借用一个老师编的顺口溜来记 忆：只有 rim 是边沿，前面加 b 意不变(brim 边 沿)，前面加t是修剪(trim修剪)，趴(p)在边沿 上真呆板(prim呆板的、拘谨的)。</div>          <div class="root"><span class="lbl">根</span>谐音联想：只有 rim 是边沿；加 b 是 brim 边沿</div>          <div class="fam"><span class="lbl">族</span>brim n. 边沿 / trim v. 修剪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">import</span>
+          <span class="ipa">/ım&#x27;pə:rt, &#x27;ımpəirt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">进口；输入 n. 进口，进口货；重要性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He imported cloth and exported tea</div>          <div class="mnem"><span class="lbl">记</span>im 往里；port 港口。运到港口 里面→进口。</div>          <div class="root"><span class="lbl">根</span>im(往里) + port(港口) → 运进港口 → 进口</div>          <div class="zt"><span class="lbl">真题</span>They may lack the money to allow them to import the necessary materials. 他们可能没 有钱来进口必要的材料。</div>          <div class="fam"><span class="lbl">族</span>export v. 出口 / portable adj. 便携的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">export</span>
+          <span class="ipa">/ık&#x27;spə:rt, &#x27;ekspəirt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">输出，出口 n. 输出(物),出口(物)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He imported cloth and exported tea</div>          <div class="mnem"><span class="lbl">记</span>ex往外；port港口。运到港口 外面→出口。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + port(港口) → 运出港口 → 出口</div>          <div class="zt"><span class="lbl">真题</span>Vietnam banned its exports for several months for the same reason. 越南也因为同样 的原因禁止了几个月的出口。(2016)</div>          <div class="fam"><span class="lbl">族</span>import v. 进口 / transportation n. 运输</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">passport</span>
+          <span class="ipa">/&#x27;pæspə:rt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">护照；途径；路子；手段</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Travelers showed their passports at the gate</div>          <div class="mnem"><span class="lbl">记</span>通过(pass)港口(port)，是需要 “护照”的。</div>          <div class="root"><span class="lbl">根</span>pass(通过) + port(港口) → 过关要用的证件</div>          <div class="zt"><span class="lbl">真题</span>They appear more formal than other passports.它们看起来比其他护照更正式。 (2021)</div>          <div class="fam"><span class="lbl">族</span>porter n. 搬运工 / portable adj. 便携的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">porter</span>
+          <span class="ipa">/&#x27;poirtər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">行李员，搬运工；护工；列车服务员；门卫； 门房</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A young porter carried the bags from the ferry</div>          <div class="mnem"><span class="lbl">记</span>port 港口；er后缀表示“人”。 以前在港口工作的人，就是“搬运工”。</div>          <div class="root"><span class="lbl">根</span>port(港口) + er(人) → 在港口干活的人 → 搬运工</div>          <div class="zt"><span class="lbl">真题</span>If you like, you can leave your bags with the porter. 如果您愿意，您可以把行李交给搬 运工。(2017)</div>          <div class="fam"><span class="lbl">族</span>transport v. 运输 / portable adj. 便携的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">tailor</span>
+          <span class="ipa">/&#x27;teilə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">裁缝 v. 专门制作；定做</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a tailor knew every detail of every coat</div>          <div class="mnem"><span class="lbl">记</span>tail 词根表示“切”，or后缀表 示“人”→裁切的人→裁缝。</div>          <div class="root"><span class="lbl">根</span>tail(切) + or(人) → 动手裁剪的人 → 裁缝</div>          <div class="zt"><span class="lbl">真题</span>This bird, called the “Tailor Bird&quot;, uses its mouth as a needle. 这种鸟叫做“裁缝鸟”，用 它的嘴当针。</div>          <div class="fam"><span class="lbl">族</span>detail n. 细节 / retail n. 零售</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">detail</span>
+          <span class="ipa">/&#x27;di:terl/</span>
+          <span class="pos"></span>
+          <span class="cn">细节,详情</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>knew every detail of every coat</div>          <div class="mnem"><span class="lbl">记</span>de除掉，分开；tail 切。分开 切，切成很小的份→细节。</div>          <div class="root"><span class="lbl">根</span>de(分开) + tail(切) → 切下来的小份 → 细节</div>          <div class="zt"><span class="lbl">真题</span>She can add multiple details to the design to communicate her idea. 她可以在设计中添加 多个细节来传达她的想法。(2017)</div>          <div class="fam"><span class="lbl">族</span>detailed adj. 详细的 / retail n. 零售</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">retail</span>
+          <span class="ipa">/&#x27;ri:teil; rı&#x27;teil/</span>
+          <span class="pos">n.</span>
+          <span class="cn">零售v. 零售，详说，述说(尤指别人的事)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>half at retail</div>          <div class="mnem"><span class="lbl">记</span>re再；tail 切。再切→已经切过 了，再切成细小的份，变成小物件→零售。</div>          <div class="root"><span class="lbl">根</span>re(再) + tail(切) → 再切小份卖 → 零售</div>          <div class="zt"><span class="lbl">真题</span>He owned a small retail business in Michigan years ago. 几年前，他在密歇根州拥有 一家小型零售公司。</div>          <div class="fam"><span class="lbl">族</span>wholesale n. 批发 / retailer n. 零售商</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">wholesale</span>
+          <span class="ipa">/&#x27;həulserl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">批发的 adv. 批量地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Half his goods he sold wholesale</div>          <div class="mnem"><span class="lbl">记</span>whole(一起)十sale(卖)→一起 卖→批发的。</div>          <div class="root"><span class="lbl">根</span>whole(整体) + sale(卖) → 整批一起卖 → 批发</div>          <div class="fam"><span class="lbl">族</span>retail n. 零售 / wholesaler n. 批发商</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">seller</span>
+          <span class="ipa">/&#x27;selər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">卖者；销售者；卖方；(畅销、滞销等的)商品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he was the only seller of English thread in the county</div>          <div class="root"><span class="lbl">根</span>sell(卖) + er(人) → 卖东西的人</div>          <div class="fam"><span class="lbl">族</span>sell v. 卖 / bestseller n. 畅销品</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">advertise</span>
+          <span class="ipa">/&#x27;ædvərtaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(为……)做广告；登广告；宣传</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He advertised nothing at all</div>          <div class="mnem"><span class="lbl">记</span>一再地(ad)我(ver)提丝(tise)， “广告”不就是无论何时何地都会提到产品吗？</div>          <div class="root"><span class="lbl">根</span>ad(朝向) + vert(转) + ise → 把注意力转过来 → 做广告</div>          <div class="zt"><span class="lbl">真题</span>They are advertised as a way for adults to finish their education. 他们被宣传为成年人 完成教育的一种方式。(2022)</div>          <div class="fam"><span class="lbl">族</span>advertisement n. 广告 / advertising n. 广告业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">bomb</span>
+          <span class="ipa">/bpm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">炸弹 v. 轰炸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old man found a small bomb beside the well</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音类似“bang”， 就是“爆炸”的声音。</div>          <div class="root"><span class="lbl">根</span>谐音联想：发音像 bang，爆炸的声音 → 炸弹</div>          <div class="fam"><span class="lbl">族</span>bomb v. 轰炸 / bomber n. 轰炸机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">bump</span>
+          <span class="ipa">/b^mp/</span>
+          <span class="pos"></span>
+          <span class="cn">碰撞(声)；撞击(声)；隆起，凸块 v. (无意 地)碰；撞</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The bumper of a delivery truck bumped the hedge</div>          <div class="mnem"><span class="lbl">记</span>这个单词读音像“梆！”，撞到了 (152) 什么东西发出的声音，因此是“碰撞声，撞击声”。 撞到了什么呢？撞到了一个“凸块，隆起”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：梆！→ 撞上去的声音 → 碰撞</div>          <div class="zt"><span class="lbl">真题</span>Waiters see only a tiny bump in tips when they do an exceptional job compared to a passable one. 当服务员的工作做得很出色时， 他们得到的小费只会比工作做得过得去的服务 员多一点点。(2016)</div>          <div class="fam"><span class="lbl">族</span>bumper n. 保险杠 / bumpy adj. 颠簸的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">bumper</span>
+          <span class="ipa">/&#x27;bampər/</span>
+          <span class="pos"></span>
+          <span class="cn">(汽车头尾的)保险杠</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The bumper of a delivery truck bumped the hedge</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分的发音类似象声 词bang，撞击的声音。汽车的“保险杠”不就是 在撞击的时候首当其冲的部位吗？</div>          <div class="root"><span class="lbl">根</span>bump(撞) + er(物) → 撞时首当其冲的部位 → 保险杠</div>          <div class="fam"><span class="lbl">族</span>bump v. 碰撞 / bumpy adj. 颠簸的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">lump</span>
+          <span class="ipa">/l^mp/</span>
+          <span class="pos">n.</span>
+          <span class="cn">块；方糖；肿块；笨重的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a lump of wet clay fell into the road</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a lump of sugar 一块方糖</div>          <div class="zt"><span class="lbl">真题</span>The key will be to do this while keeping the salad cream liquid and not turning it into a solid lump. 关键是要做到这一点，同时保持沙 拉奶油呈液态，而不是将其变成固体块。</div>          <div class="fam"><span class="lbl">族</span>lumpy adj. 块状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">slump</span>
+          <span class="ipa">/slamp/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(销售量、价格、价值等的)骤降，猛跌，萧条期 v.(价格、价值、数量等)骤降，锐减</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>That spring the market began to slump</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分发音似“死拉妹 (slum)”。为什么使劲拉你妹妹？因为她掉下 去了(骤降)，使劲把她往上拉啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：prices slump 价格骤降</div>          <div class="fam"><span class="lbl">族</span>slump n. 骤降；不景气</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">brace</span>
+          <span class="ipa">/breis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">箍子；夹子；支架 v. 加强；使做准备</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He asked two men to brace the shop wall</div>          <div class="mnem"><span class="lbl">记</span>bra是文胸，要把胸部固定起来 才行，这样就可以记住“夹子，箍子”的含义。</div>          <div class="root"><span class="lbl">根</span>谐音联想：bra(文胸) → 夹住、固定住 → 支架</div>          <div class="fam"><span class="lbl">族</span>bracelet n. 手镯 / embrace v. 拥抱</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 40</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,695 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 36 · The Soap Seller and the Town Statute</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 36 · 11/17 · Unit 6 第 1051-1080 词</div>
+  <h1>The Soap Seller and the Town Statute<span class="cn">卖肥皂的年轻人与小镇法规</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-36.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4651"><p class="en"><span class="w" data-s="43" data-e="213">Wei</span> <span class="w" data-s="256" data-e="427">was</span> <span class="w" data-s="469" data-e="555">a</span> <span class="w target" data-s="597" data-e="896" title="幼稚的，天真的；轻信的">naive</span> <span class="w" data-s="939" data-e="1152">young</span> <span class="w" data-s="1195" data-e="1323">man</span> <span class="w" data-s="1365" data-e="1621">with</span> <span class="w" data-s="1664" data-e="1792">an</span> <span class="w target" data-s="1835" data-e="2133" title="清白的，无罪的；天真的；无知的 n. 无辜 者，单纯的人">innocent</span> <span class="w" data-s="2176" data-e="2347">face,</span> <span class="w" data-s="2645" data-e="2901">and</span> <span class="w" data-s="2944" data-e="3285">half</span> <span class="w" data-s="3328" data-e="3499">the</span> <span class="w" data-s="3541" data-e="3669">market</span> <span class="w" data-s="3712" data-e="4181">trusted</span> <span class="w" data-s="4224" data-e="4352">him</span> <span class="w" data-s="4395" data-e="4523">at</span> <span class="w" data-s="4565" data-e="4651">once.</span></p><p class="zh">韦是个天真的年轻人，长着一张无辜的脸，半个市场的人立刻就信了他。</p></div>
+<div class="pair" data-s0="4907" data-s1="9557"><p class="en"><span class="w" data-s="4907" data-e="5291">He</span> <span class="w" data-s="5504" data-e="5845">was</span> <span class="w" data-s="5888" data-e="5973">sure</span> <span class="w" data-s="6016" data-e="6315">that</span> <span class="w" data-s="6357" data-e="6485">every</span> <span class="w target" data-s="6528" data-e="6997" title="">merchant</span> <span class="w" data-s="7040" data-e="7125">was</span> <span class="w target" data-s="7168" data-e="7509" title="得体的;体面的；正派的">decent,</span> <span class="w" data-s="7637" data-e="7851">and</span> <span class="w" data-s="8021" data-e="8320">that</span> <span class="w" data-s="8363" data-e="8576">nobody</span> <span class="w" data-s="8619" data-e="8875">would</span> <span class="w" data-s="8917" data-e="9131">cheat</span> <span class="w" data-s="9173" data-e="9216">a</span> <span class="w" data-s="9259" data-e="9557">beginner.</span></p><p class="zh">他确信每个商人都正派，没人会骗一个刚入行的人。</p></div>
+<div class="pair" data-s0="10081" data-s1="13707"><p class="en"><span class="w" data-s="10081" data-e="10166">On</span> <span class="w" data-s="10209" data-e="10294">the</span> <span class="w" data-s="10337" data-e="10422">first</span> <span class="w" data-s="10465" data-e="10593">of</span> <span class="w" data-s="10635" data-e="10763">May</span> <span class="w" data-s="10806" data-e="10977">he</span> <span class="w" data-s="11019" data-e="11318">rented</span> <span class="w" data-s="11361" data-e="11403">a</span> <span class="w" data-s="11446" data-e="11617">small</span> <span class="w" data-s="11659" data-e="12001">stall</span> <span class="w" data-s="12043" data-e="12257">and</span> <span class="w" data-s="12299" data-e="12385">began</span> <span class="w" data-s="12427" data-e="12598">to</span> <span class="w" data-s="12641" data-e="12769">sell</span> <span class="w" data-s="12811" data-e="13195">soap</span> <span class="w" data-s="13238" data-e="13323">and</span> <span class="w" data-s="13366" data-e="13707">candles.</span></p><p class="zh">五月一日，他租下一个小摊位，开始卖肥皂和蜡烛。</p></div>
+<div class="pair" data-s0="13878" data-s1="19297"><p class="en"><span class="w" data-s="13878" data-e="14134">The</span> <span class="w" data-s="14646" data-e="14817">town</span> <span class="w" data-s="14859" data-e="15030">had</span> <span class="w" data-s="15073" data-e="15371">strict</span> <span class="w target" data-s="15414" data-e="15926" title="立法；法律">legislation</span> <span class="w" data-s="15969" data-e="16182">about</span> <span class="w target" data-s="16225" data-e="16438" title="贸易；交易(量)v. 做买卖；做生意；从事 贸易">trade,</span> <span class="w" data-s="16694" data-e="16907">and</span> <span class="w" data-s="17078" data-e="17419">the</span> <span class="w target" data-s="17462" data-e="17547" title="与法律有关的；合法的">legal</span> <span class="w" data-s="17590" data-e="17803">side</span> <span class="w" data-s="17846" data-e="18017">of</span> <span class="w" data-s="18059" data-e="18102">a</span> <span class="w" data-s="18145" data-e="18273">small</span> <span class="w" data-s="18315" data-e="18529">shop</span> <span class="w" data-s="18571" data-e="19126">frightened</span> <span class="w" data-s="19169" data-e="19297">him.</span></p><p class="zh">小镇对买卖有严格的法规，小店的合法问题让他有点发怵。</p></div>
+<div class="pair" data-s0="19771" data-s1="21989"><p class="en"><span class="w" data-s="19771" data-e="19856">He</span> <span class="w" data-s="19899" data-e="20027">was</span> <span class="w target" data-s="20069" data-e="20539" title="有责任的；负责的；承担义务的">responsible</span> <span class="w" data-s="20581" data-e="20752">for</span> <span class="w" data-s="20795" data-e="20923">every</span> <span class="w target" data-s="20965" data-e="21349" title="">item</span> <span class="w" data-s="21392" data-e="21477">on</span> <span class="w" data-s="21520" data-e="21605">his</span> <span class="w" data-s="21648" data-e="21776">own</span> <span class="w" data-s="21819" data-e="21989">paper.</span></p><p class="zh">纸上每一项都得由他自己负责。</p></div>
+<div class="pair" data-s0="22459" data-s1="24763"><p class="en"><span class="w" data-s="22459" data-e="22501">&quot;A</span> <span class="w target" data-s="22800" data-e="23184" title="成文法；法规；章程；条例；规程">statute</span> <span class="w" data-s="23227" data-e="23440">is</span> <span class="w" data-s="23483" data-e="23611">a</span> <span class="w target" data-s="23653" data-e="23995" title="成文法；法规；章程；条例；规程">statute,&quot;</span> <span class="w" data-s="24336" data-e="24379">the</span> <span class="w" data-s="24421" data-e="24592">clerk</span> <span class="w" data-s="24635" data-e="24763">said.</span></p><p class="zh">“法规就是法规，”办事员说。</p></div>
+<div class="pair" data-s0="25104" data-s1="30352"><p class="en"><span class="w" data-s="25104" data-e="25317">&quot;Your</span> <span class="w" data-s="25787" data-e="26000">paper</span> <span class="w" data-s="26043" data-e="26299">is</span> <span class="w" data-s="26341" data-e="26512">not</span> <span class="w target" data-s="26555" data-e="26939" title="(法律上)有效的；(正式)认可的；合理的">valid</span> <span class="w" data-s="26981" data-e="27195">until</span> <span class="w" data-s="27237" data-e="27451">we</span> <span class="w target" data-s="27493" data-e="27877" title="证明，确认；使生效">validate</span> <span class="w" data-s="27920" data-e="28048">it,</span> <span class="w" data-s="28176" data-e="28347">and</span> <span class="w" data-s="28475" data-e="28816">the</span> <span class="w" data-s="28859" data-e="28944">tax</span> <span class="w" data-s="28987" data-e="29243">office</span> <span class="w" data-s="29285" data-e="29541">will</span> <span class="w target" data-s="29584" data-e="29968" title="执行，实行；处死">execute</span> <span class="w" data-s="30011" data-e="30181">the</span> <span class="w" data-s="30224" data-e="30352">rule.&quot;</span></p><p class="zh">“你的材料在我们核实之前不算有效，税务所会执行这条规定。”</p></div>
+<div class="pair" data-s0="30821" data-s1="34021"><p class="en"><span class="w" data-s="30821" data-e="31589">The</span> <span class="w" data-s="31632" data-e="31760">law</span> <span class="w target" data-s="31803" data-e="32229" title="(以法律、义务等)强迫，迫使">obliged</span> <span class="w" data-s="32272" data-e="32443">him</span> <span class="w" data-s="32485" data-e="32613">to</span> <span class="w" data-s="32656" data-e="32784">pay</span> <span class="w" data-s="32827" data-e="32955">on</span> <span class="w" data-s="32997" data-e="33125">time,</span> <span class="w" data-s="33424" data-e="33509">and</span> <span class="w" data-s="33552" data-e="33680">he</span> <span class="w" data-s="33723" data-e="34021">signed.</span></p><p class="zh">法律迫使他按时缴税，他签了字。</p></div>
+<div class="pair" data-s0="34882" data-s1="38210"><p class="en"><span class="w" data-s="34882" data-e="35138">Six</span> <span class="w" data-s="35181" data-e="35352">months</span> <span class="w" data-s="35394" data-e="35608">later</span> <span class="w" data-s="35650" data-e="35864">a</span> <span class="w" data-s="35906" data-e="36162">soap</span> <span class="w target" data-s="36205" data-e="36546" title="危机；危急关头">crisis</span> <span class="w" data-s="36589" data-e="36760">hit</span> <span class="w" data-s="36802" data-e="36888">the</span> <span class="w" data-s="36930" data-e="37058">market</span> <span class="w" data-s="37101" data-e="37314">and</span> <span class="w" data-s="37357" data-e="37656">prices</span> <span class="w" data-s="37698" data-e="38210">doubled.</span></p><p class="zh">半年后，一场肥皂危机席卷市场，价格翻了一倍。</p></div>
+<div class="pair" data-s0="38338" data-s1="41837"><p class="en"><span class="w" data-s="38338" data-e="39064">Soap</span> <span class="w" data-s="39106" data-e="39192">was</span> <span class="w" data-s="39234" data-e="39320">a</span> <span class="w" data-s="39362" data-e="39490">common</span> <span class="w target" data-s="39533" data-e="40045" title="">commodity,</span> <span class="w" data-s="40216" data-e="40557">yet</span> <span class="w" data-s="40642" data-e="40813">that</span> <span class="w" data-s="40856" data-e="41026">month</span> <span class="w" data-s="41069" data-e="41240">it</span> <span class="w" data-s="41282" data-e="41368">felt</span> <span class="w" data-s="41410" data-e="41581">like</span> <span class="w" data-s="41624" data-e="41837">gold.</span></p><p class="zh">肥皂本是寻常商品，可那个月它却像黄金一样珍贵。</p></div>
+<div class="pair" data-s0="42093" data-s1="46189"><p class="en"><span class="w" data-s="42093" data-e="42648">Wei</span> <span class="w" data-s="42690" data-e="42818">had</span> <span class="w" data-s="42861" data-e="42989">no</span> <span class="w target" data-s="43032" data-e="43458" title="资金；财政；金融；财务 v. 提供资金">finance</span> <span class="w" data-s="43501" data-e="43672">and</span> <span class="w" data-s="43714" data-e="43842">little</span> <span class="w target" data-s="43885" data-e="44098" title="(商店的)现货，存货，库存;股票；储备物v. 存货">stock,</span> <span class="w" data-s="44397" data-e="44653">and</span> <span class="w" data-s="44781" data-e="44866">he</span> <span class="w" data-s="44909" data-e="45037">found</span> <span class="w" data-s="45080" data-e="45293">no</span> <span class="w target" data-s="45336" data-e="45720" title="(法律、合同等的)漏洞，空子">loophole</span> <span class="w" data-s="45762" data-e="45890">in</span> <span class="w" data-s="45933" data-e="46018">the</span> <span class="w" data-s="46061" data-e="46189">contract.</span></p><p class="zh">韦没有资金，存货也很少，合同里也找不到任何漏洞。</p></div>
+<div class="pair" data-s0="46658" data-s1="49048"><p class="en"><span class="w" data-s="46658" data-e="46872">So</span> <span class="w" data-s="46914" data-e="47042">he</span> <span class="w" data-s="47085" data-e="47170">went</span> <span class="w" data-s="47213" data-e="47298">to</span> <span class="w" data-s="47341" data-e="47469">an</span> <span class="w target" data-s="47512" data-e="47853" title="主管，经理；行政部门">executive</span> <span class="w" data-s="47896" data-e="48066">at</span> <span class="w" data-s="48109" data-e="48152">the</span> <span class="w" data-s="48194" data-e="48450">town&#x27;s</span> <span class="w target" data-s="48493" data-e="48877" title="(尤指国际间的)贸易；商业；商务">commerce</span> <span class="w" data-s="48920" data-e="49048">office.</span></p><p class="zh">于是他去找镇上商业办公室的一位主管帮忙。</p></div>
+<div class="pair" data-s0="50191" data-s1="51769"><p class="en"><span class="w" data-s="50191" data-e="50276">She</span> <span class="w" data-s="50319" data-e="50617">offered</span> <span class="w" data-s="50660" data-e="50745">him</span> <span class="w" data-s="50788" data-e="50959">a</span> <span class="w" data-s="51001" data-e="51129">simple</span> <span class="w target" data-s="51172" data-e="51769" title="动机；刺激；激励">incentive.</span></p><p class="zh">她给了他一个简单的激励。</p></div>
+<div class="pair" data-s0="52196" data-s1="54415"><p class="en"><span class="w target" data-s="52196" data-e="52879" title="出版，发行；刊登；发布；发表">&quot;Publish</span> <span class="w" data-s="52921" data-e="53092">one</span> <span class="w" data-s="53135" data-e="53348">short</span> <span class="w" data-s="53391" data-e="53604">notice,&quot;</span> <span class="w" data-s="54159" data-e="54201">she</span> <span class="w" data-s="54244" data-e="54415">said.</span></p><p class="zh">“印一份简短的通知，”她说。</p></div>
+<div class="pair" data-s0="55012" data-s1="58340"><p class="en"><span class="w target" data-s="55012" data-e="55823" title="释放；发行；排放；泄漏；解脱；轻松感v.释 放；放出；放走">&quot;Release</span> <span class="w" data-s="55865" data-e="55993">your</span> <span class="w" data-s="56036" data-e="56164">low</span> <span class="w" data-s="56207" data-e="56377">price</span> <span class="w" data-s="56420" data-e="56676">to</span> <span class="w" data-s="56719" data-e="56761">the</span> <span class="w target" data-s="56804" data-e="56932" title="公共的 n. 民众">public,</span> <span class="w" data-s="57188" data-e="57444">and</span> <span class="w" data-s="57487" data-e="57615">the</span> <span class="w" data-s="57657" data-e="57999">customers</span> <span class="w" data-s="58041" data-e="58169">will</span> <span class="w" data-s="58212" data-e="58340">come.&quot;</span></p><p class="zh">“把你的低价告诉公众，顾客自然会上门。”</p></div>
+<div class="pair" data-s0="58809" data-s1="60217"><p class="en"><span class="w" data-s="58809" data-e="59236">He</span> <span class="w" data-s="59279" data-e="59449">did,</span> <span class="w" data-s="59620" data-e="59876">and</span> <span class="w" data-s="59961" data-e="60089">they</span> <span class="w" data-s="60132" data-e="60217">came.</span></p><p class="zh">他照做了，顾客真的来了。</p></div>
+<div class="pair" data-s0="60867" data-s1="64878"><p class="en"><span class="w" data-s="60867" data-e="60953">By</span> <span class="w" data-s="60995" data-e="61337">autumn</span> <span class="w" data-s="61379" data-e="61465">his</span> <span class="w target" data-s="61507" data-e="62019" title="商品；货品">merchandise</span> <span class="w" data-s="62062" data-e="62233">was</span> <span class="w" data-s="62275" data-e="62403">gone</span> <span class="w" data-s="62446" data-e="62574">in</span> <span class="w" data-s="62617" data-e="62702">two</span> <span class="w" data-s="62745" data-e="62915">days,</span> <span class="w" data-s="63129" data-e="63427">and</span> <span class="w" data-s="63470" data-e="63854">other</span> <span class="w target" data-s="63897" data-e="64238" title="">merchants</span> <span class="w" data-s="64281" data-e="64451">brought</span> <span class="w" data-s="64494" data-e="64665">their</span> <span class="w target" data-s="64707" data-e="64878" title="(商店的)现货，存货，库存;股票；储备物v. 存货">stock.</span></p><p class="zh">到了秋天，他的货两天就卖光了，其他商人也把存货送到他这儿。</p></div>
+<div class="pair" data-s0="65177" data-s1="68675"><p class="en"><span class="w target" data-s="65177" data-e="65859" title="贸易；交易(量)v. 做买卖；做生意；从事 贸易">Trade</span> <span class="w" data-s="65902" data-e="66030">in</span> <span class="w" data-s="66073" data-e="66115">the</span> <span class="w" data-s="66158" data-e="66243">street</span> <span class="w" data-s="66286" data-e="66542">grew,</span> <span class="w" data-s="66755" data-e="67011">and</span> <span class="w" data-s="67097" data-e="67481">people</span> <span class="w" data-s="67523" data-e="67779">began</span> <span class="w" data-s="67822" data-e="67993">to</span> <span class="w" data-s="68035" data-e="68121">call</span> <span class="w" data-s="68163" data-e="68291">him</span> <span class="w" data-s="68334" data-e="68675">clever.</span></p><p class="zh">街上的买卖越做越大，人们开始说他机灵。</p></div>
+<div class="pair" data-s0="69199" data-s1="73551"><p class="en"><span class="w" data-s="69199" data-e="69284">He</span> <span class="w" data-s="69327" data-e="69497">drew</span> <span class="w" data-s="69540" data-e="69711">a</span> <span class="w" data-s="69753" data-e="69881">small</span> <span class="w" data-s="69924" data-e="70137">sun</span> <span class="w" data-s="70180" data-e="70564">on</span> <span class="w" data-s="70607" data-e="70777">every</span> <span class="w" data-s="70820" data-e="70991">box,</span> <span class="w" data-s="71289" data-e="71588">and</span> <span class="w" data-s="71887" data-e="72057">that</span> <span class="w" data-s="72100" data-e="72271">sun</span> <span class="w" data-s="72313" data-e="72655">is</span> <span class="w" data-s="72697" data-e="72825">his</span> <span class="w target" data-s="72868" data-e="73295" title="商标，标志">trademark</span> <span class="w" data-s="73337" data-e="73551">today.</span></p><p class="zh">他在每个盒子上画了一个小太阳，那个太阳就是他今天的商标。</p></div>
+<div class="pair" data-s0="73807" data-s1="77561"><p class="en"><span class="w" data-s="73807" data-e="74745">Each</span> <span class="w" data-s="74788" data-e="75001">evening</span> <span class="w" data-s="75044" data-e="75300">he</span> <span class="w" data-s="75343" data-e="75513">wrote</span> <span class="w" data-s="75556" data-e="75684">his</span> <span class="w target" data-s="75727" data-e="76025" title="预算 v. 做预算，编入预算">budget</span> <span class="w" data-s="76068" data-e="76281">and</span> <span class="w" data-s="76324" data-e="76793">his</span> <span class="w target" data-s="76836" data-e="77007" title="（服务的)对象，目标；(射击的)靶子 v. 瞄准">target</span> <span class="w" data-s="77049" data-e="77305">on</span> <span class="w" data-s="77348" data-e="77433">the</span> <span class="w" data-s="77476" data-e="77561">wall.</span></p><p class="zh">每晚他都在墙上写下自己的预算和目标。</p></div>
+<div class="pair" data-s0="78199" data-s1="82764"><p class="en"><span class="w" data-s="78199" data-e="78540">Above</span> <span class="w" data-s="78583" data-e="78668">the</span> <span class="w" data-s="78711" data-e="78796">door</span> <span class="w" data-s="78839" data-e="79052">a</span> <span class="w" data-s="79095" data-e="79308">painter</span> <span class="w" data-s="79351" data-e="79479">had</span> <span class="w" data-s="79521" data-e="79777">painted</span> <span class="w" data-s="79820" data-e="79905">the</span> <span class="w" data-s="79948" data-e="80033">word</span> <span class="w" data-s="80076" data-e="80545">revenue</span> <span class="w" data-s="80588" data-e="80759">as</span> <span class="w target" data-s="80801" data-e="81100" title="">revent,</span> <span class="w" data-s="81313" data-e="81484">and</span> <span class="w" data-s="81569" data-e="82081">Wei</span> <span class="w" data-s="82124" data-e="82209">never</span> <span class="w" data-s="82252" data-e="82465">changed</span> <span class="w" data-s="82508" data-e="82764">it.</span></p><p class="zh">门上方，油漆匠曾把 revenue 写成了 revent，韦一直没让人改。</p></div>
+<div class="pair" data-s0="82892" data-s1="85111"><p class="en"><span class="w" data-s="82892" data-e="83361">His</span> <span class="w" data-s="83532" data-e="83703">shop</span> <span class="w" data-s="83745" data-e="83916">is</span> <span class="w" data-s="83959" data-e="84087">still</span> <span class="w" data-s="84129" data-e="84300">called</span> <span class="w target" data-s="84343" data-e="84684" title="">Revent</span> <span class="w" data-s="84727" data-e="85111">Soap.</span></p><p class="zh">他的店至今还叫“Revent 肥皂店”。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">innocent</span>
+          <span class="ipa">/&#x27;Inəsnt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">清白的，无罪的；天真的；无知的 n. 无辜 者，单纯的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a naive young man with an innocent face</div>          <div class="mnem"><span class="lbl">记</span>in(里面),no(没有),cent(分)， 口袋里没有一分钱的人一般都是小孩，他们的 特点是“天真的，单纯的”。</div>          <div class="root"><span class="lbl">根</span>in(不) + noc(伤害) + ent → 不伤害人的 → 清白的</div>          <div class="zt"><span class="lbl">真题</span>A soldier deviates when they choose not to follow orders to kill an innocent civilian. 当 一名士兵选择不服从命令，杀死一名无辜的平 民时，他就是叛变了。(2022)</div>          <div class="fam"><span class="lbl">族</span>innocence n. 清白 / innocently adv. 天真地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">naive</span>
+          <span class="ipa">/nat&#x27;i:v/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">幼稚的，天真的；轻信的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Wei was a naive young man</div>          <div class="mnem"><span class="lbl">记</span>把 naive拆开成 nai(奶）十 ve (喂)，需要喂奶的是小孩吧，小孩的特点是“幼 稚的，天真的”。</div>          <div class="root"><span class="lbl">根</span>联想：法语 naître(出生) → 刚出生般不设防 → 天真的</div>          <div class="fam"><span class="lbl">族</span>naivety n. 天真 / naively adv. 幼稚地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">decent</span>
+          <span class="ipa">/&#x27;di:snt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">得体的;体面的；正派的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every merchant was decent</div>          <div class="mnem"><span class="lbl">记</span>de发音类似“地”;cent 意为“一 分的硬币”。我在马路边，捡到一分钱，把它交 到警察叔叔手里面……这是多么“得体的” 行为！</div>          <div class="root"><span class="lbl">根</span>dec(合适、体面) + ent → 合适的 → 得体的</div>          <div class="zt"><span class="lbl">真题</span>They won&#x27;t help you get a decent job. 他 们不会帮你找到一份体面的工作。</div>          <div class="fam"><span class="lbl">族</span>decency n. 得体 / decently adv. 体面地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">incentive</span>
+          <span class="ipa">/ın&#x27;sentiv/</span>
+          <span class="pos">n.</span>
+          <span class="cn">动机；刺激；激励</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>offered him a simple incentive</div>          <div class="mnem"><span class="lbl">记</span>家里(in里面)只有一分钱(cent 分)了。设想家里穷到只剩一分钱了，你就有 “动机”，被“刺激”去挣钱了。</div>          <div class="root"><span class="lbl">根</span>in(里面) + cent(一分钱) → 家里只剩一分钱，逼出动力 → 激励</div>          <div class="zt"><span class="lbl">真题</span>But there needs to be strong economic incentives for companies to locate here. 但需要 有强有力的经济激励措施来鼓励企业在这里落 户。(2019)</div>          <div class="fam"><span class="lbl">族</span>incentivize v. 激励 / motive n. 动机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">execute</span>
+          <span class="ipa">/&#x27;eksikju:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">执行，实行；处死</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the tax office will execute the rule</div>          <div class="root"><span class="lbl">根</span>ex(出) + secut(跟随) → 一路跟到底做完 → 执行</div>          <div class="zt"><span class="lbl">真题</span>He was the first minor to be executed in South Carolina. 他是南卡罗来纳州第一个被处 决的未成年人。(2015)</div>          <div class="fam"><span class="lbl">族</span>execution n. 执行 / executive n. 主管</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">executive</span>
+          <span class="ipa">/ıg&#x27;zekjətiv/</span>
+          <span class="pos">n.</span>
+          <span class="cn">主管，经理；行政部门</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an executive at the town&#x27;s commerce office</div>          <div class="root"><span class="lbl">根</span>execut(执行) + ive(人) → 负责执行的人 → 主管</div>          <div class="zt"><span class="lbl">真题</span>The executives acknowledge that they try (137) to swing national eating habits to a food created in America. 这些高管承认，他们试图改 变国民的饮食习惯，转而采用美国制造的食品。</div>          <div class="fam"><span class="lbl">族</span>execute v. 执行 / execution n. 执行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">loophole</span>
+          <span class="ipa">/&#x27;lu:phəul/</span>
+          <span class="pos"></span>
+          <span class="cn">(法律、合同等的)漏洞，空子</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>found no loophole in the contract</div>          <div class="mnem"><span class="lbl">记</span>loop 想象成北京奥运会的开幕 式，100个人(loo想成100)跑(p)进会场，构成 了奥运会的五环——环状物，圈；hole是“洞”的 意思；100个人组成奥运五环，如果人数不够，就 会出现“漏洞”。</div>          <div class="root"><span class="lbl">根</span>loop(环) + hole(洞) → 环上的洞 → 漏洞</div>          <div class="fam"><span class="lbl">族</span>loop n. 环 / hole n. 洞</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">release</span>
+          <span class="ipa">/ri&#x27;li:s/</span>
+          <span class="pos">n.</span>
+          <span class="cn">释放；发行；排放；泄漏；解脱；轻松感v.释 放；放出；放走</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Release your low price to the public</div>          <div class="root"><span class="lbl">根</span>re(回) + lease(松开) → 松开还回去 → 释放</div>          <div class="zt"><span class="lbl">真题</span>A private wildlife management company will release the animal into the wild. 一家私人 野生动物管理公司将把这只动物放归野外。 (2019)</div>          <div class="fam"><span class="lbl">族</span>lease v. 出租 / release n. 发行</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">publish</span>
+          <span class="ipa">/&#x27;psblrʃ/</span>
+          <span class="pos">v.</span>
+          <span class="cn">出版，发行；刊登；发布；发表</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Publish one short notice</div>          <div class="root"><span class="lbl">根</span>publ(公众，同 public) + ish → 让公众看到 → 出版</div>          <div class="zt"><span class="lbl">真题</span>It is first published in Washington and then in Paris. 它首先在华盛顿出版，然后在巴 黎出版。</div>          <div class="fam"><span class="lbl">族</span>publication n. 出版 / publisher n. 出版商</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">public</span>
+          <span class="ipa">/&#x27;pablık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">公共的 n. 民众</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to the public, and the customers will come</div>          <div class="root"><span class="lbl">根</span>publ(人民，拉丁 populus) + ic → 属于人民的</div>          <div class="zt"><span class="lbl">真题</span>It doesn&#x27;t run counter to the goals of public education. 这并不违背公共教育的目标。 (2015)</div>          <div class="fam"><span class="lbl">族</span>publicly adv. 公开地 / publicity n. 宣传</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">oblige</span>
+          <span class="ipa">/ə&#x27;blaıd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(以法律、义务等)强迫，迫使</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The law obliged him to pay on time</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“我不来 挤”。你不来挤也逃不掉，因为这是你的责任， 义务→迫使，强制。</div>          <div class="root"><span class="lbl">根</span>ob(朝向) + lig(绑) + e → 绑住 → 迫使</div>          <div class="zt"><span class="lbl">真题</span>They were obliged to fulfill the signed contract. 他们必须履行已签订的合同。</div>          <div class="fam"><span class="lbl">族</span>obligation n. 义务 / obligatory adj. 强制的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">responsible</span>
+          <span class="ipa">/ri&#x27;spa:nsəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有责任的；负责的；承担义务的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He was responsible for every item</div>          <div class="mnem"><span class="lbl">记</span>respons(e)回答，回应；ible是 形容词后缀，表“……的”。能够给出回答、回应 的人是“有责任的，负责的”。</div>          <div class="root"><span class="lbl">根</span>respons(回答) + ible → 能给出回应的人 → 负责的</div>          <div class="zt"><span class="lbl">真题</span>They are responsible for working through that problem. 他们有责任解决那个问 题。(2019)</div>          <div class="fam"><span class="lbl">族</span>responsibility n. 责任 / respond v. 回答</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">legal</span>
+          <span class="ipa">/&#x27;li:gl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">与法律有关的；合法的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the legal side of a small shop</div>          <div class="root"><span class="lbl">根</span>leg(法律，拉丁 lex) + al → 法律的</div>          <div class="zt"><span class="lbl">真题</span>So we will side with the majority of the people of Philadelphia who oppose this tax and take legal action to stop it. 因此，我们将与大多 数反对这项税收的费城人民站在一起，并采取 合法行动来阻止它。(2019)</div>          <div class="fam"><span class="lbl">族</span>legally adv. 合法地 / illegal adj. 非法的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">legislation</span>
+          <span class="ipa">/iled3ıs&#x27;ler∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">立法；法律</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>strict legislation about trade</div>          <div class="mnem"><span class="lbl">记</span>该单词与legal(法律的，合法 的)同源，所以该单词的含义也和法律有关→立 法；法律。</div>          <div class="root"><span class="lbl">根</span>legisl(法律) + ation → 立法的过程 → 立法</div>          <div class="zt"><span class="lbl">真题</span>In order to avoid other legislation in America and elsewhere, fast-food companies will have to continue innovating. 为了避开在美 国和其他地方的立法，快餐公司将不得不继续 创新。 (138)</div>          <div class="fam"><span class="lbl">族</span>legislate v. 立法 / legislature n. 立法机关</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">statute</span>
+          <span class="ipa">/&#x27;stæt∫uit/</span>
+          <span class="pos"></span>
+          <span class="cn">成文法；法规；章程；条例；规程</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;A statute is a statute&quot;</div>          <div class="mnem"><span class="lbl">记</span>单词的前半部分类似 state(国 家)，tute发音类似(吐他)，国家要吐槽他，就需 要有“法规；章程”啊。</div>          <div class="root"><span class="lbl">根</span>stat(站立，同 stand) + ute → 立起来的规矩 → 法规</div>          <div class="fam"><span class="lbl">族</span>statutory adj. 法定的 / establish v. 建立</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">item</span>
+          <span class="ipa">/&#x27;aitəm/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every item on his own paper</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“爱(i)他(t)的妈 妈(m)”。他列出了很多爱妈妈的“条款”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：an item on the list 清单上的一项 → 条款，项目</div>          <div class="zt"><span class="lbl">真题</span>Sharing items such as cars does good to the environment. 共享汽车等共享物品对环境 有好处。</div>          <div class="fam"><span class="lbl">族</span>itemize v. 逐项列出 / clause n. 条款</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">valid</span>
+          <span class="ipa">/&#x27;vælıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(法律上)有效的；(正式)认可的；合理的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not valid until we validate it</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“歪理的”→歪理 是乍一听很有道理但经不起推敲的话→合理的。</div>          <div class="root"><span class="lbl">根</span>val(强壮，拉丁 valere) + id → 有力量的 → 有效的</div>          <div class="zt"><span class="lbl">真题</span>There are valid reasons boredom may feel so painful. 无聊可能会(让人)感到如此痛苦，这 是有充分理由的。</div>          <div class="fam"><span class="lbl">族</span>validity n. 有效性 / invalid adj. 无效的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">validate</span>
+          <span class="ipa">/&#x27;vælıdeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">证明，确认；使生效</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>until we validate it</div>          <div class="mnem"><span class="lbl">记</span>别人不相信我，你说我能使大 雁说的话生效，你在干什么？→证明，确认。 (139) 第六单元</div>          <div class="root"><span class="lbl">根</span>valid(有效) + ate(使……) → 使有效 → 确认</div>          <div class="zt"><span class="lbl">真题</span>We validated these expectations in a study. 我们在一项研究中验证了这些期望。</div>          <div class="fam"><span class="lbl">族</span>validation n. 确认 / valid adj. 有效的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">crisis</span>
+          <span class="ipa">/&#x27;kraisis/</span>
+          <span class="pos"></span>
+          <span class="cn">危机；危急关头</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a soap crisis hit the market</div>          <div class="root"><span class="lbl">根</span>cris(判断，希腊 krisis) + is → 做决定的时刻 → 危机</div>          <div class="zt"><span class="lbl">真题</span>New research has found deep water reserves under the state which could help solve their drought crisis. 新的研究发现，该州的深水 储备可以帮助解决干旱危机。(2018)</div>          <div class="fam"><span class="lbl">族</span>critical adj. 关键的；危急的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">finance</span>
+          <span class="ipa">/&#x27;fainæns/</span>
+          <span class="pos"></span>
+          <span class="cn">资金；财政；金融；财务 v. 提供资金</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Wei had no finance and little stock</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“犯难死”。当 西方发生“金融”危机的时候，有的人破产了，他 们就犯难死了，一分钱难倒英雄汉啊！</div>          <div class="root"><span class="lbl">根</span>fin(结束，拉丁 finis) + ance → 把账结清 → 金融，资金</div>          <div class="zt"><span class="lbl">真题</span>She started an ice-cream business to finance her daughter&#x27;s education. 她开了一家 冰激凌店来资助女儿的教育。(2016)</div>          <div class="fam"><span class="lbl">族</span>financial adj. 财政的 / finance v. 资助</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">commerce</span>
+          <span class="ipa">/&#x27;ka:m3:rs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(尤指国际间的)贸易；商业；商务</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the town&#x27;s commerce office</div>          <div class="mnem"><span class="lbl">记</span>com所有的；merce发音类似 “摩丝”。今天所有人都西装革履，头发打着摩 丝，去干吗？“商业”谈判啊。</div>          <div class="root"><span class="lbl">根</span>com(共同) + merc(交易) + e → 互相买卖 → 商业</div>          <div class="zt"><span class="lbl">真题</span>During this decade new forms of entertainment, commerce, research, and communication became commonplace in the U.S.在这十年中，新的娱乐、商业、研究和交流 形式在美国变得很普遍。</div>          <div class="fam"><span class="lbl">族</span>commercial adj. 商业的 / merchant n. 商人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">commodity</span>
+          <span class="ipa">/kə&#x27;mpdəti/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Soap was a common commodity</div>          <div class="root"><span class="lbl">根</span>com(共同) + mod(尺度) + ity → 按尺度交换之物 → 商品</div>          <div class="zt"><span class="lbl">真题</span>How do we assess the value of a commodity? 我们如何评估一件商品的价值？(2020) 例 Clean water is a precious commodity in that part of the world. 在世界的那个地方，洁 净的水是宝贵的东西。</div>          <div class="fam"><span class="lbl">族</span>commodities n. 商品(复数) / goods n. 货物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">merchant</span>
+          <span class="ipa">/&#x27;ma:t∫ənt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>other merchants brought their stock</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“摸钱他”。每天 摸钱，和钱打交道的人→商人。</div>          <div class="root"><span class="lbl">根</span>merch(交易，同 market) + ant(人) → 做买卖的人 → 商人</div>          <div class="fam"><span class="lbl">族</span>merchandise n. 商品 / commerce n. 商业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">merchandise</span>
+          <span class="ipa">/&#x27;m3:t∫əndais/</span>
+          <span class="pos"></span>
+          <span class="cn">商品；货品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his merchandise was gone in two days</div>          <div class="root"><span class="lbl">根</span>merch(交易) + andise → 用来交易的东西 → 商品</div>          <div class="fam"><span class="lbl">族</span>merchant n. 商人 / commerce n. 商业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">stock</span>
+          <span class="ipa">/sta:k/</span>
+          <span class="pos"></span>
+          <span class="cn">(商店的)现货，存货，库存;股票；储备物v. 存货</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>little stock, and he found no loophole</div>          <div class="root"><span class="lbl">根</span>靠搭配记：in stock 有货 / out of stock 缺货 → 存货</div>          <div class="zt"><span class="lbl">真题</span>Back in 1974, only 10% of marine fish stocks had been overfished. 早在 1974 年，只有 10%的海洋鱼类资源被过度捕捞。(2022)</div>          <div class="fam"><span class="lbl">族</span>stockholder n. 股东 / stock market n. 股市</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">trade</span>
+          <span class="ipa">/treid/</span>
+          <span class="pos"></span>
+          <span class="cn">贸易；交易(量)v. 做买卖；做生意；从事 贸易</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Trade in the street grew</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“锤的”。让我们 想到了拍卖的时候，用锤子确定“交易”完成。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：trade with sb 与某人做生意 → 贸易，交易</div>          <div class="zt"><span class="lbl">真题</span>It will help many African countries reduce trade deficits. 它将帮助许多非洲国家减 少贸易逆差。(2023)</div>          <div class="fam"><span class="lbl">族</span>trader n. 商人 / trademark n. 商标</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">trademark</span>
+          <span class="ipa">/&#x27;treıdma:rk/</span>
+          <span class="pos"></span>
+          <span class="cn">商标，标志</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that sun is his trademark today</div>          <div class="mnem"><span class="lbl">记</span>交易（trade）的标记（mark）→ 商标。</div>          <div class="root"><span class="lbl">根</span>trade(交易) + mark(标记) → 交易的标记 → 商标</div>          <div class="fam"><span class="lbl">族</span>trade n. 贸易 / brand n. 品牌</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">budget</span>
+          <span class="ipa">/&#x27;bad3it/</span>
+          <span class="pos"></span>
+          <span class="cn">预算 v. 做预算，编入预算</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wrote his budget and his target</div>          <div class="mnem"><span class="lbl">记</span>bud发音类似“爸的”；get是 “得到”。那就是爸爸得到了很多的“预算”。</div>          <div class="root"><span class="lbl">根</span>联想：bud(爸的) + get(得到) → 爸爸得到的那笔钱 → 预算</div>          <div class="zt"><span class="lbl">真题</span>They are under growing pressure to balance their national budgets. 他们承受着越 来越大的平衡国家预算的压力。(2016)</div>          <div class="fam"><span class="lbl">族</span>budget v. 做预算 / budgetary adj. 预算的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">target</span>
+          <span class="ipa">/&#x27;ta:git/</span>
+          <span class="pos">v.</span>
+          <span class="cn">（服务的)对象，目标；(射击的)靶子 v. 瞄准</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his target on the wall</div>          <div class="mnem"><span class="lbl">记</span>tar读音类似“它”；get 是“得 到”。得到它就是你的“目标”啊！</div>          <div class="root"><span class="lbl">根</span>联想：tar(它) + get(得到) → 想得到的东西 → 目标；瞄准</div>          <div class="zt"><span class="lbl">真题</span>Scotland will reach the national target in carbon emissions reduction ahead of schedule. 苏格兰将提前实现全国碳减排目标。(2021)</div>          <div class="fam"><span class="lbl">族</span>target v. 以……为目标 / aim n. 目标</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">revent</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>painted the word revenue as revent</div>          <div class="root"><span class="lbl">根</span>书里印作 revent，实为 revenue(收入) → 税收收入；收益</div>          <div class="fam"><span class="lbl">族</span>revenue n. 收入，税收 / income n. 收入</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 36</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

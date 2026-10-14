@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 45 · The Sign Said totate</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 45 · 11/26 · Unit 7 第 1321-1350 词</div>
+  <h1>The Sign Said totate<span class="cn">牌子上写着 totate</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-45.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4053"><p class="en"><span class="w" data-s="43" data-e="256">Peter</span> <span class="w" data-s="299" data-e="427">was</span> <span class="w" data-s="469" data-e="512">a</span> <span class="w target" data-s="555" data-e="939" title="木匠，木工">carpenter</span> <span class="w" data-s="981" data-e="1152">in</span> <span class="w" data-s="1195" data-e="1237">the</span> <span class="w" data-s="1280" data-e="1451">village</span> <span class="w" data-s="1493" data-e="1579">of</span> <span class="w" data-s="1621" data-e="1877">Wells,</span> <span class="w" data-s="2048" data-e="2304">and</span> <span class="w" data-s="2603" data-e="2731">his</span> <span class="w" data-s="2773" data-e="3115">workshop</span> <span class="w" data-s="3157" data-e="3413">stood</span> <span class="w" data-s="3456" data-e="3669">behind</span> <span class="w" data-s="3712" data-e="3925">the</span> <span class="w target" data-s="3968" data-e="4053" title="教堂，教会">church.</span></p><p class="zh">彼得是韦尔斯村里的一名木匠，他的作坊就在教堂后面。</p></div>
+<div class="pair" data-s0="4352" data-s1="8661"><p class="en"><span class="w" data-s="4352" data-e="5205">The</span> <span class="w target" data-s="5248" data-e="5504" title="教区牧师，教堂牧师；传教牧师">vicar</span> <span class="w" data-s="5547" data-e="5675">often</span> <span class="w" data-s="5717" data-e="5973">came</span> <span class="w" data-s="6016" data-e="6187">for</span> <span class="w" data-s="6229" data-e="6443">tea</span> <span class="w" data-s="6485" data-e="6784">and</span> <span class="w" data-s="6955" data-e="7125">sat</span> <span class="w" data-s="7168" data-e="7381">on</span> <span class="w" data-s="7424" data-e="7509">a</span> <span class="w" data-s="7552" data-e="7723">wooden</span> <span class="w" data-s="7765" data-e="7851">chair</span> <span class="w" data-s="7893" data-e="8320">Peter</span> <span class="w" data-s="8363" data-e="8491">had</span> <span class="w" data-s="8533" data-e="8661">made.</span></p><p class="zh">牧师常来这儿喝茶，坐在一把彼得亲手做的木椅上。</p></div>
+<div class="pair" data-s0="9003" data-s1="15232"><p class="en"><span class="w" data-s="9003" data-e="9131">On</span> <span class="w" data-s="9173" data-e="9259">the</span> <span class="w target" data-s="9301" data-e="9557" title="圣人，圣徒；圣人般的人">saint&#x27;s</span> <span class="w" data-s="9600" data-e="9728">day,</span> <span class="w" data-s="9899" data-e="10069">every</span> <span class="w target" data-s="10283" data-e="10752" title="胡萝卜 n. 基督徒，信徒 adj. 基督教的">Christian</span> <span class="w" data-s="10795" data-e="11093">walked</span> <span class="w" data-s="11136" data-e="11349">up</span> <span class="w" data-s="11392" data-e="11477">the</span> <span class="w" data-s="11520" data-e="11605">hill</span> <span class="w" data-s="11648" data-e="11819">to</span> <span class="w" data-s="11861" data-e="11947">sing,</span> <span class="w" data-s="12160" data-e="12331">and</span> <span class="w" data-s="12629" data-e="13056">Peter&#x27;s</span> <span class="w" data-s="13099" data-e="13227">wife</span> <span class="w" data-s="13269" data-e="13611">wore</span> <span class="w" data-s="13653" data-e="13739">the</span> <span class="w" data-s="13781" data-e="13867">long</span> <span class="w target" data-s="13909" data-e="14379" title="">scarf</span> <span class="w" data-s="14421" data-e="14549">she</span> <span class="w" data-s="14592" data-e="14720">had</span> <span class="w" data-s="14763" data-e="14976">knitted</span> <span class="w" data-s="15019" data-e="15232">herself.</span></p><p class="zh">圣徒节那天，村里的每个基督徒都走上山坡去唱歌，彼得的妻子围上了她自己织的那条长围巾。</p></div>
+<div class="pair" data-s0="16269" data-s1="20237"><p class="en"><span class="w" data-s="16269" data-e="16354">To</span> <span class="w" data-s="16397" data-e="16525">the</span> <span class="w" data-s="16568" data-e="16610">people</span> <span class="w" data-s="16653" data-e="16952">there,</span> <span class="w" data-s="17122" data-e="17250">that</span> <span class="w" data-s="17592" data-e="17762">old</span> <span class="w" data-s="17805" data-e="17933">building</span> <span class="w" data-s="17976" data-e="18189">was</span> <span class="w target" data-s="18232" data-e="18530" title="神圣的，圣洁的">holy</span> <span class="w" data-s="18573" data-e="18829">and</span> <span class="w" data-s="19042" data-e="19128">the</span> <span class="w" data-s="19170" data-e="19256">ground</span> <span class="w" data-s="19298" data-e="19512">around</span> <span class="w" data-s="19554" data-e="19725">it</span> <span class="w" data-s="19768" data-e="19853">was</span> <span class="w target" data-s="19896" data-e="20237" title="神圣的；受尊重的 (169) 第七单元">sacred.</span></p><p class="zh">对那里的人来说，那座老建筑是神圣的，周围那片土地也是神圣的。</p></div>
+<div class="pair" data-s0="20408" data-s1="22285"><p class="en"><span class="w" data-s="20408" data-e="20877">Behind</span> <span class="w" data-s="20920" data-e="21048">the</span> <span class="w" data-s="21090" data-e="21346">workshop</span> <span class="w" data-s="21389" data-e="21730">Peter</span> <span class="w" data-s="21773" data-e="21901">grew</span> <span class="w target" data-s="21944" data-e="22285" title="">carrots.</span></p><p class="zh">作坊后面，彼得种着胡萝卜。</p></div>
+<div class="pair" data-s0="22498" data-s1="27533"><p class="en"><span class="w" data-s="22498" data-e="22626">One</span> <span class="w" data-s="22669" data-e="22925">wet</span> <span class="w" data-s="22968" data-e="23309">autumn</span> <span class="w" data-s="23352" data-e="23394">the</span> <span class="w target" data-s="23437" data-e="23736" title="">carrots</span> <span class="w" data-s="23778" data-e="23906">began</span> <span class="w" data-s="23949" data-e="24120">to</span> <span class="w target" data-s="24162" data-e="24248" title="烂；腐败">rot,</span> <span class="w" data-s="24504" data-e="24632">and</span> <span class="w" data-s="25016" data-e="25186">when</span> <span class="w" data-s="25229" data-e="25314">he</span> <span class="w" data-s="25357" data-e="25442">pulled</span> <span class="w" data-s="25485" data-e="25656">one</span> <span class="w" data-s="25698" data-e="25826">up,</span> <span class="w" data-s="25997" data-e="26125">its</span> <span class="w target" data-s="26466" data-e="26765" title="根；根本，根源，基础 v.(使)生根，使固定">root</span> <span class="w" data-s="26808" data-e="26893">was</span> <span class="w" data-s="26936" data-e="27064">soft</span> <span class="w" data-s="27106" data-e="27362">and</span> <span class="w" data-s="27405" data-e="27533">brown.</span></p><p class="zh">有一个多雨的秋天，胡萝卜开始腐烂；他拔起一根，发现根部已经又软又黄。</p></div>
+<div class="pair" data-s0="28519" data-s1="35175"><p class="en"><span class="w" data-s="28519" data-e="28775">Beside</span> <span class="w" data-s="28817" data-e="28988">his</span> <span class="w" data-s="29031" data-e="29244">bench</span> <span class="w" data-s="29287" data-e="29585">hung</span> <span class="w" data-s="29756" data-e="29927">a</span> <span class="w" data-s="29969" data-e="30183">painted</span> <span class="w" data-s="30225" data-e="30353">sign,</span> <span class="w" data-s="30609" data-e="30780">and</span> <span class="w" data-s="30993" data-e="31335">the</span> <span class="w" data-s="31377" data-e="31463">first</span> <span class="w" data-s="31505" data-e="31719">of</span> <span class="w" data-s="31761" data-e="31847">the</span> <span class="w" data-s="31889" data-e="31975">two</span> <span class="w" data-s="32017" data-e="32188">words</span> <span class="w" data-s="32231" data-e="32444">on</span> <span class="w" data-s="32487" data-e="32615">it</span> <span class="w" data-s="32657" data-e="32871">was</span> <span class="w" data-s="33084" data-e="33297">wrong:</span> <span class="w target" data-s="33639" data-e="34748" title="">totate</span> <span class="w" data-s="34791" data-e="34919">the</span> <span class="w" data-s="34961" data-e="35175">wheel.</span></p><p class="zh">他工作台旁挂着一块刷了漆的牌子，上面两个词里的第一个还写错了：totate the wheel（本该是 rotate）。</p></div>
+<div class="pair" data-s0="35388" data-s1="38673"><p class="en"><span class="w" data-s="35388" data-e="36028">Everyone</span> <span class="w" data-s="36071" data-e="36241">knew</span> <span class="w" data-s="36284" data-e="36455">the</span> <span class="w" data-s="36497" data-e="36540">word</span> <span class="w" data-s="36583" data-e="36796">should</span> <span class="w" data-s="36839" data-e="36924">be</span> <span class="w" data-s="36967" data-e="37265">rotate,</span> <span class="w" data-s="37436" data-e="37692">but</span> <span class="w" data-s="37820" data-e="37991">nobody</span> <span class="w" data-s="38033" data-e="38545">corrected</span> <span class="w" data-s="38588" data-e="38673">it.</span></p><p class="zh">谁都知道那个词本该是 rotate，可从来没人去改。</p></div>
+<div class="pair" data-s0="39277" data-s1="45165"><p class="en"><span class="w" data-s="39277" data-e="39490">Peter</span> <span class="w" data-s="39533" data-e="39661">could</span> <span class="w" data-s="39703" data-e="39831">build</span> <span class="w" data-s="39874" data-e="40045">a</span> <span class="w target" data-s="40087" data-e="40258" title="(两轮或四轮)运货马车；手推车；手拉车">cart,</span> <span class="w" data-s="40514" data-e="40770">a</span> <span class="w target" data-s="40813" data-e="41154" title="(火车的)客车厢；(旧时载客的)四轮马车；婴 儿车；运输；运费">carriage</span> <span class="w" data-s="41197" data-e="41410">or</span> <span class="w" data-s="41453" data-e="41751">a</span> <span class="w" data-s="41794" data-e="41879">farm</span> <span class="w target" data-s="41922" data-e="42391" title="(铁路)货车车厢，车皮；四轮载重马车(或牛 车)">wagon</span> <span class="w" data-s="42434" data-e="42519">with</span> <span class="w" data-s="42562" data-e="42647">his</span> <span class="w" data-s="42690" data-e="42818">own</span> <span class="w" data-s="42861" data-e="42989">hands,</span> <span class="w" data-s="43373" data-e="43543">and</span> <span class="w" data-s="43757" data-e="44183">farmers</span> <span class="w" data-s="44226" data-e="44397">came</span> <span class="w" data-s="44439" data-e="44653">from</span> <span class="w" data-s="44695" data-e="44823">miles</span> <span class="w" data-s="44866" data-e="45165">away.</span></p><p class="zh">彼得能亲手做出一辆手推车、一辆四轮马车或一辆农用大车，农民们从好多英里外赶来。</p></div>
+<div class="pair" data-s0="45463" data-s1="48877"><p class="en"><span class="w" data-s="45463" data-e="46189">Then</span> <span class="w" data-s="46231" data-e="46402">one</span> <span class="w" data-s="46445" data-e="46573">morning</span> <span class="w" data-s="46615" data-e="46871">a</span> <span class="w" data-s="46914" data-e="47298">salesman</span> <span class="w" data-s="47341" data-e="47597">drove</span> <span class="w" data-s="47639" data-e="47725">up</span> <span class="w" data-s="47767" data-e="47895">in</span> <span class="w" data-s="47938" data-e="48023">a</span> <span class="w" data-s="48066" data-e="48365">shining</span> <span class="w target" data-s="48407" data-e="48877" title="汽车">automobile.</span></p><p class="zh">后来有一天早晨，一位推销员开着一辆锃亮的汽车来了。</p></div>
+<div class="pair" data-s0="49477" data-s1="54085"><p class="en"><span class="w" data-s="49477" data-e="49691">Its</span> <span class="w target" data-s="49733" data-e="49861" title="发动机，引擎；机车；火车头">engine</span> <span class="w" data-s="49904" data-e="50160">was</span> <span class="w" data-s="50203" data-e="50331">almost</span> <span class="w" data-s="50373" data-e="50800">silent,</span> <span class="w" data-s="50971" data-e="51141">its</span> <span class="w target" data-s="51397" data-e="51696" title="发动机；马达；汽车 adj、有引擎的；由发动 机推动的">motor</span> <span class="w" data-s="51739" data-e="51824">was</span> <span class="w" data-s="51867" data-e="52037">new,</span> <span class="w" data-s="52208" data-e="52421">and</span> <span class="w" data-s="52720" data-e="52805">it</span> <span class="w" data-s="52848" data-e="53061">drank</span> <span class="w target" data-s="53104" data-e="53445" title="(英)汽油">petrol</span> <span class="w" data-s="53488" data-e="53701">instead</span> <span class="w" data-s="53744" data-e="53872">of</span> <span class="w" data-s="53915" data-e="54085">hay.</span></p><p class="zh">它的发动机几乎没有声音，马达是新的，喝的是汽油而不是吃草料。</p></div>
+<div class="pair" data-s0="54256" data-s1="56944"><p class="en"><span class="w" data-s="54256" data-e="54939">The</span> <span class="w" data-s="54981" data-e="55408">salesman</span> <span class="w" data-s="55451" data-e="55749">slept</span> <span class="w" data-s="55792" data-e="55877">at</span> <span class="w" data-s="55920" data-e="55963">the</span> <span class="w target" data-s="56005" data-e="56219" title="汽车旅馆(附有停车设施)">motel</span> <span class="w" data-s="56261" data-e="56475">on</span> <span class="w" data-s="56517" data-e="56603">the</span> <span class="w" data-s="56645" data-e="56731">main</span> <span class="w" data-s="56773" data-e="56944">road.</span></p><p class="zh">那位推销员住在公路边的汽车旅馆。</p></div>
+<div class="pair" data-s0="57571" data-s1="62093"><p class="en"><span class="w" data-s="57571" data-e="57699">A</span> <span class="w target" data-s="57741" data-e="57869" title="长途客车；大马车；(体育运动的)教练；私人 教师；考前辅导教师；(客机的)经济舱">coach</span> <span class="w" data-s="57912" data-e="58168">full</span> <span class="w" data-s="58211" data-e="58296">of</span> <span class="w" data-s="58339" data-e="58680">visitors</span> <span class="w" data-s="58723" data-e="58936">stopped</span> <span class="w" data-s="58979" data-e="59192">at</span> <span class="w" data-s="59235" data-e="59277">the</span> <span class="w" data-s="59320" data-e="59448">gate,</span> <span class="w" data-s="59619" data-e="59832">and</span> <span class="w" data-s="60045" data-e="60131">a</span> <span class="w target" data-s="60173" data-e="60472" title="运输工具；运载工具；携带者">carrier</span> <span class="w" data-s="60515" data-e="60643">brought</span> <span class="w" data-s="60685" data-e="61155">boxes</span> <span class="w" data-s="61197" data-e="61325">of</span> <span class="w" data-s="61368" data-e="61496">parts</span> <span class="w" data-s="61539" data-e="61752">from</span> <span class="w" data-s="61795" data-e="61923">the</span> <span class="w" data-s="61965" data-e="62093">city.</span></p><p class="zh">一辆长途客车满载游客停在门口，一名运输商从城里运来了几箱配件。</p></div>
+<div class="pair" data-s0="62307" data-s1="66915"><p class="en"><span class="w" data-s="62307" data-e="62605">That</span> <span class="w" data-s="62861" data-e="63117">night</span> <span class="w" data-s="63160" data-e="63416">the</span> <span class="w target" data-s="63459" data-e="63885" title="汽车">automobile</span> <span class="w" data-s="63928" data-e="64099">had</span> <span class="w" data-s="64141" data-e="64227">a</span> <span class="w target" data-s="64269" data-e="64568" title="">breakdown:</span> <span class="w" data-s="64824" data-e="65165">a</span> <span class="w" data-s="65208" data-e="65336">long</span> <span class="w target" data-s="65379" data-e="65720" title="破裂；裂开；断裂 . 裂纹；裂缝">crack</span> <span class="w" data-s="65763" data-e="65976">had</span> <span class="w" data-s="66019" data-e="66147">opened</span> <span class="w" data-s="66189" data-e="66317">in</span> <span class="w" data-s="66360" data-e="66445">the</span> <span class="w" data-s="66488" data-e="66531">water</span> <span class="w" data-s="66573" data-e="66915">tank.</span></p><p class="zh">那天夜里，那辆汽车出了故障：水箱上裂开了一道长长的缝。</p></div>
+<div class="pair" data-s0="67213" data-s1="69944"><p class="en"><span class="w" data-s="67213" data-e="67299">The</span> <span class="w" data-s="67341" data-e="67597">driver</span> <span class="w" data-s="67640" data-e="67768">pressed</span> <span class="w" data-s="67811" data-e="68024">the</span> <span class="w target" data-s="68067" data-e="68323" title="(汽车等的)喇叭；(羊、牛等动物的)角；(乐 器)号">horn,</span> <span class="w" data-s="68493" data-e="68621">and</span> <span class="w" data-s="68877" data-e="69005">the</span> <span class="w" data-s="69048" data-e="69133">whole</span> <span class="w" data-s="69176" data-e="69432">street</span> <span class="w" data-s="69475" data-e="69816">woke</span> <span class="w" data-s="69859" data-e="69944">up.</span></p><p class="zh">司机按响喇叭，整条街都被吵醒了。</p></div>
+<div class="pair" data-s0="70115" data-s1="73827"><p class="en"><span class="w" data-s="70115" data-e="70797">Peter</span> <span class="w" data-s="70840" data-e="71096">rode</span> <span class="w" data-s="71139" data-e="71224">home</span> <span class="w" data-s="71267" data-e="71395">on</span> <span class="w" data-s="71437" data-e="71523">a</span> <span class="w" data-s="71565" data-e="71651">horse</span> <span class="w" data-s="71693" data-e="71949">with</span> <span class="w" data-s="71992" data-e="72077">an</span> <span class="w" data-s="72120" data-e="72205">old</span> <span class="w target" data-s="72248" data-e="72632" title="马鞍；车座 v.给(马)备鞍">saddle</span> <span class="w" data-s="72675" data-e="72760">and</span> <span class="w" data-s="72803" data-e="72973">decided</span> <span class="w" data-s="73016" data-e="73272">to</span> <span class="w" data-s="73315" data-e="73400">buy</span> <span class="w" data-s="73443" data-e="73571">a</span> <span class="w target" data-s="73613" data-e="73827" title="交通工具；车辆">vehicle.</span></p><p class="zh">彼得骑着配旧马鞍的马回家，决定自己也要买一辆车。</p></div>
+<div class="pair" data-s0="74598" data-s1="79761"><p class="en"><span class="w" data-s="74598" data-e="74726">Ten</span> <span class="w" data-s="74769" data-e="74897">years</span> <span class="w" data-s="74939" data-e="75110">later</span> <span class="w" data-s="75153" data-e="75409">a</span> <span class="w" data-s="75451" data-e="75921">factory</span> <span class="w target" data-s="75963" data-e="76305" title="使自动化 n. 自动化；自动操作">automated</span> <span class="w" data-s="76347" data-e="76518">the</span> <span class="w" data-s="76561" data-e="76646">whole</span> <span class="w" data-s="76689" data-e="76902">process,</span> <span class="w" data-s="77201" data-e="77585">and</span> <span class="w" data-s="77627" data-e="77798">work</span> <span class="w" data-s="77841" data-e="78011">that</span> <span class="w" data-s="78054" data-e="78139">once</span> <span class="w" data-s="78182" data-e="78353">took</span> <span class="w" data-s="78395" data-e="78523">a</span> <span class="w" data-s="78566" data-e="78651">month</span> <span class="w" data-s="78694" data-e="79163">became</span> <span class="w target" data-s="79206" data-e="79761" title="自动的；无意识的；不假思索的；必然的；当 然的η. 自动手枪(或步枪)；自动变速汽车；自 动换挡汽车">automatic.</span></p><p class="zh">十年后，一家工厂把整个流程自动化了，过去要一个月才干完的活儿变得几乎不用人动手。</p></div>
+<div class="pair" data-s0="79931" data-s1="83217"><p class="en"><span class="w" data-s="79931" data-e="80614">Today</span> <span class="w" data-s="80657" data-e="80827">a</span> <span class="w" data-s="80870" data-e="80998">whole</span> <span class="w target" data-s="81041" data-e="81382" title="舰队；捕鱼船队；(同一机构或统一调度的)机 群，车队">fleet</span> <span class="w" data-s="81425" data-e="81510">of</span> <span class="w" data-s="81553" data-e="81681">small</span> <span class="w" data-s="81723" data-e="82022">cars</span> <span class="w" data-s="82065" data-e="82363">leaves</span> <span class="w" data-s="82406" data-e="82534">the</span> <span class="w" data-s="82577" data-e="82833">village</span> <span class="w" data-s="82875" data-e="83046">every</span> <span class="w" data-s="83089" data-e="83217">morning.</span></p><p class="zh">如今，一整个小车队每天早上从村里开出去。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">scarf</span>
+          <span class="ipa">/ska:rf/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wore the long scarf she had knitted herself</div>          <div class="mnem"><span class="lbl">记</span>scar伤疤，f想成“附”，那就是 伤疤用“围巾”附着，以防吓着别人。</div>          <div class="root"><span class="lbl">根</span>和 scar(伤疤) 只差一个字母 → 围巾挡疤</div>          <div class="zt"><span class="lbl">真题</span>I&#x27;ve made countless baby blankets, sweaters, scarves, hats, caps for newborns. 我 为新生儿制作了无数婴儿毯、毛衣、围巾和帽子。</div>          <div class="fam"><span class="lbl">族</span>scarves n. 围巾（复数）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">vicar</span>
+          <span class="ipa">/&#x27;vikər/</span>
+          <span class="pos"></span>
+          <span class="cn">教区牧师，教堂牧师；传教牧师</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The vicar often came for tea</div>          <div class="mnem"><span class="lbl">记</span>vi六，car车，有六辆车的人，很 有钱啊→牧师。</div>          <div class="root"><span class="lbl">根</span>谐音联想：六(vi)辆汽车(car)的有钱人</div>          <div class="fam"><span class="lbl">族</span>vicarage n. 牧师住所</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">christian</span>
+          <span class="ipa">/&#x27;krist∫ən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">胡萝卜 n. 基督徒，信徒 adj. 基督教的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every Christian walked up the hill to sing</div>          <div class="root"><span class="lbl">根</span>Christ(基督) + ian(人) → 信基督的人</div>          <div class="fam"><span class="lbl">族</span>Christianity n. 基督教 / Christmas n. 圣诞节</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">saint</span>
+          <span class="ipa">/seint/</span>
+          <span class="pos">n.</span>
+          <span class="cn">圣人，圣徒；圣人般的人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On the saint&#x27;s day</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“神他”。他是 神人，就是“圣人”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：神他 → 神一样的人</div>          <div class="zt"><span class="lbl">真题</span>She mainly drew on stories of ancient saints. 她主要借鉴了古代圣人的故事。</div>          <div class="fam"><span class="lbl">族</span>saintly adj. 圣洁的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">holy</span>
+          <span class="ipa">/&#x27;həuli/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">神圣的，圣洁的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that old building was holy</div>          <div class="mnem"><span class="lbl">记</span>好莱坞的英文是：Hollywood。 对于电影人来说，那是个很“神圣的”地方吧。</div>          <div class="root"><span class="lbl">根</span>和 whole(完好) 同源 → 完好无缺的 → 神圣的</div>          <div class="fam"><span class="lbl">族</span>holiday n. 假日（原指圣日）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">sacred</span>
+          <span class="ipa">/&#x27;seikrıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">神圣的；受尊重的 (169) 第七单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the ground around it was sacred</div>          <div class="mnem"><span class="lbl">记</span>发音特别像“seek(寻找)red(红 色)”，红色就代表我们的党啊。国内战争时期， 无数个散落的共产党人都要去寻找我们的党组 织，为什么？党组织在我们党员心中是“神圣 的”。</div>          <div class="root"><span class="lbl">根</span>sacr(神圣) + ed → 属于神的</div>          <div class="zt"><span class="lbl">真题</span>A sacred place of peace is a distinctly human need. 一个神圣的和平之地显然是人类 的需要。</div>          <div class="fam"><span class="lbl">族</span>sacrifice n./v. 牺牲</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">church</span>
+          <span class="ipa">/t∫3:rt∫/</span>
+          <span class="pos"></span>
+          <span class="cn">教堂，教会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his workshop stood behind the church</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠 go to church 记 → 教堂</div>          <div class="zt"><span class="lbl">真题</span>The tradition, dating back to 300 B.C., was later incorporated into the Christian church.这一传统可以追溯到公元前300年，后 来被纳入基督教会。(2017)</div>          <div class="fam"><span class="lbl">族</span>churchgoer n. 常去教堂的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">carrot</span>
+          <span class="ipa">/&#x27;kærət/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Behind the workshop Peter grew carrots</div>          <div class="mnem"><span class="lbl">记</span>车上(car）装满了腐烂的（rot） “胡萝卜”。</div>          <div class="root"><span class="lbl">根</span>car(车) + rot(烂) → 车上装满烂胡萝卜</div>          <div class="zt"><span class="lbl">真题</span>Carrots give you night vision. 胡萝卜给 你夜视能力。</div>          <div class="fam"><span class="lbl">族</span>carrot n. 胡萝卜（可数）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">rot</span>
+          <span class="ipa">/rpt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">烂；腐败</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the carrots began to rot</div>          <div class="mnem"><span class="lbl">记</span>该单词发音很像“肉特”。肉特 别容易“腐烂”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：肉特 → 肉特别容易烂</div>          <div class="fam"><span class="lbl">族</span>rotten adj. 腐烂的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">root</span>
+          <span class="ipa">/ru:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">根；根本，根源，基础 v.(使)生根，使固定</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>its root was soft and brown</div>          <div class="root"><span class="lbl">根</span>和 rot(烂) 只差一个字母 → 从根上烂起</div>          <div class="zt"><span class="lbl">真题</span>Doctors used carrot seeds and roots as medicine.医生用胡萝卜的种子和根作药。 (2017) 例 We have to get to the root of the problem. 我们必须找到问题的根源。 例 Most plants will root in about six to eight weeks. 大多数植物会在 6～8周内生根。</div>          <div class="fam"><span class="lbl">族</span>rootless adj. 无根的 / rooted adj. 根深蒂固的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">totate</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the first of the two words on it was wrong: totate the wheel</div>          <div class="root"><span class="lbl">根</span>书里印作 totate，实为 rotate(旋转、转动)</div>          <div class="fam"><span class="lbl">族</span>rotation n. 旋转；轮换 / rotate v. 旋转</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">carpenter</span>
+          <span class="ipa">/&#x27;ka:rpəntər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">木匠，木工</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Peter was a carpenter in the village of Wells</div>          <div class="mnem"><span class="lbl">记</span>修理车(car)和车棚(pen)的(t) 人(er)，就是“木匠”啊。</div>          <div class="root"><span class="lbl">根</span>car(车) + pent(车棚) + er(人) → 做车和车棚的人</div>          <div class="zt"><span class="lbl">真题</span>They were skilled carpenters themselves. 他们自己就是熟练的木匠。</div>          <div class="fam"><span class="lbl">族</span>carpentry n. 木工活</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">carrier</span>
+          <span class="ipa">/&#x27;kæriər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">运输工具；运载工具；携带者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a carrier brought boxes of parts from the city</div>          <div class="mnem"><span class="lbl">记</span>carry 是“携带”，那这个单词是 它的名词→携带者。</div>          <div class="root"><span class="lbl">根</span>carry(运送) + er(者、物) → 运东西的</div>          <div class="zt"><span class="lbl">真题</span>He was Spiridon Loues, a water carrier who won the marathon race. 他就是斯皮里登· 卢斯，一个在马拉松比赛中获胜的送水员。</div>          <div class="fam"><span class="lbl">族</span>carry v. 运送 / carriage n. 车厢</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">carriage</span>
+          <span class="ipa">/&#x27;kærıd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(火车的)客车厢；(旧时载客的)四轮马车；婴 儿车；运输；运费</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a carriage or a farm wagon</div>          <div class="root"><span class="lbl">根</span>carry(运送) + age(名词后缀) → 用来载人的</div>          <div class="zt"><span class="lbl">真题</span>There are mothers pushing baby carriages, and old women with walkers. 有推着婴儿车的母 亲，还有推着学步车的老妇人。(2019)</div>          <div class="fam"><span class="lbl">族</span>carriageway n. 车道 / carry v. 运送</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">cart</span>
+          <span class="ipa">/ka:rt/</span>
+          <span class="pos"></span>
+          <span class="cn">(两轮或四轮)运货马车；手推车；手拉车</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Peter could build a cart</div>          <div class="root"><span class="lbl">根</span>car(车) + t → 拉货的小车</div>          <div class="zt"><span class="lbl">真题</span>People are cheering and holding their carts in the air. 人们欢呼着，把他们的车举到 空中。</div>          <div class="fam"><span class="lbl">族</span>carton n. 纸箱 / cart v. 用车装运</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">automobile</span>
+          <span class="ipa">/&#x27;o:təməbi:l/</span>
+          <span class="pos">n.</span>
+          <span class="cn">汽车</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a salesman drove up in a shining automobile</div>          <div class="mnem"><span class="lbl">记</span>auto（自动的）十mobile（= move，移动)→自动地移动，不用人推着→汽车。</div>          <div class="root"><span class="lbl">根</span>auto(自己) + mobile(会动的) → 自己会动的车</div>          <div class="zt"><span class="lbl">真题</span>The center of American automobile innovation has in the past decade moved 2,000 miles away. 在过去的 10 年里，美国汽车创新中 心已经转移到了2 000英里以外的地方。 (2019)</div>          <div class="fam"><span class="lbl">族</span>mobile adj. 可移动的 / automotive adj. 汽车的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">automate</span>
+          <span class="ipa">/&#x27;o:təmeit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使自动化 n. 自动化；自动操作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a factory automated the whole process</div>          <div class="mnem"><span class="lbl">记</span>auto 表示汽车(汽车就是自动 的)；ate动词后缀。那该单词就是“使自动化”。</div>          <div class="root"><span class="lbl">根</span>auto(自己) + mate → 让机器自己干</div>          <div class="zt"><span class="lbl">真题</span>Automated grading systems for multiple- choice and true-false tests are now widespread. 多项选择题和是非题的自动评分系统现在很 普遍。</div>          <div class="fam"><span class="lbl">族</span>automation n. 自动化 / automated adj. 自动化的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">automatic</span>
+          <span class="ipa">/ə:tə&#x27;mætik/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">自动的；无意识的；不假思索的；必然的；当 然的η. 自动手枪(或步枪)；自动变速汽车；自 动换挡汽车</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>work that once took a month became automatic</div>          <div class="root"><span class="lbl">根</span>auto(自己) + mat(动) + ic → 自己会动的</div>          <div class="zt"><span class="lbl">真题</span>Most drivers have test driven cars with automatic braking features. 大多数驾驶员都试 驾过带有自动制动功能的汽车。(2017)</div>          <div class="fam"><span class="lbl">族</span>automatically adv. 自动地 / automation n. 自动化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">engine</span>
+          <span class="ipa">/&#x27;end3ın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">发动机，引擎；机车；火车头</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its engine was almost silent</div>          <div class="root"><span class="lbl">根</span>源自拉丁 ingenium(天赋) → 有本事的东西</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s clear that petrol-driven engines have no future. 很明显，汽油发动机没有未来。 (2013)</div>          <div class="fam"><span class="lbl">族</span>engineer n. 工程师 / engineering n. 工程</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">vehicle</span>
+          <span class="ipa">/&#x27;vi:əkl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">交通工具；车辆</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>decided to buy a vehicle</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似一款车的名 (170) 字，叫依维柯，把“依”去掉，就是该单词的发音 “维柯”。这款车就是“交通工具，车辆”啊。</div>          <div class="root"><span class="lbl">根</span>veh(运) + icle(小东西) → 运载的东西</div>          <div class="zt"><span class="lbl">真题</span>There&#x27;s no question that self-driving vehicles could be an enormous benefit. 毫无疑 问，自动驾驶汽车会带来巨大的好处。(2018)</div>          <div class="fam"><span class="lbl">族</span>vehicular adj. 车辆的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">motor</span>
+          <span class="ipa">/&#x27;məutər/</span>
+          <span class="pos"></span>
+          <span class="cn">发动机；马达；汽车 adj、有引擎的；由发动 机推动的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>its motor was new</div>          <div class="root"><span class="lbl">根</span>mot(动) + or(物) → 让车动起来的东西</div>          <div class="zt"><span class="lbl">真题</span>It marked a new era in motor travel. 它标 志着汽车旅行的新时代。(2016)</div>          <div class="fam"><span class="lbl">族</span>motorist n. 驾车者 / motorbike n. 摩托车</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">motel</span>
+          <span class="ipa">/məu&#x27;tel/</span>
+          <span class="pos"></span>
+          <span class="cn">汽车旅馆(附有停车设施)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The salesman slept at the motel on the main road</div>          <div class="mnem"><span class="lbl">记</span>mo想成 motor（发动机；汽 车);tel 想成 hotel(旅店)。那该单词就是“汽车 旅馆”了。</div>          <div class="root"><span class="lbl">根</span>motor + hotel 缩合 → 汽车旅馆</div>          <div class="fam"><span class="lbl">族</span>hotel n. 旅馆 / motel n. 汽车旅馆</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">petrol</span>
+          <span class="ipa">/&#x27;petrəl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(英)汽油</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it drank petrol instead of hay</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“排出”。把什么 排出来？→汽油。</div>          <div class="root"><span class="lbl">根</span>petr(石头) + ol(油) → 石头里炼出的油</div>          <div class="zt"><span class="lbl">真题</span>They can match conventional petrol engines in terms of performance and safety. 它 们在性能和安全性方面都可以与传统的汽油发 动机相媲美。</div>          <div class="fam"><span class="lbl">族</span>petroleum n. 石油</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">wagon</span>
+          <span class="ipa">/&#x27;wægən/</span>
+          <span class="pos"></span>
+          <span class="cn">(铁路)货车车厢，车皮；四轮载重马车(或牛 车)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a farm wagon with his own hands</div>          <div class="mnem"><span class="lbl">记</span>你会写大众车的英文吗？就是 Volkswagen(大众车)→wagon(车)。</div>          <div class="root"><span class="lbl">根</span>从 Volkswagen(大众汽车) 里认 wagon → 车</div>          <div class="fam"><span class="lbl">族</span>wagon n. 货车 / station wagon n. 旅行车</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">coach</span>
+          <span class="ipa">/kəut∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">长途客车；大马车；(体育运动的)教练；私人 教师；考前辅导教师；(客机的)经济舱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A coach full of visitors stopped at the gate</div>          <div class="mnem"><span class="lbl">记</span>一个轻奢品牌，就叫Coach(蔻 驰)。</div>          <div class="root"><span class="lbl">根</span>源自匈牙利 kocsi(科奇村造的车) → 大马车 → 客车</div>          <div class="zt"><span class="lbl">真题</span>The teacher&#x27;s role is more of a coach or (171) 第七单元 observer.教师的角色更多的是一个教练或观察 者。(2019)</div>          <div class="fam"><span class="lbl">族</span>coaching n. 辅导</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">saddle</span>
+          <span class="ipa">/&#x27;sædl/</span>
+          <span class="pos"></span>
+          <span class="cn">马鞍；车座 v.给(马)备鞍</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>on a horse with an old saddle</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“筛豆”(农村 人很了解，就是抖动的意思)。坐在“马鞍”上， 是不是也是抖得厉害，像筛豆一样。</div>          <div class="root"><span class="lbl">根</span>谐音联想：筛豆 → 骑马颠得像筛豆</div>          <div class="fam"><span class="lbl">族</span>saddler n. 马具匠</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">horn</span>
+          <span class="ipa">/hə:rn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(汽车等的)喇叭；(羊、牛等动物的)角；(乐 器)号</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The driver pressed the horn</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“号”。就是吹 的那种号子，是不是像“喇叭”一样响？</div>          <div class="root"><span class="lbl">根</span>谐音联想：号 → 吹号像按喇叭</div>          <div class="zt"><span class="lbl">真题</span>Horn is prohibited in the park. 公园内禁 止使用喇叭。</div>          <div class="fam"><span class="lbl">族</span>horned adj. 有角的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">fleet</span>
+          <span class="ipa">/fli:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">舰队；捕鱼船队；(同一机构或统一调度的)机 群，车队</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a whole fleet of small cars leaves the village every morning</div>          <div class="mnem"><span class="lbl">记</span>flee逃跑(发音类似“飞离”，只 有逃跑时才那么快地飞离啊)。那这个单词就 是逃跑(flee)它(t)，谁逃跑了？→舰队。</div>          <div class="root"><span class="lbl">根</span>联想：flee(逃跑) + t → 一起开走的车队</div>          <div class="zt"><span class="lbl">真题</span>He owns a fleet of aircraft. 他拥有一 支 机队。</div>          <div class="fam"><span class="lbl">族</span>fleeting adj. 飞逝的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">breakdown</span>
+          <span class="ipa">/&#x27;breıkdaun/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the automobile had a breakdown</div>          <div class="root"><span class="lbl">根</span>break(断) + down(下) → 车坏在半路上</div>          <div class="zt"><span class="lbl">真题</span>There were no petrol pumps and few garages, so every driver had to be his own engineer for the frequent breakdowns. 没有加 油站，也没有几个修理厂，所以每个司机都必须 自己当机修工，以应对经常发生的故障。(2016)</div>          <div class="fam"><span class="lbl">族</span>break down 出故障 / broken-down adj. 坏掉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">crack</span>
+          <span class="ipa">/kræk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">破裂；裂开；断裂 . 裂纹；裂缝</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a long crack had opened in the water tank</div>          <div class="mnem"><span class="lbl">记</span>cra 想成 cry(哭);ck 想成一块 手表(CK牌子的手表)。为什么在一块手表上 哭？因为它掉在地上，“破裂”了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：cra(cry 哭) + ck → 表摔裂了才哭</div>          <div class="zt"><span class="lbl">真题</span>It may shed light on people&#x27;s desire to crack a secret. 这或许能揭示人们想要揭开秘 密的欲望。(2016)</div>          <div class="fam"><span class="lbl">族</span>cracked adj. 裂开的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 7 · Day 45</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

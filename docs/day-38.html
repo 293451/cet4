@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 38 · The Rain That Came to Sand Cove</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 38 · 11/19 · Unit 6 第 1111-1140 词</div>
+  <h1>The Rain That Came to Sand Cove<span class="cn">雨落在沙湾</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-38.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5888"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="384">village</span> <span class="w" data-s="427" data-e="555">of</span> <span class="w" data-s="597" data-e="725">Sand</span> <span class="w" data-s="768" data-e="1067">Cove</span> <span class="w" data-s="1109" data-e="1365">stood</span> <span class="w" data-s="1408" data-e="1621">on</span> <span class="w" data-s="1664" data-e="1749">a</span> <span class="w target" data-s="1792" data-e="2005" title="贫瘠的；不结果的；无效果的 (143)">barren</span> <span class="w" data-s="2048" data-e="2304">coast,</span> <span class="w" data-s="2517" data-e="2816">where</span> <span class="w" data-s="2859" data-e="2987">the</span> <span class="w" data-s="3029" data-e="3243">soil</span> <span class="w" data-s="3285" data-e="3413">was</span> <span class="w target" data-s="3456" data-e="3755" title="浅滩adj. 浅的；浅薄的">shallow</span> <span class="w" data-s="3797" data-e="4096">and</span> <span class="w" data-s="4224" data-e="4309">the</span> <span class="w" data-s="4352" data-e="4437">rain</span> <span class="w" data-s="4480" data-e="4651">had</span> <span class="w" data-s="4693" data-e="4821">been</span> <span class="w target" data-s="4864" data-e="5120" title="缺乏的，缺少的；有缺点的，有缺陷的">deficient</span> <span class="w" data-s="5163" data-e="5376">for</span> <span class="w" data-s="5419" data-e="5589">nine</span> <span class="w" data-s="5632" data-e="5888">weeks.</span></p><p class="zh">沙湾村坐落在一段贫瘠的海岸上，那里的土层很浅，雨水已经缺了九个星期。</p></div>
+<div class="pair" data-s0="6144" data-s1="9600"><p class="en"><span class="w" data-s="6144" data-e="6656">The</span> <span class="w" data-s="6699" data-e="6955">wells</span> <span class="w" data-s="6997" data-e="7083">were</span> <span class="w" data-s="7125" data-e="7253">low,</span> <span class="w" data-s="7467" data-e="7680">and</span> <span class="w" data-s="7765" data-e="7893">there</span> <span class="w" data-s="7936" data-e="7979">was</span> <span class="w" data-s="8021" data-e="8320">barely</span> <span class="w target" data-s="8363" data-e="8661" title="充足的，足够的">sufficient</span> <span class="w" data-s="8704" data-e="8917">water</span> <span class="w" data-s="8960" data-e="9216">for</span> <span class="w" data-s="9259" data-e="9344">the</span> <span class="w" data-s="9387" data-e="9600">sheep.</span></p><p class="zh">井水很浅，勉强够羊喝。</p></div>
+<div class="pair" data-s0="10116" data-s1="12633"><p class="en"><span class="w" data-s="10116" data-e="10244">Every</span> <span class="w" data-s="10286" data-e="10500">morning</span> <span class="w" data-s="10542" data-e="10798">the</span> <span class="w" data-s="10841" data-e="10926">men</span> <span class="w target" data-s="10969" data-e="11310" title="(用力)拖，拉，拽 η.拖，拉">hauled</span> <span class="w target" data-s="11353" data-e="11694" title="桶；一桶(的量)">barrels</span> <span class="w" data-s="11737" data-e="11822">and</span> <span class="w target" data-s="11865" data-e="12164" title="(有提梁的)桶；(挖土机的)铲斗；一桶(的 量);大量">buckets</span> <span class="w" data-s="12206" data-e="12377">up</span> <span class="w" data-s="12420" data-e="12505">the</span> <span class="w" data-s="12548" data-e="12633">hill.</span></p><p class="zh">每天早上，男人们把一桶桶水拖上山。</p></div>
+<div class="pair" data-s0="12889" data-s1="18564"><p class="en"><span class="w" data-s="12889" data-e="13486">Two</span> <span class="w" data-s="13529" data-e="13700">boys</span> <span class="w" data-s="13742" data-e="13956">had</span> <span class="w" data-s="13998" data-e="14126">to</span> <span class="w target" data-s="14169" data-e="14254" title="拖，拽n.累赘，拖累；令人厌烦的人，无聊 的事">drag</span> <span class="w" data-s="14297" data-e="14510">a</span> <span class="w" data-s="14553" data-e="14894">handcart</span> <span class="w" data-s="14937" data-e="15150">behind</span> <span class="w" data-s="15193" data-e="15492">them,</span> <span class="w" data-s="15662" data-e="15876">and</span> <span class="w" data-s="15918" data-e="16132">by</span> <span class="w" data-s="16174" data-e="16302">noon</span> <span class="w" data-s="16345" data-e="16644">they</span> <span class="w" data-s="16686" data-e="16814">could</span> <span class="w" data-s="16857" data-e="17113">hardly</span> <span class="w target" data-s="17156" data-e="17284" title="电梯；提；抬；举；上升；吊；搭便车 v.(被) 提起，举起，抬高，吊起；鼓舞">lift</span> <span class="w" data-s="17326" data-e="17454">a</span> <span class="w" data-s="17497" data-e="17582">full</span> <span class="w target" data-s="17625" data-e="17966" title="(有提梁的)桶；(挖土机的)铲斗；一桶(的 量);大量">bucket</span> <span class="w" data-s="18009" data-e="18180">onto</span> <span class="w" data-s="18222" data-e="18393">the</span> <span class="w" data-s="18436" data-e="18564">truck.</span></p><p class="zh">两个男孩还得在后面拽一辆手推车，到中午，他们几乎抬不动满满一桶水上车。</p></div>
+<div class="pair" data-s0="18862" data-s1="21252"><p class="en"><span class="w" data-s="18862" data-e="18990">At</span> <span class="w" data-s="19033" data-e="19204">noon</span> <span class="w" data-s="19246" data-e="19630">they</span> <span class="w" data-s="19673" data-e="20014">rested</span> <span class="w" data-s="20057" data-e="20185">in</span> <span class="w" data-s="20228" data-e="20270">the</span> <span class="w target" data-s="20313" data-e="20526" title="阴凉处，暗处，百叶窗v.为……遮阳，遮蔽">shade</span> <span class="w" data-s="20569" data-e="20740">of</span> <span class="w" data-s="20782" data-e="20825">a</span> <span class="w" data-s="20868" data-e="21038">grey</span> <span class="w" data-s="21081" data-e="21252">rock.</span></p><p class="zh">正午，他们就在一块灰石头下的阴凉里歇脚。</p></div>
+<div class="pair" data-s0="21508" data-s1="24110"><p class="en"><span class="w" data-s="21508" data-e="22233">Down</span> <span class="w" data-s="22276" data-e="22361">at</span> <span class="w" data-s="22404" data-e="22446">the</span> <span class="w target" data-s="22489" data-e="22788" title="海港，港口 v. 庇护；心怀">harbour,</span> <span class="w" data-s="22873" data-e="23086">the</span> <span class="w" data-s="23214" data-e="23342">market</span> <span class="w" data-s="23385" data-e="23641">opened</span> <span class="w" data-s="23684" data-e="23897">at</span> <span class="w" data-s="23940" data-e="24110">six.</span></p><p class="zh">港口边的集市六点开张。</p></div>
+<div class="pair" data-s0="25099" data-s1="30176"><p class="en"><span class="w" data-s="25099" data-e="25227">An</span> <span class="w" data-s="25269" data-e="25355">old</span> <span class="w" data-s="25397" data-e="25568">woman</span> <span class="w target" data-s="25611" data-e="26123" title="便宜货，减价品；协议，交易v. 讨价还价； 谈判">bargained</span> <span class="w" data-s="26165" data-e="26251">over</span> <span class="w" data-s="26293" data-e="26379">the</span> <span class="w" data-s="26421" data-e="26549">price</span> <span class="w" data-s="26592" data-e="26763">of</span> <span class="w" data-s="26805" data-e="26933">fish,</span> <span class="w" data-s="27189" data-e="27403">and</span> <span class="w" data-s="27616" data-e="27744">in</span> <span class="w target" data-s="27787" data-e="28000" title="加；增加；增加物">addition</span> <span class="w" data-s="28043" data-e="28213">to</span> <span class="w" data-s="28256" data-e="28341">the</span> <span class="w" data-s="28384" data-e="28469">fish</span> <span class="w" data-s="28512" data-e="28768">she</span> <span class="w" data-s="28811" data-e="29323">asked</span> <span class="w" data-s="29365" data-e="29579">for</span> <span class="w" data-s="29621" data-e="29749">free</span> <span class="w" data-s="29792" data-e="30176">salt.</span></p><p class="zh">一位老太太为鱼价讨价还价，除了鱼，她还要免费的盐。</p></div>
+<div class="pair" data-s0="30347" data-s1="34272"><p class="en"><span class="w" data-s="30347" data-e="31115">The</span> <span class="w" data-s="31157" data-e="31413">seller</span> <span class="w" data-s="31456" data-e="31712">laughed,</span> <span class="w" data-s="31883" data-e="32053">which</span> <span class="w target" data-s="32096" data-e="32565" title="使窘迫，使尴尬；使困惑；使为难；使陷入困境">embarrassed</span> <span class="w" data-s="32608" data-e="32693">her,</span> <span class="w" data-s="32821" data-e="32949">and</span> <span class="w" data-s="33077" data-e="33419">she</span> <span class="w" data-s="33461" data-e="33589">turned</span> <span class="w" data-s="33632" data-e="33845">her</span> <span class="w target" data-s="33888" data-e="34059" title="面颊，脸蛋">cheek</span> <span class="w" data-s="34101" data-e="34272">away.</span></p><p class="zh">卖鱼的人笑了，这让她有点尴尬，便把脸侧了过去。</p></div>
+<div class="pair" data-s0="34613" data-s1="37643"><p class="en"><span class="w" data-s="34613" data-e="34741">That</span> <span class="w" data-s="34784" data-e="35168">August</span> <span class="w" data-s="35211" data-e="35424">the</span> <span class="w" data-s="35467" data-e="35851">village</span> <span class="w" data-s="35893" data-e="36021">held</span> <span class="w" data-s="36064" data-e="36192">a</span> <span class="w target" data-s="36235" data-e="36704" title="仪式，典礼">ceremony</span> <span class="w" data-s="36747" data-e="36832">to</span> <span class="w target" data-s="36875" data-e="37259" title="庆祝">celebrate</span> <span class="w" data-s="37301" data-e="37472">the</span> <span class="w" data-s="37515" data-e="37643">rain.</span></p><p class="zh">那年八月，村里办了一场典礼来庆祝这场雨。</p></div>
+<div class="pair" data-s0="37899" data-s1="41227"><p class="en"><span class="w" data-s="37899" data-e="38667">Before</span> <span class="w" data-s="38709" data-e="38837">the</span> <span class="w" data-s="38880" data-e="38965">first</span> <span class="w" data-s="39008" data-e="39307">cloud</span> <span class="w" data-s="39349" data-e="39563">appeared,</span> <span class="w" data-s="39819" data-e="40075">the</span> <span class="w" data-s="40160" data-e="40331">children</span> <span class="w" data-s="40373" data-e="40715">began</span> <span class="w" data-s="40757" data-e="40971">to</span> <span class="w target" data-s="41013" data-e="41227" title="使振作；欢呼，鼓舞n. 欢呼声，喝彩声">cheer.</span></p><p class="zh">第一片云还没出现，孩子们就开始欢呼起来。</p></div>
+<div class="pair" data-s0="42045" data-s1="47933"><p class="en"><span class="w" data-s="42045" data-e="42130">A</span> <span class="w" data-s="42173" data-e="42301">young</span> <span class="w" data-s="42343" data-e="42685">teacher</span> <span class="w" data-s="42727" data-e="42941">raised</span> <span class="w" data-s="42983" data-e="43197">both</span> <span class="w" data-s="43239" data-e="43453">arms</span> <span class="w" data-s="43495" data-e="43837">and</span> <span class="w" data-s="43879" data-e="44050">seemed</span> <span class="w" data-s="44093" data-e="44263">to</span> <span class="w target" data-s="44306" data-e="44647" title="举起，升起；提高；晋升；使情绪高昂">elevate</span> <span class="w" data-s="44690" data-e="44861">the</span> <span class="w" data-s="44903" data-e="44989">whole</span> <span class="w" data-s="45031" data-e="45415">crowd,</span> <span class="w" data-s="45629" data-e="45799">and</span> <span class="w" data-s="45885" data-e="46141">the</span> <span class="w target" data-s="46183" data-e="46439" title="愉快，快乐；乐事 71. 龙 designing something new.她总是从设计新东 西中获得极大的乐趣。(2017) (145) 第六单元">pleasure</span> <span class="w" data-s="46482" data-e="46610">on</span> <span class="w" data-s="46653" data-e="46781">every</span> <span class="w" data-s="46823" data-e="47037">face</span> <span class="w" data-s="47079" data-e="47378">was</span> <span class="w" data-s="47421" data-e="47549">easy</span> <span class="w" data-s="47591" data-e="47762">to</span> <span class="w" data-s="47805" data-e="47933">see.</span></p><p class="zh">一位年轻老师举起双臂，好像把整个人群都托了起来，每个人脸上的喜悦都看得见。</p></div>
+<div class="pair" data-s0="48146" data-s1="51517"><p class="en"><span class="w" data-s="48146" data-e="48701">When</span> <span class="w" data-s="48743" data-e="48871">the</span> <span class="w" data-s="48914" data-e="49170">storm</span> <span class="w" data-s="49213" data-e="49383">finally</span> <span class="w" data-s="49426" data-e="49767">came,</span> <span class="w" data-s="49981" data-e="50322">the</span> <span class="w" data-s="50535" data-e="50663">wind</span> <span class="w" data-s="50706" data-e="51005">began</span> <span class="w" data-s="51047" data-e="51218">to</span> <span class="w target" data-s="51261" data-e="51517" title="咆哮；吼叫；(机器的)隆隆声 v. 吼叫；咆 哮;放声大笑">roar.</span></p><p class="zh">暴风雨终于来时，风开始咆哮。</p></div>
+<div class="pair" data-s0="51687" data-s1="52967"><p class="en"><span class="w" data-s="51687" data-e="52029">It</span> <span class="w" data-s="52071" data-e="52285">was</span> <span class="w" data-s="52327" data-e="52455">no</span> <span class="w target" data-s="52498" data-e="52797" title="傻的,愚蠢的">silly</span> <span class="w" data-s="52839" data-e="52967">game.</span></p><p class="zh">这可不是什么犯傻的游戏。</p></div>
+<div class="pair" data-s0="53611" data-s1="57963"><p class="en"><span class="w" data-s="53611" data-e="53696">The</span> <span class="w" data-s="53739" data-e="54123">fishermen</span> <span class="w" data-s="54165" data-e="54293">ran</span> <span class="w" data-s="54336" data-e="54507">for</span> <span class="w target" data-s="54549" data-e="54848" title="掩蔽；掩藏处；避难所 v. 提供庇护；躲避">shelter</span> <span class="w" data-s="54891" data-e="55019">behind</span> <span class="w" data-s="55061" data-e="55275">the</span> <span class="w target" data-s="55317" data-e="55531" title="海港，港口 v. 庇护；心怀">harbour</span> <span class="w" data-s="55573" data-e="55701">wall,</span> <span class="w" data-s="55957" data-e="56171">which</span> <span class="w" data-s="56341" data-e="56469">had</span> <span class="w" data-s="56512" data-e="56811">protected</span> <span class="w" data-s="56853" data-e="57152">boats</span> <span class="w" data-s="57195" data-e="57365">for</span> <span class="w" data-s="57408" data-e="57536">two</span> <span class="w" data-s="57579" data-e="57707">hundred</span> <span class="w" data-s="57749" data-e="57963">years.</span></p><p class="zh">渔民们跑到港墙后面躲避，那堵墙替船只挡了两百年的风雨。</p></div>
+<div class="pair" data-s0="58261" data-s1="62869"><p class="en"><span class="w" data-s="58261" data-e="59243">Someone</span> <span class="w" data-s="59285" data-e="59413">brought</span> <span class="w target" data-s="59456" data-e="59797" title="燃料 v. 给……提供燃料；增加；刺激">fuel</span> <span class="w" data-s="59840" data-e="59968">for</span> <span class="w" data-s="60011" data-e="60139">the</span> <span class="w" data-s="60181" data-e="60437">lamps,</span> <span class="w" data-s="60565" data-e="60821">and</span> <span class="w" data-s="60992" data-e="61120">others</span> <span class="w target" data-s="61163" data-e="61589" title="埋葬；掩埋，隐藏">buried</span> <span class="w" data-s="61632" data-e="61760">the</span> <span class="w" data-s="61803" data-e="61888">fish</span> <span class="w" data-s="61931" data-e="62315">boxes</span> <span class="w" data-s="62357" data-e="62443">in</span> <span class="w" data-s="62485" data-e="62656">wet</span> <span class="w" data-s="62699" data-e="62869">sand.</span></p><p class="zh">有人拿来了灯油，还有人把鱼箱埋进湿沙里。</p></div>
+<div class="pair" data-s0="63296" data-s1="68971"><p class="en"><span class="w" data-s="63296" data-e="63381">To</span> <span class="w" data-s="63424" data-e="63680">amuse</span> <span class="w" data-s="63723" data-e="63851">the</span> <span class="w" data-s="63893" data-e="64021">children,</span> <span class="w" data-s="64277" data-e="64533">a</span> <span class="w" data-s="64832" data-e="64960">young</span> <span class="w" data-s="65003" data-e="65173">man</span> <span class="w" data-s="65216" data-e="65429">who</span> <span class="w" data-s="65472" data-e="65600">had</span> <span class="w target" data-s="65643" data-e="65941" title="剃，刮去(毛发)η.刮脸，剃须">shaved</span> <span class="w" data-s="65984" data-e="66027">his</span> <span class="w" data-s="66069" data-e="66155">head</span> <span class="w" data-s="66197" data-e="66411">put</span> <span class="w" data-s="66453" data-e="66581">on</span> <span class="w" data-s="66624" data-e="66667">an</span> <span class="w target" data-s="66709" data-e="67179" title="人造的，人为的，矫揉造作的">artificial</span> <span class="w target" data-s="67221" data-e="67563" title="">dragon</span> <span class="w" data-s="67605" data-e="67691">head</span> <span class="w" data-s="67733" data-e="67947">and</span> <span class="w" data-s="67989" data-e="68416">ran</span> <span class="w" data-s="68459" data-e="68672">down</span> <span class="w" data-s="68715" data-e="68800">the</span> <span class="w" data-s="68843" data-e="68971">street.</span></p><p class="zh">为了让孩子们开心，一个刚剃了头的年轻人套上一个人造的龙头，沿街跑了起来。</p></div>
+<div class="pair" data-s0="69872" data-s1="77253"><p class="en"><span class="w" data-s="69872" data-e="69957">It</span> <span class="w" data-s="70000" data-e="70085">could</span> <span class="w" data-s="70128" data-e="70213">not</span> <span class="w" data-s="70256" data-e="70426">really</span> <span class="w target" data-s="70469" data-e="70896" title="咆哮；吼叫；(机器的)隆隆声 v. 吼叫；咆 哮;放声大笑">roar,</span> <span class="w" data-s="71024" data-e="71280">and</span> <span class="w" data-s="71322" data-e="71664">the</span> <span class="w" data-s="71706" data-e="72048">fishermen</span> <span class="w" data-s="72090" data-e="72304">were</span> <span class="w target" data-s="72346" data-e="72688" title="熟练的，精通的">proficient</span> <span class="w" data-s="72730" data-e="72944">at</span> <span class="w" data-s="72986" data-e="73200">mending</span> <span class="w" data-s="73242" data-e="73498">nets</span> <span class="w" data-s="73541" data-e="73968">but</span> <span class="w" data-s="74224" data-e="74394">not</span> <span class="w" data-s="74437" data-e="74565">at</span> <span class="w" data-s="74608" data-e="74736">making</span> <span class="w" data-s="74778" data-e="75162">toys,</span> <span class="w" data-s="75376" data-e="75674">so</span> <span class="w" data-s="76016" data-e="76229">they</span> <span class="w" data-s="76272" data-e="76400">knew</span> <span class="w" data-s="76442" data-e="76613">it</span> <span class="w" data-s="76656" data-e="76784">looked</span> <span class="w target" data-s="76826" data-e="77253" title="傻的,愚蠢的">silly.</span></p><p class="zh">它其实不会吼，而这些渔民补网很在行、做玩具却不在行，所以他们知道它看着挺傻。</p></div>
+<div class="pair" data-s0="77381" data-s1="80837"><p class="en"><span class="w" data-s="77381" data-e="78106">Still,</span> <span class="w" data-s="78320" data-e="78448">it</span> <span class="w" data-s="78618" data-e="78832">was</span> <span class="w target" data-s="78874" data-e="79216" title="效率高的，能干的">efficient</span> <span class="w" data-s="79258" data-e="79429">enough</span> <span class="w" data-s="79472" data-e="79728">to</span> <span class="w" data-s="79770" data-e="79856">make</span> <span class="w" data-s="79898" data-e="79984">the</span> <span class="w" data-s="80026" data-e="80154">whole</span> <span class="w" data-s="80197" data-e="80624">village</span> <span class="w" data-s="80666" data-e="80837">laugh.</span></p><p class="zh">可它还是够管用的，让全村人都笑了。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">barren</span>
+          <span class="ipa">/&#x27;bærən/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">贫瘠的；不结果的；无效果的 (143)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood on a barren coast</div>          <div class="root"><span class="lbl">根</span>拆不出来：联想 bare(光秃的) → 光秃秃的 → 贫瘠的</div>          <div class="fam"><span class="lbl">族</span>barrenness n. 贫瘠</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">barrel</span>
+          <span class="ipa">/&#x27;bærəl/</span>
+          <span class="pos"></span>
+          <span class="cn">桶；一桶(的量)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the men hauled barrels and buckets up the hill</div>          <div class="mnem"><span class="lbl">记</span>以前的“桶”就是用木板（bar） 做的。</div>          <div class="root"><span class="lbl">根</span>联想：bar(木板) → 木板箍成的桶</div>          <div class="zt"><span class="lbl">真题</span>There may be no more than 3.2 billion barrels of economically recoverable oil. 经济上 可开采的石油储量可能不超过32亿桶。</div>          <div class="fam"><span class="lbl">族</span>barrel n. 桶 / barreled adj. 桶装的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">bucket</span>
+          <span class="ipa">/&#x27;bakit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(有提梁的)桶；(挖土机的)铲斗；一桶(的 量);大量</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>hauled barrels and buckets up the hill</div>          <div class="mnem"><span class="lbl">记</span>这个单词前半部分发音类似 “巴克”，它是《野性的呼唤》里的一条狗，它体形 很大，一顿能吃“一桶”饭。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a bucket of water 一桶水</div>          <div class="zt"><span class="lbl">真题</span>Students who carried their lunch often did so in a re-purposed bucket or tin of some kind. 自带午餐的学生通常把午餐放在某种改 造好的桶或罐子中。(2020)</div>          <div class="fam"><span class="lbl">族</span>bucketful n. 一桶之量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">bargain</span>
+          <span class="ipa">/&#x27;ba:rgən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">便宜货，减价品；协议，交易v. 讨价还价； 谈判</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>An old woman bargained over the price of fish</div>          <div class="mnem"><span class="lbl">记</span>用棍子(bar)得到(gain，我们最 熟悉的是“No pains，no gains.”)，设想一位盲 人用棍子指着你卖的东西，轻声说：“能便宜点 吗？”→讨价还价。</div>          <div class="root"><span class="lbl">根</span>bar(棍子) + gain(得到) → 拿棍子指着货砍价</div>          <div class="zt"><span class="lbl">真题</span>To make customers believe they are getting a bargain. 让顾客相信他们捡了便宜。</div>          <div class="fam"><span class="lbl">族</span>bargaining n. 讨价还价</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">embarrass</span>
+          <span class="ipa">/ım&#x27;bærəs/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使窘迫，使尴尬；使困惑；使为难；使陷入困境</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The seller laughed, which embarrassed her</div>          <div class="mnem"><span class="lbl">记</span>em使；bar 棍子；r 发音类似 “啊”；ass屁股→用棍子打屁股啊。小时候妈妈 拿着棍子，到处追着你在人群中打，你多尴尬 啊！→使尴尬。</div>          <div class="root"><span class="lbl">根</span>em(使) + bar(棍子) + ass(屁股) → 当众挨打 → 尴尬</div>          <div class="zt"><span class="lbl">真题</span>Many people were too embarrassed to admit their absent-mindedness. 许多人都不好 意思承认他们的心不在焉。</div>          <div class="fam"><span class="lbl">族</span>embarrassment n. 尴尬 / embarrassing adj. 令人尴尬的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">addition</span>
+          <span class="ipa">/ə&#x27;dı∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">加；增加；增加物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in addition to the fish she asked for free salt</div>          <div class="mnem"><span class="lbl">记</span>add 是“增加”，addition是它的 名词形式，也意为“增加”。</div>          <div class="root"><span class="lbl">根</span>add(增加) + ition(名词后缀) → 增加的部分</div>          <div class="zt"><span class="lbl">真题</span>In addition to benefits for creativity, deviance can be a good thing in other ways. 除了对创造力有好处之外，异于常人的行为在 其他方面也是一件好事。(2022)</div>          <div class="fam"><span class="lbl">族</span>additional adj. 额外的 / add v. 增加</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">celebrate</span>
+          <span class="ipa">/&#x27;selibreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">庆祝</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a ceremony to celebrate the rain</div>          <div class="mnem"><span class="lbl">记</span>ce(测）+le(了)→测完了；br (必然)+ate(吃)→必然要吃。测量完了，必然 要吃饭“庆祝”一下啊。</div>          <div class="root"><span class="lbl">根</span>celebr(热闹、有名) + ate → 热热闹闹地办</div>          <div class="zt"><span class="lbl">真题</span>So it&#x27;s no surprise that cultures around the world celebrate spring by honoring the egg. 因此，世界各地的文化通过纪念鸡蛋来庆祝春 天也就不足为奇了。(2017)</div>          <div class="fam"><span class="lbl">族</span>celebration n. 庆祝 / celebrity n. 名人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">ceremony</span>
+          <span class="ipa">/&#x27;serəməni/</span>
+          <span class="pos"></span>
+          <span class="cn">仪式，典礼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the village held a ceremony</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“赛罗（奥特 曼)蒙你”。赛罗说为你举行一个“典礼”，结果 蒙了你。</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠搭配记 wedding ceremony 婚礼</div>          <div class="zt"><span class="lbl">真题</span>He attended his graduation ceremony. 他参加了毕业典礼。(2020)</div>          <div class="fam"><span class="lbl">族</span>ceremonial adj. 仪式的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">fuel</span>
+          <span class="ipa">/&#x27;fju:əl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">燃料 v. 给……提供燃料；增加；刺激</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Someone brought fuel for the lamps</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“服了”。大力 水手吃(服)了菠菜，就像加了“燃料”一样，瞬间 充满力量。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：fossil fuels 化石燃料</div>          <div class="zt"><span class="lbl">真题</span>It does produce much less pollution than that caused by energy production through fossil fuels. 它产生的污染比化石燃料产生的污 染要少得多。(2018)</div>          <div class="fam"><span class="lbl">族</span>fuel v. 加燃料；刺激 / refuel v. 补充燃料</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">bury</span>
+          <span class="ipa">/&#x27;beri/</span>
+          <span class="pos">v.</span>
+          <span class="cn">埋葬；掩埋，隐藏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>others buried the fish boxes in wet sand</div>          <div class="mnem"><span class="lbl">记</span>这个单词形似：Burberry博柏 利。奢侈品不是谁都能消费起的，“隐藏”买奢 侈品这个想法吧。</div>          <div class="root"><span class="lbl">根</span>谐音联想：berry(浆果)埋进土里 → 埋葬</div>          <div class="zt"><span class="lbl">真题</span>Capturing carbon dioxide and burying it under the sea. 捕获二氧化碳并将其埋在海底。 (2023) 例 The girl buried her face in the pillows. 这 个女孩把脸埋进枕头中。</div>          <div class="fam"><span class="lbl">族</span>burial n. 埋葬</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">cheer</span>
+          <span class="ipa">/t∫ir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使振作；欢呼，鼓舞n. 欢呼声，喝彩声</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the children began to cheer</div>          <div class="root"><span class="lbl">根</span>靠搭配记：cheer up 振作起来</div>          <div class="zt"><span class="lbl">真题</span>We gave out a cheer when the red roof of the cottage came into view. 当小屋的红色屋顶 映入眼帘时，我们发出了欢呼。</div>          <div class="fam"><span class="lbl">族</span>cheerful adj. 高兴的 / cheering n. 欢呼</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">pleasure</span>
+          <span class="ipa">/&#x27;pleçər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">愉快，快乐；乐事 71. 龙 designing something new.她总是从设计新东 西中获得极大的乐趣。(2017) (145) 第六单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the pleasure on every face</div>          <div class="root"><span class="lbl">根</span>pleas(取悦) + ure(名词后缀) → 被取悦的感觉</div>          <div class="zt"><span class="lbl">真题</span>She always derives great pleasure from</div>          <div class="fam"><span class="lbl">族</span>please v. 使高兴 / pleasant adj. 愉快的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">cheek</span>
+          <span class="ipa">/t∫i:k/</span>
+          <span class="pos"></span>
+          <span class="cn">面颊，脸蛋</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she turned her cheek away</div>          <div class="root"><span class="lbl">根</span>联想：cheek 和 chin(下巴)挨着 → 脸颊</div>          <div class="zt"><span class="lbl">真题</span>One common French custom of greetings is cheek-kissing. 法国人的一个常见的问候习惯 是亲吻脸颊。</div>          <div class="fam"><span class="lbl">族</span>cheeky adj. 厚脸皮的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">elevate</span>
+          <span class="ipa">/&#x27;eliveit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">举起，升起；提高；晋升；使情绪高昂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>seemed to elevate the whole crowd</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“爱丽（Ele女生 的名字)喂她(vate)”。爱丽长得很高，要喂她吃 饭，必须踞起脚尖，“举起”手臂。</div>          <div class="root"><span class="lbl">根</span>e(向上) + lev(举起) + ate → 向上举起</div>          <div class="zt"><span class="lbl">真题</span>Even better would be to help elevate notions of beauty. 更好的办法是帮助提升美的 概念。</div>          <div class="fam"><span class="lbl">族</span>elevation n. 提升 / elevator n. 电梯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">lift</span>
+          <span class="ipa">/lxft/</span>
+          <span class="pos">n.</span>
+          <span class="cn">电梯；提；抬；举；上升；吊；搭便车 v.(被) 提起，举起，抬高，吊起；鼓舞</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they could hardly lift a full bucket</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠搭配记 give sb a lift 让某人搭便车</div>          <div class="zt"><span class="lbl">真题</span>Medical Association offers a picture of how risky it is to get a lift from a teenage driver.医学协会提供了一张图片，展示了从 十几岁的司机那里搭便车有多危险。</div>          <div class="fam"><span class="lbl">族</span>lift n. 电梯 / uplift v. 提升</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">drag</span>
+          <span class="ipa">/dræg/</span>
+          <span class="pos">v.</span>
+          <span class="cn">拖，拽n.累赘，拖累；令人厌烦的人，无聊 的事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had to drag a handcart behind them</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“拽个”，所以这 个单词就是“拖，拽”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：拽个 → 拖，拽</div>          <div class="zt"><span class="lbl">真题</span>Hillenbrand barely had enough physical energy to drag herself out of bed to write. 希伦 布兰德几乎没有足够的体力从床上爬起来 写作。</div>          <div class="fam"><span class="lbl">族</span>drag n. 累赘；拖累</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">dragon</span>
+          <span class="ipa">/&#x27;drægən/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>put on an artificial dragon head</div>          <div class="mnem"><span class="lbl">记</span>发音类似“拽紧”。看过《驯龙高 手》吧？一定要抓紧那条“龙”，以防掉下来啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：拽紧 → 抓牢那条龙</div>          <div class="fam"><span class="lbl">族</span>dragonfly n. 蜻蜓</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">haul</span>
+          <span class="ipa">/he:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用力)拖，拉，拽 η.拖，拉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the men hauled barrels</div>          <div class="mnem"><span class="lbl">记</span>早年间，“拉”船的纤夫要喊口 号，喊起口号来低沉有力，就像这个单词的发音 一样。</div>          <div class="root"><span class="lbl">根</span>谐音联想：纤夫喊的号子声 → 用力拉</div>          <div class="zt"><span class="lbl">真题</span>These people are usually unable or unprepared to endure the long haul. 这些人通 常无法或没有准备好忍受长期的考验。(2020)</div>          <div class="fam"><span class="lbl">族</span>long-haul adj. 长途的 / hauler n. 搬运工</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">roar</span>
+          <span class="ipa">/re:r/</span>
+          <span class="pos"></span>
+          <span class="cn">咆哮；吼叫；(机器的)隆隆声 v. 吼叫；咆 哮;放声大笑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the wind began to roar</div>          <div class="mnem"><span class="lbl">记</span>这个单词读起来是不是像一只 狗发出的低低的“咆哮”声？</div>          <div class="root"><span class="lbl">根</span>谐音联想：像野兽低沉的吼声</div>          <div class="fam"><span class="lbl">族</span>roaring adj. 咆哮的 / roar n. 吼声</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">harbour</span>
+          <span class="ipa">/&#x27;ha:rbər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">海港，港口 v. 庇护；心怀</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>ran for shelter behind the harbour wall</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“哈勃”，让我 们想到了哈勃望远镜，很昂贵的东西，我们要 “庇护”好啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a natural harbour 天然港</div>          <div class="fam"><span class="lbl">族</span>harbour v. 庇护；心怀 / harbor n. 港口（美式）</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">shelter</span>
+          <span class="ipa">/&#x27;Seltə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">掩蔽；掩藏处；避难所 v. 提供庇护；躲避</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>ran for shelter behind the harbour wall</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“歇(休息） 了他”。他实在太累了，在“避难所”休息一下。</div>          <div class="root"><span class="lbl">根</span>拆不出来：靠搭配记 take shelter 躲避</div>          <div class="zt"><span class="lbl">真题</span>They have to look for food and shelter underground. 他们不得不在地下寻找食物和住 所。(2017)</div>          <div class="fam"><span class="lbl">族</span>sheltered adj. 受保护的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">shade</span>
+          <span class="ipa">/∫erd/</span>
+          <span class="pos"></span>
+          <span class="cn">阴凉处，暗处，百叶窗v.为……遮阳，遮蔽</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rested in the shade of a grey rock</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“傻的”。他可 不傻，别人干活，他总坐在“阴凉处”休息。</div>          <div class="root"><span class="lbl">根</span>联想：与 shadow(影子)同源 → 阴凉处</div>          <div class="zt"><span class="lbl">真题</span>Most animals seek shade when temperatures in the Sahara Desert soar to 120 degrees Fahrenheit. 当撒哈拉沙漠的温度飙升 到120华氏度时，大多数动物都会寻找阴凉的 地方。(2021)</div>          <div class="fam"><span class="lbl">族</span>shady adj. 阴凉的 / shadow n. 影子</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">shave</span>
+          <span class="ipa">/∫erv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">剃，刮去(毛发)η.刮脸，剃须</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a young man who had shaved his head</div>          <div class="mnem"><span class="lbl">记</span>s(撕)+ have(有)→撕掉脸上 有的→脸上有什么？胡子→剃，刮去。</div>          <div class="root"><span class="lbl">根</span>s(撕) + have(有) → 撕掉脸上有的胡子</div>          <div class="zt"><span class="lbl">真题</span>One would have to shave their head to remove a bat in their hair. 人们必须剃光头才 能去掉头发上的蝙蝠。(2017)</div>          <div class="fam"><span class="lbl">族</span>shaver n. 剃须刀 / shaving n. 剃须</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">silly</span>
+          <span class="ipa">/&#x27;sili/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">傻的,愚蠢的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was no silly game</div>          <div class="root"><span class="lbl">根</span>谐音联想：sil-ly 听起来像“傻的”</div>          <div class="zt"><span class="lbl">真题</span>It would seem silly to call such a thing a “disease”.把这种事称为“疾病”似乎很愚蠢。</div>          <div class="fam"><span class="lbl">族</span>silliness n. 愚蠢</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">deficient</span>
+          <span class="ipa">/dı&#x27;fi∫nt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">缺乏的，缺少的；有缺点的，有缺陷的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the rain had been deficient for nine weeks</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“弟费神的”。弟 弟“有缺点，缺陷”，做什么事都很费神。</div>          <div class="root"><span class="lbl">根</span>de(不) + fic(做) + ient → 做得不够的</div>          <div class="fam"><span class="lbl">族</span>deficiency n. 缺乏 / deficit n. 赤字</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">artificial</span>
+          <span class="ipa">/a:rtı&#x27;fi∫l/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">人造的，人为的，矫揉造作的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an artificial dragon head</div>          <div class="root"><span class="lbl">根</span>arti(技艺) + fic(做) + ial → 用技艺做出来的</div>          <div class="zt"><span class="lbl">真题</span>As artificial intelligence becomes increasingly sophisticated, there are growing concerns that robots could become a threat. 随 着人工智能变得越来越复杂，人们越来越担心 (146) 机器人可能成为一种威胁。(2016) 心(fici)的(al是形容词后缀)。让我们想到了 一些艺术家，他们无论是画画还是雕塑，艺术上 再费心，也是用手做出来的→人造的。</div>          <div class="fam"><span class="lbl">族</span>artificially adv. 人造地 / artificiality n. 人造</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">proficient</span>
+          <span class="ipa">/prə&#x27;fi∫nt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">熟练的，精通的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the fishermen were proficient at mending nets</div>          <div class="mnem"><span class="lbl">记</span>pro 提前；fici 费心；ent 形容词 后缀。提前都很费心的。别人考四级准备两个 月，你提前准备了一年，那你对单词一定是“熟 练的，精通的”。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + fic(做) + ient → 做事做到前头</div>          <div class="zt"><span class="lbl">真题</span>For instance, many babies are perfectly proficient crawlers. 例如，许多婴儿都是非常熟 练的爬行者。</div>          <div class="fam"><span class="lbl">族</span>proficiency n. 熟练</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">efficient</span>
+          <span class="ipa">/1&#x27;fi∫nt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">效率高的，能干的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it was efficient enough</div>          <div class="mnem"><span class="lbl">记</span>发音类似“一飞身的”。别人爬 楼梯来上课，你一飞身就上来了→效率高的，能 干的。</div>          <div class="root"><span class="lbl">根</span>ef(出) + fic(做) + ient → 做出成果的</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s not necessarily an efficient way to learn. 这并不是一种有效的学习方式。(2019)</div>          <div class="fam"><span class="lbl">族</span>efficiency n. 效率 / efficiently adv. 高效地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">sufficient</span>
+          <span class="ipa">/sə&#x27;fi∫nt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">充足的，足够的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>barely sufficient water for the sheep</div>          <div class="mnem"><span class="lbl">记</span>fici发音类似“费心”，故有以下 例子：sufficient用河南话读成“歇费心的”，“歇” 表示很，河南人会说：你长得歇漂亮，你歇有钱。 所以如果你做一件事很费心，那就做得足够好 了→足够的，充足的。</div>          <div class="root"><span class="lbl">根</span>suf(在下面) + fic(做) + ient → 底下做够了</div>          <div class="zt"><span class="lbl">真题</span>After some adjustments, and sufficient time, Jill was able to answer the students&#x27; questions correctly 97% of the time. 经过一番 调整，加上充足的时间，吉尔能够正确回答学生 的问题，正确率高达97%。(2019)</div>          <div class="fam"><span class="lbl">族</span>sufficiency n. 充足 / insufficient adj. 不足的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">shallow</span>
+          <span class="ipa">/&#x27;∫æləu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">浅滩adj. 浅的；浅薄的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the soil was shallow</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“沙漏”。水 很“浅”，沙子漏(露)出来了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：沙漏 → 水浅，沙子露出来</div>          <div class="zt"><span class="lbl">真题</span>One problem with these sources is that 丸卧在“枕头”上。 第六单元 the deep water also has a higher level of salt</div>          <div class="fam"><span class="lbl">族</span>shallowness n. 浅薄</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 38</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

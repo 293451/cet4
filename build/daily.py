@@ -93,9 +93,24 @@ def main() -> None:
         if content_ready(d) and not already_built(d):
             pending.append(d)
 
+    # 没有待生成的天：说明页面早就做好了（内容+音频都已提交）。
+    # 这时**仍然要推送当天的那一页** —— 否则「页面已备好但没推」的场景会静默跳过。
     if not pending:
-        log(f"今天该学 Day {target:02d}，但没有待生成的内容。")
-        log("（内容需提前准备：把 content/day-XX/words.json 放好）")
+        today_day = f"{target:02d}"
+        page = ROOT / "docs" / f"day-{today_day}.html"
+        if not page.exists():
+            log(f"今天该学 Day {today_day}，但页面不存在（内容也没准备）。")
+            log("（内容需提前准备：把 content/day-XX/words.json 放好）")
+            return
+        log(f"今天该学 Day {today_day}，页面已就绪，直接推送。")
+        if args.dry_run:
+            return
+        base = base_url()
+        if not base:
+            log("未配置 .secrets/base_url.txt，跳过推送。")
+            return
+        run([sys.executable, str(BUILD / "push.py"), "--day", today_day,
+             "--url", f"{base}/day-{today_day}.html"])
         return
 
     log(f"目标 Day {target:02d}；待生成 {len(pending)} 天：{', '.join(pending)}")

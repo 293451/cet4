@@ -1,0 +1,692 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 39 · The Last Shift at Blackwater Station</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 39 · 11/20 · Unit 6 第 1141-1170 词</div>
+  <h1>The Last Shift at Blackwater Station<span class="cn">黑水站的最后一班</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-39.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3328"><p class="en"><span class="w" data-s="43" data-e="213">Old</span> <span class="w" data-s="256" data-e="427">Mr.</span> <span class="w" data-s="555" data-e="853">Bao</span> <span class="w" data-s="896" data-e="1109">had</span> <span class="w" data-s="1152" data-e="1280">worked</span> <span class="w" data-s="1323" data-e="1536">at</span> <span class="w" data-s="1579" data-e="1963">Blackwater</span> <span class="w" data-s="2005" data-e="2304">Station</span> <span class="w" data-s="2347" data-e="2731">for</span> <span class="w" data-s="2816" data-e="3157">forty</span> <span class="w" data-s="3200" data-e="3328">years.</span></p><p class="zh">老包先生已经在黑水车站干了四十年。</p></div>
+<div class="pair" data-s0="3712" data-s1="12117"><p class="en"><span class="w" data-s="3712" data-e="3797">His</span> <span class="w target" data-s="3840" data-e="4096" title="养老金；退休金；抚恤金">pension</span> <span class="w" data-s="4139" data-e="4309">was</span> <span class="w" data-s="4352" data-e="4523">small,</span> <span class="w" data-s="4821" data-e="4992">but</span> <span class="w" data-s="5419" data-e="5589">the</span> <span class="w target" data-s="5632" data-e="5931" title="福利；;救济；幸福">welfare</span> <span class="w" data-s="5973" data-e="6101">was</span> <span class="w" data-s="6144" data-e="6315">good:</span> <span class="w" data-s="6528" data-e="7125">a</span> <span class="w" data-s="7168" data-e="7381">travel</span> <span class="w target" data-s="7424" data-e="7979" title="">allowance,</span> <span class="w" data-s="8107" data-e="8320">a</span> <span class="w target" data-s="8533" data-e="8704" title="费用；酬金">fee</span> <span class="w" data-s="8747" data-e="8917">for</span> <span class="w" data-s="8960" data-e="9088">every</span> <span class="w" data-s="9131" data-e="9301">night</span> <span class="w" data-s="9344" data-e="9643">shift,</span> <span class="w" data-s="9856" data-e="10325">and</span> <span class="w" data-s="10368" data-e="10539">a</span> <span class="w" data-s="10581" data-e="10667">share</span> <span class="w" data-s="10709" data-e="10880">of</span> <span class="w" data-s="10923" data-e="10965">the</span> <span class="w target" data-s="11008" data-e="11264" title="利润；利益，好处.有/得利，有益于……">profit</span> <span class="w" data-s="11307" data-e="11435">from</span> <span class="w" data-s="11477" data-e="11605">the</span> <span class="w" data-s="11648" data-e="11733">station</span> <span class="w" data-s="11776" data-e="12117">shop.</span></p><p class="zh">他的养老金不多，但福利不错：一份差旅补贴、每上一个夜班有一笔酬金，还能分到车站小卖部的一份利润。</p></div>
+<div class="pair" data-s0="13146" data-s1="18138"><p class="en"><span class="w" data-s="13146" data-e="13274">The</span> <span class="w" data-s="13317" data-e="13445">best</span> <span class="w target" data-s="13487" data-e="13701" title="方面；外貌">aspect</span> <span class="w" data-s="13743" data-e="14085">of</span> <span class="w" data-s="14127" data-e="14213">the</span> <span class="w" data-s="14255" data-e="14341">job,</span> <span class="w" data-s="14639" data-e="14810">he</span> <span class="w" data-s="14938" data-e="15151">always</span> <span class="w" data-s="15194" data-e="15407">said,</span> <span class="w" data-s="15663" data-e="15791">was</span> <span class="w" data-s="16090" data-e="16261">not</span> <span class="w" data-s="16303" data-e="16474">the</span> <span class="w target" data-s="16517" data-e="16773" title="利益，好处；津贴，救济金v. 使受益">benefit</span> <span class="w" data-s="16815" data-e="16986">of</span> <span class="w" data-s="17029" data-e="17071">the</span> <span class="w" data-s="17114" data-e="17199">money</span> <span class="w" data-s="17242" data-e="17583">but</span> <span class="w" data-s="17797" data-e="17967">the</span> <span class="w" data-s="18010" data-e="18138">people.</span></p><p class="zh">他总说，这份工作最好的一面不是那点好处，而是这些人。</p></div>
+<div class="pair" data-s0="18437" data-s1="22405"><p class="en"><span class="w" data-s="18437" data-e="18949">On</span> <span class="w" data-s="18991" data-e="19162">his</span> <span class="w" data-s="19205" data-e="19375">last</span> <span class="w" data-s="19418" data-e="19674">morning</span> <span class="w" data-s="19717" data-e="19973">a</span> <span class="w" data-s="20015" data-e="20442">young</span> <span class="w target" data-s="20485" data-e="20997" title="调查；检查；视察">inspector</span> <span class="w" data-s="21039" data-e="21253">came</span> <span class="w" data-s="21295" data-e="21466">to</span> <span class="w target" data-s="21509" data-e="21807" title="调查；检查；视察">inspect</span> <span class="w" data-s="21850" data-e="21935">the</span> <span class="w" data-s="21978" data-e="22191">ticket</span> <span class="w" data-s="22234" data-e="22405">office.</span></p><p class="zh">他最后一个上班日的早上，一位年轻的检查员来检查售票处。</p></div>
+<div class="pair" data-s0="23191" data-s1="28481"><p class="en"><span class="w" data-s="23191" data-e="23276">For</span> <span class="w" data-s="23319" data-e="23489">an</span> <span class="w" data-s="23532" data-e="23575">hour</span> <span class="w" data-s="23617" data-e="23873">he</span> <span class="w" data-s="23916" data-e="24044">watched</span> <span class="w" data-s="24087" data-e="24343">the</span> <span class="w" data-s="24385" data-e="24727">platform,</span> <span class="w" data-s="24940" data-e="25153">as</span> <span class="w" data-s="25367" data-e="25751">silent</span> <span class="w" data-s="25793" data-e="25921">as</span> <span class="w" data-s="25964" data-e="26007">a</span> <span class="w target" data-s="26049" data-e="26263" title="">spy,</span> <span class="w" data-s="26561" data-e="26647">and</span> <span class="w" data-s="27031" data-e="27159">he</span> <span class="w" data-s="27201" data-e="27329">seemed</span> <span class="w target" data-s="27372" data-e="27927" title="可疑的，猜疑的">suspicious</span> <span class="w" data-s="27969" data-e="28140">of</span> <span class="w" data-s="28183" data-e="28481">everything.</span></p><p class="zh">他在站台上看了一个小时，安静得像个间谍，对什么都显得疑神疑鬼。</p></div>
+<div class="pair" data-s0="29121" data-s1="32797"><p class="en"><span class="w" data-s="29121" data-e="29164">&quot;I</span> <span class="w target" data-s="29207" data-e="29420" title="&amp;- n.尊重">respect</span> <span class="w" data-s="29463" data-e="29676">your</span> <span class="w" data-s="29719" data-e="29847">work,&quot;</span> <span class="w" data-s="30621" data-e="30663">he</span> <span class="w" data-s="30706" data-e="30791">said,</span> <span class="w" data-s="31090" data-e="31175">&quot;but</span> <span class="w" data-s="31687" data-e="31901">the</span> <span class="w" data-s="31943" data-e="32029">numbers</span> <span class="w" data-s="32071" data-e="32413">do</span> <span class="w" data-s="32455" data-e="32583">not</span> <span class="w" data-s="32626" data-e="32797">match.&quot;</span></p><p class="zh">“我尊重你的工作，”他说，“可这些数字对不上。”</p></div>
+<div class="pair" data-s0="33351" data-s1="38386"><p class="en"><span class="w" data-s="33351" data-e="33863">He</span> <span class="w" data-s="33906" data-e="34077">began</span> <span class="w" data-s="34119" data-e="34333">to</span> <span class="w target" data-s="34375" data-e="34887" title="推测，推断；投机">speculate</span> <span class="w" data-s="34930" data-e="35101">about</span> <span class="w" data-s="35143" data-e="35314">the</span> <span class="w" data-s="35357" data-e="35485">missing</span> <span class="w target" data-s="35527" data-e="35869" title="">fare,</span> <span class="w" data-s="36082" data-e="36253">and</span> <span class="w" data-s="36423" data-e="36807">he</span> <span class="w" data-s="36850" data-e="36978">asked</span> <span class="w" data-s="37021" data-e="37234">to</span> <span class="w target" data-s="37277" data-e="37618" title="显示屏；监视器；(计算机)显示器；班长；(尤 指派往国外的)监督员，核查员v.监视；监测； 跟踪调查；监听(电话、外国无线电广播等)">monitor</span> <span class="w" data-s="37661" data-e="37789">the</span> <span class="w" data-s="37831" data-e="38002">machine</span> <span class="w" data-s="38045" data-e="38386">himself.</span></p><p class="zh">他开始推测那笔不见了的车费去了哪儿，还要求自己亲手盯着那台机器。</p></div>
+<div class="pair" data-s0="38813" data-s1="42141"><p class="en"><span class="w" data-s="38813" data-e="39623">From</span> <span class="w" data-s="39666" data-e="39794">his</span> <span class="w target" data-s="39837" data-e="40349" title="看法，观点">perspective,</span> <span class="w" data-s="40562" data-e="40775">Mr.</span> <span class="w" data-s="41159" data-e="41458">Bao</span> <span class="w" data-s="41501" data-e="41629">was</span> <span class="w" data-s="41671" data-e="41757">a</span> <span class="w target" data-s="41799" data-e="42141" title="嫌疑分子 v. 怀疑">suspect.</span></p><p class="zh">在他看来，包先生就是个嫌疑人。</p></div>
+<div class="pair" data-s0="42439" data-s1="44658"><p class="en"><span class="w" data-s="42439" data-e="42567">The</span> <span class="w" data-s="42610" data-e="42695">two</span> <span class="w" data-s="42738" data-e="43079">clerks</span> <span class="w" data-s="43122" data-e="43506">handed</span> <span class="w" data-s="43549" data-e="43591">in</span> <span class="w" data-s="43634" data-e="43762">their</span> <span class="w target" data-s="43805" data-e="44146" title="分别的,各自的">respective</span> <span class="w" data-s="44189" data-e="44658">reports.</span></p><p class="zh">两个售票员各自交上了自己的报表。</p></div>
+<div class="pair" data-s0="44829" data-s1="47277"><p class="en"><span class="w" data-s="44829" data-e="45213">Mr.</span> <span class="w" data-s="46339" data-e="46595">Bao</span> <span class="w" data-s="46637" data-e="46723">did</span> <span class="w" data-s="46765" data-e="46893">not</span> <span class="w" data-s="46936" data-e="47277">argue.</span></p><p class="zh">包先生没有争辩。</p></div>
+<div class="pair" data-s0="47789" data-s1="49411"><p class="en"><span class="w" data-s="47789" data-e="48173">&quot;Look</span> <span class="w" data-s="48216" data-e="48344">at</span> <span class="w" data-s="48387" data-e="48472">the</span> <span class="w target" data-s="48515" data-e="48899" title="前途；预期，可能性，展望；前景">prospect,&quot;</span> <span class="w" data-s="49240" data-e="49283">he</span> <span class="w" data-s="49325" data-e="49411">said.</span></p><p class="zh">“看看前景吧，”他说。</p></div>
+<div class="pair" data-s0="50264" data-s1="52781"><p class="en"><span class="w" data-s="50264" data-e="50477">&quot;Forty</span> <span class="w" data-s="50520" data-e="50648">years,</span> <span class="w" data-s="50904" data-e="51245">and</span> <span class="w" data-s="51416" data-e="51587">not</span> <span class="w" data-s="51629" data-e="51757">one</span> <span class="w" data-s="51800" data-e="52312">passenger</span> <span class="w" data-s="52355" data-e="52611">cheated</span> <span class="w" data-s="52653" data-e="52781">us.&quot;</span></p><p class="zh">“四十年了，没有一个乘客骗过我们。”</p></div>
+<div class="pair" data-s0="53251" data-s1="58968"><p class="en"><span class="w" data-s="53251" data-e="53976">The</span> <span class="w target" data-s="54019" data-e="54147" title="更低的；下面的；在底部的；低洼的 v.把……放低；减少；降低">lower</span> <span class="w" data-s="54189" data-e="54403">half</span> <span class="w" data-s="54445" data-e="54616">of</span> <span class="w" data-s="54659" data-e="54701">the</span> <span class="w" data-s="54744" data-e="54829">station</span> <span class="w" data-s="54872" data-e="55213">lay</span> <span class="w" data-s="55256" data-e="55384">in</span> <span class="w" data-s="55427" data-e="55469">a</span> <span class="w target" data-s="55512" data-e="55725" title="山谷；洼地 adj.空的，中空的；空虚的">hollow</span> <span class="w" data-s="55768" data-e="55981">between</span> <span class="w" data-s="56024" data-e="56237">two</span> <span class="w" data-s="56280" data-e="56536">hills,</span> <span class="w" data-s="56749" data-e="57219">where</span> <span class="w" data-s="57304" data-e="57475">the</span> <span class="w" data-s="57517" data-e="57560">wind</span> <span class="w target" data-s="57603" data-e="57987" title="燕子 v. 吞下，咽下">swallowed</span> <span class="w" data-s="58029" data-e="58157">the</span> <span class="w" data-s="58200" data-e="58285">sound</span> <span class="w" data-s="58328" data-e="58541">of</span> <span class="w" data-s="58584" data-e="58627">the</span> <span class="w" data-s="58669" data-e="58968">trains.</span></p><p class="zh">车站的下半截建在两座山之间的一个洼地里，冬天风一吹，火车的声音就被吞掉了。</p></div>
+<div class="pair" data-s0="59744" data-s1="64650"><p class="en"><span class="w" data-s="59744" data-e="59957">In</span> <span class="w" data-s="60000" data-e="60085">his</span> <span class="w" data-s="60128" data-e="60341">office</span> <span class="w" data-s="60384" data-e="60938">there</span> <span class="w" data-s="60981" data-e="61109">was</span> <span class="w" data-s="61152" data-e="61194">an</span> <span class="w" data-s="61237" data-e="61322">old</span> <span class="w target" data-s="61365" data-e="61706" title="枕头">pillow</span> <span class="w" data-s="61749" data-e="61877">on</span> <span class="w" data-s="61920" data-e="61962">a</span> <span class="w" data-s="62005" data-e="62176">bench</span> <span class="w" data-s="62218" data-e="62560">and</span> <span class="w" data-s="62602" data-e="62901">a</span> <span class="w target" data-s="62944" data-e="63370" title="望远镜">telescope</span> <span class="w" data-s="63413" data-e="63968">pointed</span> <span class="w" data-s="64010" data-e="64096">at</span> <span class="w" data-s="64138" data-e="64224">the</span> <span class="w target" data-s="64266" data-e="64650" title="地平线；范围；眼界">horizon.</span></p><p class="zh">他的办公室里有一条长凳，上面放着一只旧枕头，还有一架望远镜对着地平线。</p></div>
+<div class="pair" data-s0="64864" data-s1="68149"><p class="en"><span class="w" data-s="64864" data-e="64992">On</span> <span class="w" data-s="65333" data-e="65546">clear</span> <span class="w" data-s="65589" data-e="65802">days</span> <span class="w" data-s="65845" data-e="66272">he</span> <span class="w" data-s="66314" data-e="66613">could</span> <span class="w" data-s="66656" data-e="66741">see</span> <span class="w" data-s="66784" data-e="66954">the</span> <span class="w target" data-s="66997" data-e="67296" title="边界；界限；分界线">boundary</span> <span class="w" data-s="67338" data-e="67466">of</span> <span class="w" data-s="67509" data-e="67594">the</span> <span class="w" data-s="67637" data-e="67680">next</span> <span class="w" data-s="67722" data-e="68149">county.</span></p><p class="zh">天气好的时候，他能看见邻县的地界。</p></div>
+<div class="pair" data-s0="68320" data-s1="71136"><p class="en"><span class="w" data-s="68320" data-e="68746">At</span> <span class="w" data-s="68789" data-e="69002">noon</span> <span class="w" data-s="69045" data-e="69557">the</span> <span class="w target" data-s="69600" data-e="70026" title="观众">spectators</span> <span class="w" data-s="70069" data-e="70496">gathered</span> <span class="w" data-s="70538" data-e="70624">for</span> <span class="w" data-s="70666" data-e="70752">his</span> <span class="w target" data-s="70794" data-e="71136" title="告别">farewell.</span></p><p class="zh">中午，观众们聚在站台上，为他送别。</p></div>
+<div class="pair" data-s0="71791" data-s1="77252"><p class="en"><span class="w" data-s="71791" data-e="72132">Someone</span> <span class="w" data-s="72175" data-e="72260">had</span> <span class="w" data-s="72303" data-e="72516">hung</span> <span class="w" data-s="72559" data-e="72601">a</span> <span class="w target" data-s="72644" data-e="73199" title="显著的，引人注目的">conspicuous</span> <span class="w" data-s="73241" data-e="73412">red</span> <span class="w" data-s="73455" data-e="73668">flag</span> <span class="w" data-s="73711" data-e="74095">above</span> <span class="w" data-s="74137" data-e="74351">the</span> <span class="w" data-s="74393" data-e="74564">roof,</span> <span class="w" data-s="74692" data-e="75033">and</span> <span class="w" data-s="75204" data-e="75332">the</span> <span class="w target" data-s="75375" data-e="75588" title="边缘，页边空白；白边；利润，盈余">margin</span> <span class="w" data-s="75631" data-e="75759">of</span> <span class="w" data-s="75801" data-e="75844">the</span> <span class="w" data-s="75887" data-e="76228">platform</span> <span class="w" data-s="76271" data-e="76527">was</span> <span class="w" data-s="76569" data-e="76911">crowded</span> <span class="w" data-s="76953" data-e="77039">with</span> <span class="w" data-s="77081" data-e="77252">friends.</span></p><p class="zh">有人在屋顶上方挂了一面显眼的红旗，站台的边缘挤满了朋友。</p></div>
+<div class="pair" data-s0="77593" data-s1="80153"><p class="en"><span class="w" data-s="77593" data-e="77721">The</span> <span class="w target" data-s="77764" data-e="78148" title="调查；检查；视察">inspector</span> <span class="w" data-s="78191" data-e="78319">found</span> <span class="w" data-s="78361" data-e="78575">his</span> <span class="w" data-s="78617" data-e="78959">mistake</span> <span class="w" data-s="79001" data-e="79257">before</span> <span class="w" data-s="79300" data-e="79471">the</span> <span class="w" data-s="79513" data-e="79641">flag</span> <span class="w" data-s="79684" data-e="79897">came</span> <span class="w" data-s="79940" data-e="80153">down.</span></p><p class="zh">旗还没降下来，检查员就发现自己算错了。</p></div>
+<div class="pair" data-s0="81135" data-s1="85743"><p class="en"><span class="w" data-s="81135" data-e="81177">&quot;I</span> <span class="w" data-s="81220" data-e="81433">hope</span> <span class="w" data-s="81476" data-e="81689">the</span> <span class="w" data-s="81732" data-e="81903">station</span> <span class="w target" data-s="81945" data-e="82543" title="繁荣，昌盛">prospers,&quot;</span> <span class="w" data-s="83012" data-e="83140">Mr.</span> <span class="w" data-s="83268" data-e="83524">Bao</span> <span class="w" data-s="83567" data-e="83652">said,</span> <span class="w" data-s="83865" data-e="83993">and</span> <span class="w" data-s="84164" data-e="84548">he</span> <span class="w" data-s="84591" data-e="84847">waved</span> <span class="w" data-s="84889" data-e="85103">goodbye</span> <span class="w" data-s="85145" data-e="85359">to</span> <span class="w" data-s="85401" data-e="85487">the</span> <span class="w" data-s="85529" data-e="85743">crowd.</span></p><p class="zh">“我希望这个车站越来越兴旺，”包先生说完，朝人群挥手告别。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">lower</span>
+          <span class="ipa">/&#x27;ləuə(r)/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">更低的；下面的；在底部的；低洼的 v.把……放低；减少；降低</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The lower half of the station</div>          <div class="root"><span class="lbl">根</span>low(低) + er(比较级) → 更低；放低</div>          <div class="zt"><span class="lbl">真题</span>The energy used by microwaves is lower than any other form of cooking. 微波炉所用的 能量比其他任何烹饪方式都要低。(2019)</div>          <div class="fam"><span class="lbl">族</span>low adj. 低的 / lowest adj. 最低的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">swallow</span>
+          <span class="ipa">/&#x27;swpləu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">燕子 v. 吞下，咽下</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the wind swallowed the sound of the trains</div>          <div class="mnem"><span class="lbl">记</span>把 s 想成“蛇”；wall墙；low低 的。想象一个画面：一条蛇低低地趴在墙上，它 在干什么？要吞下燕子啊→所以该单词作动词 时意为“吞”，作名词时意为“燕子”。</div>          <div class="root"><span class="lbl">根</span>联想：蛇(s)低低地(low)趴在墙上吞燕子</div>          <div class="zt"><span class="lbl">真题</span>Their homes will be swallowed up by the hungry sea. 他们的家园将会被饥饿的大海 吞没。</div>          <div class="fam"><span class="lbl">族</span>swallow n. 燕子；吞下 / swallowing n. 吞咽</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">hollow</span>
+          <span class="ipa">/&#x27;hpləu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">山谷；洼地 adj.空的，中空的；空虚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>lay in a hollow between two hills</div>          <div class="mnem"><span class="lbl">记</span>低的（low）地方有个洞（hol想 成 hole)。你探险的时候，看到一个大地洞，这 个洞一定是“空的”。</div>          <div class="root"><span class="lbl">根</span>hol(想成 hole 洞) + low(低) → 低处的空洞</div>          <div class="zt"><span class="lbl">真题</span>And to some of the residents, Songdo feels hollow.对一些居民来说，松岛空荡荡的。 (2019)</div>          <div class="fam"><span class="lbl">族</span>hollowly adv. 空洞地 / hollow n. 洼地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">pillow</span>
+          <span class="ipa">/&#x27;piləu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">枕头</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an old pillow on a bench</div>          <div class="mnem"><span class="lbl">记</span>pill 药丸；ow 想成卧(wo)。药 (147)</div>          <div class="root"><span class="lbl">根</span>pill(药丸) + ow(想成“卧”) → 药卧在头边</div>          <div class="fam"><span class="lbl">族</span>pillowcase n. 枕套</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">profit</span>
+          <span class="ipa">/&#x27;profit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">利润；利益，好处.有/得利，有益于……</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a share of the profit from the station shop</div>          <div class="mnem"><span class="lbl">记</span>提前(pro)十肥(fi的谐音)+他 (t的谐音)→他提前就比别人胖，是不是得到很 多好处才那么胖？→利益，好处。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + fit(做) → 做出来多出的部分</div>          <div class="zt"><span class="lbl">真题</span>I&#x27;m not sure whether I can gain any profit from the investment. 我不确定我是否能 从这次投资中获利。</div>          <div class="fam"><span class="lbl">族</span>profitable adj. 有利可图的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">benefit</span>
+          <span class="ipa">/&#x27;benifit/</span>
+          <span class="pos"></span>
+          <span class="cn">利益，好处；津贴，救济金v. 使受益</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the benefit of the money</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“比你肥 的”。你找了份“比你肥的”工作，说明这个工作 是有“好处”的。</div>          <div class="root"><span class="lbl">根</span>bene(好) + fit(做) → 做出来的好事</div>          <div class="zt"><span class="lbl">真题</span>Tips benefit the boss rather that the employees. 小费使老板受益，而不是使雇员受 益。(2016)</div>          <div class="fam"><span class="lbl">族</span>beneficial adj. 有益的 / beneficiary n. 受益人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">fee</span>
+          <span class="ipa">/fi:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">费用；酬金</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a fee for every night shift</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a monthly fee 月费</div>          <div class="zt"><span class="lbl">真题</span>A fee should be charged on used containers for recycling. 对回收的旧容器应收取费用。</div>          <div class="fam"><span class="lbl">族</span>fee n. 费用；酬金 / fee-paying adj. 收费的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">fare</span>
+          <span class="ipa">/feə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the missing fare</div>          <div class="mnem"><span class="lbl">记</span>远(far)姨(e)，姨家很远，去阿 姨家需要“费用，路费”啊！</div>          <div class="root"><span class="lbl">根</span>谐音联想：远(far)姨(e)家远 → 要路费</div>          <div class="zt"><span class="lbl">真题</span>Fathers may fare better than mothers in part due to how they spend time with their children.父亲可能比母亲表现得更好，部分原 因在于他们如何花时间陪伴孩子。(2022)</div>          <div class="fam"><span class="lbl">族</span>fare n. 车费 / airfare n. 机票钱</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">farewell</span>
+          <span class="ipa">/ifer&#x27;wel/</span>
+          <span class="pos">n.</span>
+          <span class="cn">告别</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the spectators gathered for his farewell</div>          <div class="mnem"><span class="lbl">记</span>fare(车费)十well(好)→我已 经付好了车费，我们再会→告别。</div>          <div class="root"><span class="lbl">根</span>fare(车费) + well(好) → 车费付好，再会</div>          <div class="zt"><span class="lbl">真题</span>Bid farewell to guilt and regret. 告别内疚 和遗憾。</div>          <div class="fam"><span class="lbl">族</span>farewell n. 告别；再见</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">welfare</span>
+          <span class="ipa">/&#x27;welfer/</span>
+          <span class="pos"></span>
+          <span class="cn">福利；;救济；幸福</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but the welfare was good</div>          <div class="mnem"><span class="lbl">记</span>wel(想成 well 好)十 fare(车 费，船费，飞机费），你旅游需要的车费最好用自 己的“福利”。</div>          <div class="root"><span class="lbl">根</span>wel(好) + fare(过活) → 过得好 → 福利</div>          <div class="zt"><span class="lbl">真题</span>They live on charity and social welfare. 他们靠慈善和社会福利生活。</div>          <div class="fam"><span class="lbl">族</span>welfare n. 福利 / well-being n. 幸福</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">pension</span>
+          <span class="ipa">/&#x27;pen∫ən/</span>
+          <span class="pos"></span>
+          <span class="cn">养老金；退休金；抚恤金</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His pension was small</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“陪剩”。陪我 度过剩下的日子的是“养老金，抚恤金”。</div>          <div class="root"><span class="lbl">根</span>pens(称重、付钱) + ion → 按年付的钱</div>          <div class="zt"><span class="lbl">真题</span>People may be able to enjoy generous defined-benefits from pension plans. 人们也许 可以享受养老金计划带来的丰厚的固定福利。</div>          <div class="fam"><span class="lbl">族</span>pensioner n. 领养老金的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">allowance</span>
+          <span class="ipa">/ə&#x27;lauəns/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a travel allowance</div>          <div class="mnem"><span class="lbl">记</span>允许(allow)给的恩赐(ance的 发音似“恩赐”)，单位给你的恩赐→补贴，补助。</div>          <div class="root"><span class="lbl">根</span>allow(允许给) + ance(名词后缀) → 允许给的钱</div>          <div class="zt"><span class="lbl">真题</span>Plus, they give me a really generous allowance.另外，他们还给了我一笔非常丰厚的 津贴。</div>          <div class="fam"><span class="lbl">族</span>allow v. 允许 / allowable adj. 可允许的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">spy</span>
+          <span class="ipa">/spai/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>as silent as a spy</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a spy film 间谍片</div>          <div class="fam"><span class="lbl">族</span>spy v. 侦察 / spyware n. 间谍软件</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">aspect</span>
+          <span class="ipa">/&#x27;æspekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">方面；外貌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The best aspect of the job</div>          <div class="mnem"><span class="lbl">记</span>词根 sp 发音似“思盼”(日思夜 盼着妈妈快回来，往外看），所以，sp当词根时意 为“看”。那 aspect 就可以理解为：只看了一(a 一个)眼，只能了解事物的一个“方面”。</div>          <div class="root"><span class="lbl">根</span>a(一个) + spect(看) → 只看一眼见到的一面</div>          <div class="zt"><span class="lbl">真题</span>The most researched aspect of breakfast and breakfast-skipping has been its links to obesity. 关于吃早餐和不吃早餐的研究最多的 方面是它与肥胖的关系。(2019) (148)</div>          <div class="fam"><span class="lbl">族</span>aspect n. 方面；外貌</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">suspect</span>
+          <span class="ipa">/sə&#x27;spekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">嫌疑分子 v. 怀疑</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mr. Bao was a suspect</div>          <div class="mnem"><span class="lbl">记</span>sus表示“下面”；pect 表示 “看”。往下看→怀疑。</div>          <div class="root"><span class="lbl">根</span>sus(下面) + spect(看) → 从下面偷看 → 怀疑</div>          <div class="zt"><span class="lbl">真题</span>They suspect that mums may be less happy than dads because they&#x27;re more likely to have higher expectations about parenthood. 他们怀疑妈妈们可能比爸爸们更不快乐，因为 妈妈们对为人父母的期望可能会更高。(2022)</div>          <div class="fam"><span class="lbl">族</span>suspicion n. 怀疑 / suspected adj. 有嫌疑的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">suspicious</span>
+          <span class="ipa">/sə&#x27;spi∫əs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可疑的，猜疑的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he seemed suspicious of everything</div>          <div class="root"><span class="lbl">根</span>sus(下面) + spic(看) + ious → 值得被偷看的</div>          <div class="fam"><span class="lbl">族</span>suspicion n. 猜疑 / suspiciously adv. 可疑地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">inspect</span>
+          <span class="ipa">/ın&#x27;spekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">调查；检查；视察</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>came to inspect the ticket office</div>          <div class="mnem"><span class="lbl">记</span>in表示“里面”；pect 表示“看”。 往里面看→调查；检查。</div>          <div class="root"><span class="lbl">根</span>in(向里) + spect(看) → 往里看 → 检查</div>          <div class="zt"><span class="lbl">真题</span>I&#x27;ll inspect the product before we put it in the container and ship it over. 在我们把产品 装进集装箱并运过去之前，我会先检查一下。 (2023)</div>          <div class="fam"><span class="lbl">族</span>inspection n. 检查 / inspector n. 检查员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">monitor</span>
+          <span class="ipa">/&#x27;ma:nitər/</span>
+          <span class="pos"></span>
+          <span class="cn">显示屏；监视器；(计算机)显示器；班长；(尤 指派往国外的)监督员，核查员v.监视；监测； 跟踪调查；监听(电话、外国无线电广播等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he asked to monitor the machine himself</div>          <div class="mnem"><span class="lbl">记</span>这个单词作“班长”的意思时， 我们都很熟悉，班长是干嘛的？不就是做着“监 视”的工作吗？</div>          <div class="root"><span class="lbl">根</span>mon(提醒) + itor(人/物) → 提醒你的东西</div>          <div class="zt"><span class="lbl">真题</span>She monitored the brain activity of participants sleeping in a new environment. (149) 第六单元 她监测了在新环境中睡觉的参与者的大脑活 动。(2017)</div>          <div class="fam"><span class="lbl">族</span>monitor n. 显示器；班长 / monitoring n. 监测</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">respect</span>
+          <span class="ipa">/rı&#x27;spekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp;- n.尊重</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I respect your work</div>          <div class="mnem"><span class="lbl">记</span>re 表示“重复”;spect 表示“看” →重复地看。妈妈教导我们，说话要看着别人 的眼睛，这是对别人的“尊重”。</div>          <div class="root"><span class="lbl">根</span>re(一再) + spect(看) → 一再地看 → 尊重</div>          <div class="zt"><span class="lbl">真题</span>The people who live there respect the land. 住在那里的人尊重那片土地。</div>          <div class="fam"><span class="lbl">族</span>respectful adj. 恭敬的 / respectable adj. 体面的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">respective</span>
+          <span class="ipa">/ri&#x27;spektiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">分别的,各自的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>their respective reports</div>          <div class="root"><span class="lbl">根</span>re(一再) + spect(看) + ive → 各自看各自的</div>          <div class="zt"><span class="lbl">真题</span>Grant awarders tend to favor researchers already recognized in their respective fields. 资助奖的获得者倾向于支持在各自领域已经得 到认可的研究人员。</div>          <div class="fam"><span class="lbl">族</span>respectively adv. 分别地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">prospect</span>
+          <span class="ipa">/&#x27;prpspekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">前途；预期，可能性，展望；前景</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Look at the prospect</div>          <div class="mnem"><span class="lbl">记</span>pro表示“往前”；spect 表示 “看”→提前都能看到的。提前都能看到证明很 有前途→前途；预期；展望。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + spect(看) → 往前看得到的东西</div>          <div class="zt"><span class="lbl">真题</span>So is there any evidence that setbacks might actually improve our career prospects? 那么，有没有证据表明挫折实际上会改善我们 的职业前景呢？(2021)</div>          <div class="fam"><span class="lbl">族</span>prospective adj. 未来的 / prospector n. 勘探者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">spectator</span>
+          <span class="ipa">/spek&#x27;teitə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">观众</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the spectators gathered for his farewell</div>          <div class="mnem"><span class="lbl">记</span>spect表示“看”，or是表示“人” 的后缀。能看到的人是谁？→观众。</div>          <div class="root"><span class="lbl">根</span>spect(看) + ator(人) → 看的人 → 观众</div>          <div class="zt"><span class="lbl">真题</span>So the lines between active spectators, and passive spectators may be difficult to draw from our point of view.因此，从我们的角度来 看，主动观众和被动观众之间的界限可能很难 划定。</div>          <div class="fam"><span class="lbl">族</span>spectate v. 观看 / spectacle n. 景象</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">speculate</span>
+          <span class="ipa">/&#x27;spekjulert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">推测，推断；投机</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He began to speculate about the missing fare</div>          <div class="mnem"><span class="lbl">记</span>spec 表示“看”；ul 发音类似 “you(你)”;ate 动词后缀。因此，speculate 可以 理解为“你看的动作”，从而引发“思考或推测”。</div>          <div class="root"><span class="lbl">根</span>spec(看) + ul + ate → 看着猜 → 推测</div>          <div class="zt"><span class="lbl">真题</span>The researchers speculate that craft activities promote the development of nerve pathways in the brain. 研究人员推测，手工艺 活动促进了大脑神经通路的发展。</div>          <div class="fam"><span class="lbl">族</span>speculation n. 推测 / speculative adj. 推测的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">perspective</span>
+          <span class="ipa">/pə&#x27;spektiv/</span>
+          <span class="pos"></span>
+          <span class="cn">看法，观点</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>From his perspective</div>          <div class="mnem"><span class="lbl">记</span>per表示“每一个”；spect 表示 “看”;ive名词后缀，每一个都看到了。只有当 你把事物的每一面都看到时，你才能得出对这 个事物的“看法，观点”。</div>          <div class="root"><span class="lbl">根</span>per(全部) + spect(看) + ive → 全看到后的看法</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s nice to have people agree, but you need conflicting perspectives to dig out the truth.人们意见一致是件好事，但你需要相互 矛盾的观点来挖掘真相。(2015)</div>          <div class="fam"><span class="lbl">族</span>perspective n. 观点；透视法</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">prosper</span>
+          <span class="ipa">/&#x27;prpspə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">繁荣，昌盛</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I hope the station prospers</div>          <div class="mnem"><span class="lbl">记</span>pro表示“向前”；sper 表示“希 望”，向前的希望→繁荣，昌盛。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + sper(希望) → 一路有希望 → 繁荣</div>          <div class="fam"><span class="lbl">族</span>prosperity n. 繁荣 / prosperous adj. 繁荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">conspicuous</span>
+          <span class="ipa">/kən&#x27;spikjuəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">显著的，引人注目的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a conspicuous red flag above the roof</div>          <div class="mnem"><span class="lbl">记</span>con 表示“所有人”；spic 表示 “看”；uous是形容词后缀。所有人都看得到的 →显著的，引人注目的。</div>          <div class="root"><span class="lbl">根</span>con(共同) + spic(看) + uous → 大家都看得见</div>          <div class="fam"><span class="lbl">族</span>conspicuously adv. 显眼地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">telescope</span>
+          <span class="ipa">/&#x27;teliskəup/</span>
+          <span class="pos"></span>
+          <span class="cn">望远镜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a telescope pointed at the horizon</div>          <div class="mnem"><span class="lbl">记</span>tele 表示“远的”，比如 television， 电视就是把远的图像(vision)传到你的眼前； telephone，电话就是把远处的声音(phone)传到 你耳边；telescope，望远镜就是把远的视野 (scope)传到你的眼前。</div>          <div class="root"><span class="lbl">根</span>tele(远) + scope(看) → 看远处的东西</div>          <div class="zt"><span class="lbl">真题</span>Buy $ 50 million worth of new telescopes right now.现在就购买价值 5 000万美元的新 望远镜。</div>          <div class="fam"><span class="lbl">族</span>telescopic adj. 望远镜的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">margin</span>
+          <span class="ipa">/&#x27;ma:rd3ın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">边缘，页边空白；白边；利润，盈余</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the margin of the platform</div>          <div class="mnem"><span class="lbl">记</span>Mar（火星），gin（想成汉字 “进”)。设想一下：我们去了火星。进火星是不 是得从火星的边缘进去？所以该单词意为“边 缘”。</div>          <div class="root"><span class="lbl">根</span>marg(边) + in → 边上的空白；边上多出的钱</div>          <div class="zt"><span class="lbl">真题</span>Most students write questions or short notes in the margins. 大多数学生在页边空白处 写问题或简短的笔记。(2014)</div>          <div class="fam"><span class="lbl">族</span>marginal adj. 边缘的 / marginalize v. 边缘化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">horizon</span>
+          <span class="ipa">/hə&#x27;raizn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地平线；范围；眼界</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a telescope pointed at the horizon</div>          <div class="root"><span class="lbl">根</span>horiz(界限) + on → 天地相接的那条线</div>          <div class="zt"><span class="lbl">真题</span>You told me to look over the horizons and to pursue my own dreams without hesitation. 你告诉我要放眼未来，毫不犹豫地追 求自己的梦想。(2016)</div>          <div class="fam"><span class="lbl">族</span>horizontal adj. 水平的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">boundary</span>
+          <span class="ipa">/&#x27;baundri/</span>
+          <span class="pos">n.</span>
+          <span class="cn">边界；界限；分界线</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the boundary of the next county</div>          <div class="mnem"><span class="lbl">记</span>James Bound 詹姆斯·邦德是 电影《007》的主角，Bound可是界限感很强的 (150) 人，惩恶扬善，完成危险任务，因此看到bound 十ary可以记忆为“分界线”。</div>          <div class="root"><span class="lbl">根</span>bound(界限) + ary(名词后缀) → 划出的界限</div>          <div class="zt"><span class="lbl">真题</span>The left boundary of this plate is the west coast of North America. 这个板块的左边 界是北美的西海岸。</div>          <div class="fam"><span class="lbl">族</span>bound n. 界限 / boundless adj. 无边无际的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 39</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

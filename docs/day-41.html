@@ -1,0 +1,693 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 41 · The Dialect Class</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 41 · 11/22 · Unit 6 第 1201-1230 词</div>
+  <h1>The Dialect Class<span class="cn">方言课</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-41.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="6400"><p class="en"><span class="w" data-s="43" data-e="427">Professor</span> <span class="w" data-s="469" data-e="640">Lin</span> <span class="w" data-s="683" data-e="939">was</span> <span class="w" data-s="981" data-e="1109">a</span> <span class="w target" data-s="1152" data-e="1579" title="">specialist</span> <span class="w" data-s="1621" data-e="1792">in</span> <span class="w" data-s="1835" data-e="1920">the</span> <span class="w target" data-s="1963" data-e="2304" title="方言，土话">dialect</span> <span class="w" data-s="2347" data-e="2517">of</span> <span class="w" data-s="2560" data-e="2645">the</span> <span class="w" data-s="2688" data-e="2987">eastern</span> <span class="w" data-s="3029" data-e="3200">hills,</span> <span class="w" data-s="3413" data-e="3669">and</span> <span class="w" data-s="3883" data-e="4011">his</span> <span class="w target" data-s="4053" data-e="4352" title="演讲；讲座；讲课；教训v.讲课；讲授；告 诫;指责">lecture</span> <span class="w" data-s="4395" data-e="4523">on</span> <span class="w" data-s="4565" data-e="4651">the</span> <span class="w" data-s="4693" data-e="4736">first</span> <span class="w" data-s="4779" data-e="5163">Monday</span> <span class="w" data-s="5205" data-e="5291">of</span> <span class="w" data-s="5333" data-e="5419">term</span> <span class="w" data-s="5461" data-e="5717">was</span> <span class="w" data-s="5760" data-e="5888">a</span> <span class="w target" data-s="5931" data-e="6059" title="特殊的；特别的；特设的 n. 特别活动；特 色菜;特价">special</span> <span class="w" data-s="6101" data-e="6400">event.</span></p><p class="zh">林教授是东部山区方言的专家，开学第一个周一的讲座是件特别的事。</p></div>
+<div class="pair" data-s0="6656" data-s1="10709"><p class="en"><span class="w" data-s="6656" data-e="7083">The</span> <span class="w target" data-s="7211" data-e="7339" title="课程；过程，道路；航线；进程；方针；疗程；一 道菜">course</span> <span class="w" data-s="7381" data-e="7595">was</span> <span class="w" data-s="7637" data-e="7765">not</span> <span class="w target" data-s="7808" data-e="8405" title="强制的；义务的">compulsory:</span> <span class="w" data-s="8619" data-e="9088">students</span> <span class="w" data-s="9131" data-e="9387">could</span> <span class="w target" data-s="9429" data-e="9557" title="选择；挑选">opt</span> <span class="w" data-s="9600" data-e="9771">for</span> <span class="w" data-s="9813" data-e="9984">it</span> <span class="w" data-s="10027" data-e="10155">or</span> <span class="w target" data-s="10197" data-e="10368" title="选择；挑选；选拔adj. 精选的；优等的">select</span> <span class="w" data-s="10411" data-e="10709">another.</span></p><p class="zh">这门课不是必修的：学生可以选它，也可以选别的。</p></div>
+<div class="pair" data-s0="11439" data-s1="15066"><p class="en"><span class="w" data-s="11439" data-e="11695">Forty</span> <span class="w" data-s="11738" data-e="11866">came,</span> <span class="w" data-s="12165" data-e="12378">and</span> <span class="w" data-s="12634" data-e="12762">half</span> <span class="w" data-s="12805" data-e="12975">of</span> <span class="w" data-s="13018" data-e="13061">them</span> <span class="w" data-s="13103" data-e="13231">were</span> <span class="w target" data-s="13274" data-e="13743" title="乐观(主义)的">optimistic,</span> <span class="w" data-s="13999" data-e="14213">half</span> <span class="w target" data-s="14469" data-e="15066" title="悲观的，厌世的">pessimistic.</span></p><p class="zh">来了四十个人，一半乐观，一半悲观。</p></div>
+<div class="pair" data-s0="16133" data-s1="18181"><p class="en"><span class="w" data-s="16133" data-e="16175">&quot;I</span> <span class="w" data-s="16218" data-e="16389">have</span> <span class="w" data-s="16431" data-e="16559">one</span> <span class="w target" data-s="16602" data-e="16901" title="(常 pl.)细节，详情 adj. 具体的，详细的">specific</span> <span class="w" data-s="16943" data-e="17413">aim,&quot;</span> <span class="w" data-s="17797" data-e="17967">he</span> <span class="w" data-s="18010" data-e="18181">said.</span></p><p class="zh">“我只有一个很具体的目标，”他说。</p></div>
+<div class="pair" data-s0="18830" data-s1="23225"><p class="en"><span class="w" data-s="18830" data-e="18958">Then</span> <span class="w" data-s="19001" data-e="19129">he</span> <span class="w" data-s="19172" data-e="19300">read</span> <span class="w" data-s="19342" data-e="19428">the</span> <span class="w target" data-s="19470" data-e="19940" title="详述，明确说明；说明书">specification</span> <span class="w" data-s="19982" data-e="20366">aloud:</span> <span class="w" data-s="20708" data-e="21348">three</span> <span class="w" data-s="21390" data-e="21604">hundred</span> <span class="w" data-s="21646" data-e="21902">words</span> <span class="w" data-s="21945" data-e="22286">that</span> <span class="w" data-s="22329" data-e="22500">exist</span> <span class="w" data-s="22542" data-e="23012">nowhere</span> <span class="w" data-s="23054" data-e="23225">else.</span></p><p class="zh">然后他把课程说明念了出来：三百个别处不存在的词。</p></div>
+<div class="pair" data-s0="24164" data-s1="28174"><p class="en"><span class="w" data-s="24164" data-e="24249">&quot;The</span> <span class="w target" data-s="24292" data-e="24889" title="专业，专长；特色食品，特产">speciality</span> <span class="w" data-s="24932" data-e="25102">of</span> <span class="w" data-s="25145" data-e="25273">these</span> <span class="w" data-s="25316" data-e="25572">hills</span> <span class="w" data-s="25614" data-e="25828">is</span> <span class="w" data-s="25870" data-e="25998">a</span> <span class="w" data-s="26041" data-e="26126">word</span> <span class="w" data-s="26169" data-e="26382">for</span> <span class="w" data-s="26425" data-e="26510">the</span> <span class="w" data-s="26553" data-e="26638">sound</span> <span class="w" data-s="26681" data-e="26894">of</span> <span class="w" data-s="26937" data-e="27065">rain</span> <span class="w" data-s="27108" data-e="27321">on</span> <span class="w" data-s="27364" data-e="27577">stone,&quot;</span> <span class="w" data-s="27961" data-e="28004">he</span> <span class="w" data-s="28046" data-e="28174">said.</span></p><p class="zh">“这片山区的特产，是形容雨打石头那个声音的词，”他说。</p></div>
+<div class="pair" data-s0="28807" data-s1="34524"><p class="en"><span class="w" data-s="28807" data-e="28977">Every</span> <span class="w target" data-s="29020" data-e="29233" title="实例，案例，诉讼；容器，箱子；情况">case</span> <span class="w" data-s="29276" data-e="29489">was</span> <span class="w target" data-s="29532" data-e="30001" title="特别的，格外的；特定的，特殊的；详细的； 专指的；挑剔的η.(正式记下的)细节，详情">particular,</span> <span class="w" data-s="30215" data-e="30385">every</span> <span class="w" data-s="30684" data-e="30940">rule</span> <span class="w target" data-s="30983" data-e="31281" title="唯一的；独一无二的；(某人、地或事物)独 具的，特有的；独特的；罕见的">unique,</span> <span class="w" data-s="31580" data-e="31793">and</span> <span class="w" data-s="32007" data-e="32135">his</span> <span class="w" data-s="32177" data-e="32519">handwriting</span> <span class="w" data-s="32561" data-e="32775">was</span> <span class="w" data-s="32817" data-e="32903">a</span> <span class="w" data-s="32945" data-e="33073">little</span> <span class="w target" data-s="33116" data-e="33671" title="怪异的，奇怪的；特殊的；罕见的 adj.奇怪的，古怪的；临时的；零散的，奇数的 (154)">peculiar,</span> <span class="w" data-s="33841" data-e="34012">even</span> <span class="w target" data-s="34225" data-e="34524" title="怪异的，奇怪的，不可思议的">weird.</span></p><p class="zh">每个案例都很个别，每条规则都独一无二，他的字也有点古怪，甚至可以说奇怪。</p></div>
+<div class="pair" data-s0="34823" data-s1="37895"><p class="en"><span class="w" data-s="34823" data-e="35036">A</span> <span class="w" data-s="35164" data-e="35591">girl</span> <span class="w" data-s="35633" data-e="35804">in</span> <span class="w" data-s="35847" data-e="35889">the</span> <span class="w" data-s="35932" data-e="36017">front</span> <span class="w" data-s="36060" data-e="36273">row</span> <span class="w" data-s="36316" data-e="36529">was</span> <span class="w target" data-s="36572" data-e="36956" title="">bothered</span> <span class="w" data-s="36999" data-e="37041">by</span> <span class="w" data-s="37084" data-e="37255">one</span> <span class="w" data-s="37297" data-e="37468">habit</span> <span class="w" data-s="37511" data-e="37767">of</span> <span class="w" data-s="37809" data-e="37895">his.</span></p><p class="zh">前排的一个女生被他一个习惯弄得心烦。</p></div>
+<div class="pair" data-s0="38193" data-s1="40881"><p class="en"><span class="w" data-s="38193" data-e="38279">He</span> <span class="w" data-s="38321" data-e="38449">would</span> <span class="w" data-s="38492" data-e="38620">stop</span> <span class="w" data-s="38663" data-e="38876">in</span> <span class="w" data-s="38919" data-e="38961">the</span> <span class="w" data-s="39004" data-e="39089">middle</span> <span class="w" data-s="39132" data-e="39260">of</span> <span class="w" data-s="39303" data-e="39345">a</span> <span class="w" data-s="39388" data-e="39687">sentence</span> <span class="w" data-s="39729" data-e="40071">and</span> <span class="w" data-s="40156" data-e="40327">look</span> <span class="w" data-s="40369" data-e="40455">at</span> <span class="w" data-s="40497" data-e="40540">the</span> <span class="w" data-s="40583" data-e="40881">ceiling.</span></p><p class="zh">他会在句子中间停下来，抬头看天花板。</p></div>
+<div class="pair" data-s0="41052" data-s1="44167"><p class="en"><span class="w" data-s="41052" data-e="41265">It</span> <span class="w" data-s="41692" data-e="42033">did</span> <span class="w target" data-s="42076" data-e="42417" title="">annoy</span> <span class="w" data-s="42460" data-e="42588">her,</span> <span class="w" data-s="42716" data-e="42929">and</span> <span class="w" data-s="43015" data-e="43271">she</span> <span class="w" data-s="43313" data-e="43441">could</span> <span class="w" data-s="43484" data-e="43612">not</span> <span class="w target" data-s="43655" data-e="43953" title="忽视;不予理睬">ignore</span> <span class="w" data-s="43996" data-e="44167">it.</span></p><p class="zh">这确实让她恼火，可她没法不理它。</p></div>
+<div class="pair" data-s0="44940" data-s1="47287"><p class="en"><span class="w" data-s="44940" data-e="45068">But</span> <span class="w" data-s="45111" data-e="46007">Professor</span> <span class="w" data-s="46049" data-e="46177">Lin</span> <span class="w" data-s="46220" data-e="46561">only</span> <span class="w" data-s="46860" data-e="47287">smiled.</span></p><p class="zh">但林教授只是笑了笑。</p></div>
+<div class="pair" data-s0="48311" data-s1="50145"><p class="en"><span class="w" data-s="48311" data-e="48439">&quot;Do</span> <span class="w" data-s="48481" data-e="48609">not</span> <span class="w target" data-s="48652" data-e="48908" title="&amp; v. 忽略；忽视；不予重视">neglect</span> <span class="w" data-s="48951" data-e="49121">the</span> <span class="w" data-s="49164" data-e="49420">pause,&quot;</span> <span class="w" data-s="49847" data-e="49932">he</span> <span class="w" data-s="49975" data-e="50145">said.</span></p><p class="zh">“别忽视那个停顿，”他说。</p></div>
+<div class="pair" data-s0="50700" data-s1="53175"><p class="en"><span class="w" data-s="50700" data-e="50999">&quot;The</span> <span class="w" data-s="51041" data-e="51297">pause</span> <span class="w" data-s="51340" data-e="51724">is</span> <span class="w" data-s="51852" data-e="52023">where</span> <span class="w" data-s="52065" data-e="52151">the</span> <span class="w" data-s="52193" data-e="52279">old</span> <span class="w" data-s="52321" data-e="52535">people</span> <span class="w" data-s="52577" data-e="52791">put</span> <span class="w" data-s="52833" data-e="52961">their</span> <span class="w" data-s="53004" data-e="53175">feeling.&quot;</span></p><p class="zh">“停顿，是老人家放感情的地方。”</p></div>
+<div class="pair" data-s0="53772" data-s1="56503"><p class="en"><span class="w" data-s="53772" data-e="54284">Then</span> <span class="w" data-s="54327" data-e="54497">he</span> <span class="w" data-s="54540" data-e="54668">asked</span> <span class="w" data-s="54711" data-e="54881">the</span> <span class="w" data-s="54924" data-e="55052">class</span> <span class="w" data-s="55095" data-e="55351">to</span> <span class="w target" data-s="55393" data-e="55479" title="收集">collect</span> <span class="w" data-s="55521" data-e="55735">one</span> <span class="w" data-s="55777" data-e="56033">word</span> <span class="w" data-s="56076" data-e="56289">from</span> <span class="w" data-s="56332" data-e="56503">home.</span></p><p class="zh">接着他让全班每人从家里收集一个词。</p></div>
+<div class="pair" data-s0="57103" data-s1="60047"><p class="en"><span class="w" data-s="57103" data-e="57188">He</span> <span class="w target" data-s="57231" data-e="57529" title="供应，供给；满足(需要) n. 供应，供给；补 给；存货；必需品">supplied</span> <span class="w" data-s="57572" data-e="57956">boxes</span> <span class="w" data-s="57999" data-e="58169">and</span> <span class="w" data-s="58212" data-e="58340">one</span> <span class="w" data-s="58383" data-e="58639">small</span> <span class="w target" data-s="58681" data-e="59151" title="增补(物)；补充(物)；添加物 v. 增补；补充">supplement,</span> <span class="w" data-s="59321" data-e="59492">a</span> <span class="w" data-s="59620" data-e="60047">recorder.</span></p><p class="zh">他提供了纸箱，还有一份小小的补充品——一台录音机。</p></div>
+<div class="pair" data-s0="60175" data-s1="64697"><p class="en"><span class="w" data-s="60175" data-e="60345">He</span> <span class="w" data-s="60644" data-e="60985">told</span> <span class="w" data-s="61028" data-e="61241">each</span> <span class="w" data-s="61284" data-e="61455">student</span> <span class="w" data-s="61497" data-e="61753">to</span> <span class="w target" data-s="61796" data-e="62052" title="拥抱；包括；围绕η. 拥抱；包括；接受">embrace</span> <span class="w" data-s="62095" data-e="62265">the</span> <span class="w" data-s="62308" data-e="62393">work</span> <span class="w" data-s="62436" data-e="62649">slowly,</span> <span class="w" data-s="62948" data-e="63204">and</span> <span class="w" data-s="63417" data-e="63545">not</span> <span class="w" data-s="63588" data-e="63759">to</span> <span class="w" data-s="63801" data-e="63844">be</span> <span class="w target" data-s="63887" data-e="64015" title="消极的;悲观的；否定的">negative</span> <span class="w" data-s="64057" data-e="64313">or</span> <span class="w target" data-s="64356" data-e="64697" title="被动的,消极的">passive.</span></p><p class="zh">他让每个学生慢慢地拥抱这项工作，不要消极，也不要被动。</p></div>
+<div class="pair" data-s0="65593" data-s1="68593"><p class="en"><span class="w" data-s="65593" data-e="65636">&quot;You</span> <span class="w" data-s="65679" data-e="65807">will</span> <span class="w" data-s="65849" data-e="65977">be</span> <span class="w target" data-s="66020" data-e="66361" title="使熟悉，使了解">acquainted</span> <span class="w" data-s="66404" data-e="66532">with</span> <span class="w" data-s="66575" data-e="66660">a</span> <span class="w" data-s="66703" data-e="66788">world</span> <span class="w" data-s="66831" data-e="67129">you</span> <span class="w" data-s="67172" data-e="67257">have</span> <span class="w" data-s="67300" data-e="67428">never</span> <span class="w" data-s="67471" data-e="67641">heard,&quot;</span> <span class="w" data-s="68422" data-e="68465">he</span> <span class="w" data-s="68507" data-e="68593">said.</span></p><p class="zh">“你们会认识一个从没听过的世界，”他说。</p></div>
+<div class="pair" data-s0="68891" data-s1="71579"><p class="en"><span class="w" data-s="68891" data-e="69574">&quot;Thirty</span> <span class="w" data-s="69617" data-e="69745">years</span> <span class="w" data-s="69787" data-e="69958">from</span> <span class="w" data-s="70001" data-e="70129">now,</span> <span class="w" data-s="70342" data-e="70470">this</span> <span class="w target" data-s="70641" data-e="71110" title="方言，土话">dialect</span> <span class="w" data-s="71153" data-e="71281">will</span> <span class="w" data-s="71323" data-e="71409">be</span> <span class="w" data-s="71451" data-e="71579">gone.&quot;</span></p><p class="zh">“三十年后，这种方言就没了。”</p></div>
+<div class="pair" data-s0="72347" data-s1="72902"><p class="en"><span class="w" data-s="72347" data-e="72390">&quot;So</span> <span class="w" data-s="72433" data-e="72603">choose</span> <span class="w" data-s="72646" data-e="72902">now.&quot;</span></p><p class="zh">“所以现在就选。”</p></div>
+<div class="pair" data-s0="73713" data-s1="75121"><p class="en"><span class="w target" data-s="73713" data-e="73883" title="">&quot;Elect</span> <span class="w" data-s="73926" data-e="74054">one</span> <span class="w" data-s="74097" data-e="74310">word</span> <span class="w" data-s="74353" data-e="74523">to</span> <span class="w" data-s="74566" data-e="74651">carry</span> <span class="w" data-s="74694" data-e="74907">with</span> <span class="w" data-s="74950" data-e="75121">you.&quot;</span></p><p class="zh">“选一个词，带在身上。”</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">embrace</span>
+          <span class="ipa">/ım&#x27;breis/</span>
+          <span class="pos">v.</span>
+          <span class="cn">拥抱；包括；围绕η. 拥抱；包括；接受</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He told each student to embrace the work slowly</div>          <div class="mnem"><span class="lbl">记</span>em(进入……之中)十 brace(夹 子，想成臂膀)→把某人包围在自己的臂膀中→ 拥抱。</div>          <div class="root"><span class="lbl">根</span>em(进入) + brace(臂膀) → 把某人抱进臂膀里</div>          <div class="zt"><span class="lbl">真题</span>Evil behavior is typically thought to embrace one or both forms. 邪恶的行为通常被 认为包含一种或两种形式。(2022) (153) 第六单元</div>          <div class="fam"><span class="lbl">族</span>brace n. 支架 / embrace n. 拥抱</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">specific</span>
+          <span class="ipa">/spə&#x27;sıfık/</span>
+          <span class="pos"></span>
+          <span class="cn">(常 pl.)细节，详情 adj. 具体的，详细的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I have one specific aim</div>          <div class="root"><span class="lbl">根</span>spec(看) + ific → 一看就说得明明白白 → 具体的</div>          <div class="zt"><span class="lbl">真题</span>They tried to meet astronauts&#x27;specific requirements.他们尽力满足航天员的特殊要 求。(2017)</div>          <div class="fam"><span class="lbl">族</span>specify v. 具体说明 / specification n. 说明书</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">specification</span>
+          <span class="ipa">/ıspesıfı&#x27;ker∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">详述，明确说明；说明书</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then he read the specification aloud</div>          <div class="root"><span class="lbl">根</span>specific(具体的) + ation(名词后缀) → 写具体的东西</div>          <div class="zt"><span class="lbl">真题</span>Many were built using specifications of 19th century Scottish engineers Thomas Telford and John MacAdam. 许多建筑是使用 19世纪苏格兰工程师托马斯·特尔福德和约翰· 麦克阿丹的规范建造的。</div>          <div class="fam"><span class="lbl">族</span>specify v. 明确规定 / specific adj. 具体的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">particular</span>
+          <span class="ipa">/pər&#x27;tıkjələr/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">特别的，格外的；特定的，特殊的；详细的； 专指的；挑剔的η.(正式记下的)细节，详情</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every case was particular</div>          <div class="root"><span class="lbl">根</span>part(部分) + icular → 单指某一部分 → 特定的</div>          <div class="zt"><span class="lbl">真题</span>They are particular about the quality of toilet paper.他们对卫生纸的质量很挑剔。 (2017)</div>          <div class="fam"><span class="lbl">族</span>particularly adv. 尤其 / particularity n. 特殊性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">special</span>
+          <span class="ipa">/&#x27;speʃl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">特殊的；特别的；特设的 n. 特别活动；特 色菜;特价</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his lecture on the first Monday of term was a special event</div>          <div class="root"><span class="lbl">根</span>spec(看) + ial → 一眼就看出不一样 → 特殊的</div>          <div class="zt"><span class="lbl">真题</span>Many of them are specialized libraries. 其中许多都是专门的图书馆。</div>          <div class="fam"><span class="lbl">族</span>specially adv. 专门地 / specialist n. 专家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">speciality</span>
+          <span class="ipa">/ispeSi&#x27;æeləti/</span>
+          <span class="pos"></span>
+          <span class="cn">专业，专长；特色食品，特产</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The speciality of these hills is a word for the sound of rain on stone</div>          <div class="mnem"><span class="lbl">记</span>special 特别的，特殊的；ity 名 词后缀。speciality就是某个地方特别的东西→ 特产。例如：local specialities 土特产。</div>          <div class="root"><span class="lbl">根</span>special(特别的) + ity(名词后缀) → 特别的东西 → 特产</div>          <div class="zt"><span class="lbl">真题</span>The lifestyle medicine speciality is designed to train doctors in how to prevent and treat disease. 生活方式医学专业旨在培训医生 如何预防和治疗疾病。</div>          <div class="fam"><span class="lbl">族</span>specialize v. 专门研究 / specialty n. 特产</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">specialist</span>
+          <span class="ipa">/&#x27;spe∫əlist/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Professor Lin was a specialist in the dialect of the eastern hills</div>          <div class="mnem"><span class="lbl">记</span>special 特别的；ist 表示人的后 缀，在某个行业特别的人→专家。</div>          <div class="root"><span class="lbl">根</span>special(特别的) + ist(人) → 某一行特别强的人 → 专家</div>          <div class="zt"><span class="lbl">真题</span>This rat detection method doesn&#x27;t rely on specialist equipment. 这种检测老鼠的方法不依 赖于专业设备。(2017)</div>          <div class="fam"><span class="lbl">族</span>specialize v. 专攻 / speciality n. 专业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">unique</span>
+          <span class="ipa">/ju&#x27;ni:k/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">唯一的；独一无二的；(某人、地或事物)独 具的，特有的；独特的；罕见的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every rule unique</div>          <div class="root"><span class="lbl">根</span>uni(一个) + que → 世上只有一个 → 独一无二的</div>          <div class="zt"><span class="lbl">真题</span>If you want to reduce boredom and increase your sense of meaning, seek work where you can make a unique contribution. 如 果你想减少无聊，增加你的意义感，找一份你能 做出独特贡献的工作。(2021)</div>          <div class="fam"><span class="lbl">族</span>uniquely adv. 独特地 / uniqueness n. 独特性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">peculiar</span>
+          <span class="ipa">/pı&#x27;kju:liə(r)/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">怪异的，奇怪的；特殊的；罕见的 adj.奇怪的，古怪的；临时的；零散的，奇数的 (154)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his handwriting was a little peculiar, even weird</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“凹的”。地面 有一块是凹的，很奇怪→奇怪的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：凹的 → 地上凹一块，很奇怪</div>          <div class="zt"><span class="lbl">真题</span>A sudden switch of interest to the depth of the sea does seem peculiar. 突然把兴趣转向 深海探险，这似乎有些奇怪。</div>          <div class="fam"><span class="lbl">族</span>peculiarly adv. 奇怪地 / peculiarity n. 特点</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">weird</span>
+          <span class="ipa">/wiəd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">怪异的，奇怪的，不可思议的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a little peculiar, even weird</div>          <div class="mnem"><span class="lbl">记</span>单词可以联想为：我们(we)饿 的(ird 发音)，这个时候怎么会饿？→奇怪的。</div>          <div class="root"><span class="lbl">根</span>联想：we(我们) + ird(饿的) → 怎么会饿？真奇怪</div>          <div class="fam"><span class="lbl">族</span>weirdly adv. 古怪地 / weirdness n. 古怪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">acquaint</span>
+          <span class="ipa">/ə&#x27;kweint/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使熟悉，使了解</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>You will be acquainted with a world you have never heard</div>          <div class="mnem"><span class="lbl">记</span>一再地(ac)怪(quai发音类似 “怪”)。我们中国有句古话叫“见怪不怪”，意思 是见得多了就不奇怪了，见得多了就“熟悉”了。</div>          <div class="root"><span class="lbl">根</span>ac(一再) + quaint(怪) → 见怪不怪就熟悉了</div>          <div class="zt"><span class="lbl">真题</span>Through their reading they find a deeper significance to life as books acquaint them with life in the world as it was and it is now. 通过阅 读，他们发现了生活中更深层次的意义，因为书 籍让他们熟悉了世界上过去和现在的生活。</div>          <div class="fam"><span class="lbl">族</span>acquaintance n. 熟人 / acquainted adj. 熟悉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">bother</span>
+          <span class="ipa">/&#x27;bpðə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A girl in the front row was bothered by one habit of his</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以结合 brother(弟 弟)来记，弟弟把你的小花(r想成花)弄不见了， 真烦。</div>          <div class="root"><span class="lbl">根</span>联想 brother(弟弟)：弟弟添乱惹人烦</div>          <div class="zt"><span class="lbl">真题</span>I have been bothered for a long time about the curious lack of curiosity. 很长一段时 间以来，我一直对这种奇怪的对好奇心的缺乏 感到困扰。(2017) 例I don&#x27;t want to bother my father with my problems at the moment. 此刻我不想让我父亲 为我的事操心。</div>          <div class="fam"><span class="lbl">族</span>bothersome adj. 麻烦的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">annoy</span>
+          <span class="ipa">/ə&#x27;nu/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It did annoy her</div>          <div class="mnem"><span class="lbl">记</span>an(一个)十no(没有)十y(“用” 拼音的第一个字母)→一个没用的人才会特别 喜欢生气→使生气。</div>          <div class="root"><span class="lbl">根</span>谐音联想：一个闹啊 → 吵闹让人恼火</div>          <div class="zt"><span class="lbl">真题</span>The authorities were annoyed but could find nothing to charge him with. 当局很恼火， 但找不到指控他的任何罪名。(2020)</div>          <div class="fam"><span class="lbl">族</span>annoying adj. 恼人的 / annoyance n. 恼怒</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">ignore</span>
+          <span class="ipa">/ig&#x27;noir/</span>
+          <span class="pos">v.</span>
+          <span class="cn">忽视;不予理睬</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she could not ignore it</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“一个闹啊”， 对付无理取闹的孩子，最好的方法就是“不予理 睬”。</div>          <div class="root"><span class="lbl">根</span>i(不) + gnore(知道) → 装作不知道 → 不理睬</div>          <div class="zt"><span class="lbl">真题</span>They tend to be ignored by drivers in a short period of time. 他们往往在很短的时间内 被司机忽略。</div>          <div class="fam"><span class="lbl">族</span>ignorance n. 无知 / ignorant adj. 无知的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">neglect</span>
+          <span class="ipa">/nı&#x27;glekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 忽略；忽视；不予重视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Do not neglect the pause</div>          <div class="mnem"><span class="lbl">记</span>neg 表示消极否定的意思(比 如 negative 消极的);lect 表示选择(比如 select 挑选；election选举)→不去选择→忽视；不 重视。</div>          <div class="root"><span class="lbl">根</span>neg(否定) + lect(选择) → 不去选它 → 忽视</div>          <div class="zt"><span class="lbl">真题</span>It leads students to neglect their studies. 它导致学生忽视他们的学业。(2023)</div>          <div class="fam"><span class="lbl">族</span>negligence n. 疏忽 / negligent adj. 疏忽的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">negative</span>
+          <span class="ipa">/&#x27;negətiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">消极的;悲观的；否定的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not to be negative or passive</div>          <div class="mnem"><span class="lbl">记</span>其发音类似“奶哥提我”。小时 (155) 第六单元 候的我，调皮捣蛋，请家长是常事，所以奶奶和 哥哥提到我就是“悲观的；消极的”。</div>          <div class="root"><span class="lbl">根</span>neg(否定) + ative → 否定的、消极的</div>          <div class="zt"><span class="lbl">真题</span>How technology could be playing a negative role in the learning process?技术如何 在学习过程中发挥消极作用？(2022)</div>          <div class="fam"><span class="lbl">族</span>negatively adv. 消极地 / negate v. 否定</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">passive</span>
+          <span class="ipa">/&#x27;pæsiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">被动的,消极的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not to be negative or passive</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“怕媳妇”。一个 男子动不动就怕媳妇，这个人是不是太“消 极”了？</div>          <div class="root"><span class="lbl">根</span>pass(承受) + ive → 只被动承受 → 被动的</div>          <div class="zt"><span class="lbl">真题</span>While they may not be as dynamic as an iPad, textbooks are not passive or lifeless. 虽 然教科书可能不像iPad那样生动有趣，但它们 也不是消极或毫无生气的。</div>          <div class="fam"><span class="lbl">族</span>passively adv. 被动地 / passivity n. 被动</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">optimistic</span>
+          <span class="ipa">/ıpptı&#x27;mistık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">乐观(主义)的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>half of them were optimistic, half pessimistic</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：opti(发音类似 “我不提”)+ mistic(想成mistake“错误”)→我 做什么事情总是不提错误，盲目乐观可不好→ 乐观的。</div>          <div class="root"><span class="lbl">根</span>optim(最好) + istic → 总想着最好的 → 乐观的</div>          <div class="zt"><span class="lbl">真题</span>Try to be optimistic whatever happens. 无论发生什么，都要保持乐观。</div>          <div class="fam"><span class="lbl">族</span>optimism n. 乐观 / optimist n. 乐观者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">pessimistic</span>
+          <span class="ipa">/pesı&#x27;mistık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">悲观的，厌世的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>half of them were optimistic, half pessimistic</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：pessi(发音类似 “拍死”)+mistic(想成mistake“错误”)→我一 做错事情，你就想拍死我，从来不说服教育，你 太悲观了吧→悲观的。</div>          <div class="root"><span class="lbl">根</span>pessim(最坏) + istic → 总想着最坏的 → 悲观的</div>          <div class="zt"><span class="lbl">真题</span>Some pessimistic experts feel that the automobile is bound to fall into disuse. 一些悲 观的专家认为汽车一定会被淘汰。</div>          <div class="fam"><span class="lbl">族</span>pessimism n. 悲观 / pessimist n. 悲观者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">supply</span>
+          <span class="ipa">/sə&#x27;plai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">供应，供给；满足(需要) n. 供应，供给；补 给；存货；必需品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He supplied boxes and one small supplement</div>          <div class="mnem"><span class="lbl">记</span>从下面(sup=sub)扑来(ply的 谐音)→提供，供给。</div>          <div class="root"><span class="lbl">根</span>sup(从下面) + ply(填满) → 往上填 → 供应</div>          <div class="zt"><span class="lbl">真题</span>This helps them pick the right startups, and means they can supply advice and connections as well as money. 这有助于他们选 择合适的创业公司，也意味着他们可以提供建 议、人脉以及资金。(2015)</div>          <div class="fam"><span class="lbl">族</span>supplier n. 供应商 / supply n. 供应</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">supplement</span>
+          <span class="ipa">/&#x27;saplimənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">增补(物)；补充(物)；添加物 v. 增补；补充</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one small supplement, a recorder</div>          <div class="root"><span class="lbl">根</span>sup(从下面) + ple(填满) + ment → 补上去的东西</div>          <div class="fam"><span class="lbl">族</span>supplementary adj. 补充的 / supply v. 供应</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">opt</span>
+          <span class="ipa">/a:pt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">选择；挑选</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>students could opt for it or select another</div>          <div class="mnem"><span class="lbl">记</span>op = ob 表示方向；t 想成他。 那这个单词就可以理解为朝向他，走向他。是 不是想到了你女朋友，在你和铁锤之间犹豫了 一段时间，最后“选择”了他？</div>          <div class="root"><span class="lbl">根</span>op(朝向) + t → 朝着它走 → 选择</div>          <div class="zt"><span class="lbl">真题</span>Provide a variety of optional courses. 提 供了各种各样的选修课。</div>          <div class="fam"><span class="lbl">族</span>option n. 选择 / optional adj. 可选的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">compulsory</span>
+          <span class="ipa">/kəm&#x27;palsəri/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">强制的；义务的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The course was not compulsory</div>          <div class="mnem"><span class="lbl">记</span>该单词可被拆分为：com(都)， 别像sorry，即“对不起”)。在古代，所有仆人都 扑在那里说对不起，这是为什么？估计是在向 为某人提供某物 当时的君主请罪吧。这是“强制的”，不扑估计 就要掉脑袋了。</div>          <div class="root"><span class="lbl">根</span>com(一起) + puls(推) + ory → 被推着做 → 强制的</div>          <div class="zt"><span class="lbl">真题</span>The use of seat belts was compulsory for the population. 使用安全带是强制性的。</div>          <div class="fam"><span class="lbl">族</span>compel v. 强迫 / compulsorily adv. 强制地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">course</span>
+          <span class="ipa">/kə:rs/</span>
+          <span class="pos"></span>
+          <span class="cn">课程；过程，道路；航线；进程；方针；疗程；一 道菜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The course was not compulsory</div>          <div class="mnem"><span class="lbl">记</span>supple 想成 supply（供给，提 大学都开设工商管理课程。</div>          <div class="root"><span class="lbl">根</span>词根 cours(跑) → 要跑完的一段路 → 课程；过程</div>          <div class="zt"><span class="lbl">真题</span>Universities in many countries offer courses in business administration. 许多国家的</div>          <div class="fam"><span class="lbl">族</span>coursework n. 课程作业 / of course 当然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">case</span>
+          <span class="ipa">/keis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">实例，案例，诉讼；容器，箱子；情况</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every case was particular, every rule unique</div>          <div class="root"><span class="lbl">根</span>cas(落下) + e → 落到眼前的事 → 实例，情况</div>          <div class="zt"><span class="lbl">真题</span>Some people are absorbed in the past but not open to new memories, but that&#x27;s not the case for me. 有些人沉湎于过去，而不愿接受新 的回忆，但我不是这样的人。(2017)</div>          <div class="fam"><span class="lbl">族</span>in case 万一 / in any case 无论如何</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">select</span>
+          <span class="ipa">/sı&#x27;lekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">选择；挑选；选拔adj. 精选的；优等的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>students could opt for it or select another</div>          <div class="mnem"><span class="lbl">记</span>se表示分开；lect 表示选择。 那这个单词可以解释为“分开选择”→挑选。</div>          <div class="root"><span class="lbl">根</span>se(分开) + lect(选) → 挑出来 → 选择</div>          <div class="zt"><span class="lbl">真题</span>It helps people to select the most effective sunscreen. 它帮助人们选择最有效的 防晒霜。(2015)</div>          <div class="fam"><span class="lbl">族</span>selection n. 选择 / selective adj. 有选择的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">lecture</span>
+          <span class="ipa">/&#x27;lekt∫ə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">演讲；讲座；讲课；教训v.讲课；讲授；告 诫;指责</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his lecture on the first Monday of term was a special event</div>          <div class="mnem"><span class="lbl">记</span>词根 lect 表示“选择，说”；ure 名词后缀→说的内容→演讲。</div>          <div class="root"><span class="lbl">根</span>lect(说) + ure(名词后缀) → 讲出来的内容 → 讲座</div>          <div class="zt"><span class="lbl">真题</span>The content of the lecture is a much more effective method for students to learn. 对 于学生来说，讲座里讲的内容是一种更有效的 学习方法。 (156)</div>          <div class="fam"><span class="lbl">族</span>lecturer n. 讲师 / lecturing n. 讲课</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">elect</span>
+          <span class="ipa">/1&#x27;lekt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Elect one word to carry with you</div>          <div class="mnem"><span class="lbl">记</span>选(lect)出去(e)→选举。</div>          <div class="root"><span class="lbl">根</span>e(向外) + lect(选) → 选出来 → 选举，选定</div>          <div class="zt"><span class="lbl">真题</span>And people who elect to track their sleep may try to get more sleep than the average person.那些选择跟踪自己睡眠的人可能会努 力比普通人睡得更多。</div>          <div class="fam"><span class="lbl">族</span>election n. 选举 / elective adj. 选修的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">collect</span>
+          <span class="ipa">/kə&#x27;lekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">收集</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then he asked the class to collect one word from home</div>          <div class="mnem"><span class="lbl">记</span>col 所有的；lect 选择。所有的 都选择了，不就是“收集”吗？</div>          <div class="root"><span class="lbl">根</span>col(一起) + lect(选) → 选到一起 → 收集</div>          <div class="zt"><span class="lbl">真题</span>Its conclusions are based on carefully collected data. 它的结论是基于仔细收集的数 据的。(2011)</div>          <div class="fam"><span class="lbl">族</span>collection n. 收藏 / collective adj. 集体的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">dialect</span>
+          <span class="ipa">/&#x27;daiəlekt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">方言，土话</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a specialist in the dialect of the eastern hills</div>          <div class="mnem"><span class="lbl">记</span>dia发音似“嗲”，lect 表示 “说”，那个地方的人都很嗲地说话，就是“方言， 土话”。</div>          <div class="root"><span class="lbl">根</span>dia(之间) + lect(说) → 一地人之间说的话 → 方言</div>          <div class="zt"><span class="lbl">真题</span>The most basic reason why dialects should be preserved is that language helps to retain a culture. 应该保留方言的最基本原因是 语言有助于保留一种文化。</div>          <div class="fam"><span class="lbl">族</span>dialectal adj. 方言的 / dialogue n. 对话</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 41</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

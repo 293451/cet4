@@ -1,0 +1,690 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 37 · The Jam Factory on Market Avenue</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 37 · 11/18 · Unit 6 第 1081-1110 词</div>
+  <h1>The Jam Factory on Market Avenue<span class="cn">市场大道上的果酱厂</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-37.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3413"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="299">Lin</span> <span class="w" data-s="341" data-e="768">family&#x27;s</span> <span class="w" data-s="811" data-e="939">jam</span> <span class="w" data-s="981" data-e="1408">factory</span> <span class="w" data-s="1451" data-e="1707">stood</span> <span class="w" data-s="1749" data-e="1920">on</span> <span class="w" data-s="1963" data-e="2048">a</span> <span class="w" data-s="2091" data-e="2176">wide</span> <span class="w target" data-s="2219" data-e="2731" title="大街，林荫大道；方法，途径">avenue</span> <span class="w" data-s="2773" data-e="2901">at</span> <span class="w" data-s="2944" data-e="2987">the</span> <span class="w" data-s="3029" data-e="3115">edge</span> <span class="w" data-s="3157" data-e="3243">of</span> <span class="w" data-s="3285" data-e="3413">town.</span></p><p class="zh">林家果酱厂坐落在镇边一条宽阔的大街上。</p></div>
+<div class="pair" data-s0="3712" data-s1="8832"><p class="en"><span class="w" data-s="3712" data-e="4480">Mei</span> <span class="w" data-s="4523" data-e="4651">had</span> <span class="w" data-s="4693" data-e="4992">studied</span> <span class="w target" data-s="5035" data-e="5461" title="经济学；经济情况">economics</span> <span class="w" data-s="5504" data-e="5632">in</span> <span class="w" data-s="5675" data-e="5717">the</span> <span class="w" data-s="5760" data-e="5888">city,</span> <span class="w" data-s="6101" data-e="6272">and</span> <span class="w" data-s="6315" data-e="6699">she</span> <span class="w" data-s="6741" data-e="6869">came</span> <span class="w" data-s="6912" data-e="7125">home</span> <span class="w" data-s="7168" data-e="7296">with</span> <span class="w" data-s="7339" data-e="7424">a</span> <span class="w" data-s="7467" data-e="7552">bright</span> <span class="w target" data-s="7595" data-e="8021" title="观点；前景；景色；世界观；人生观">outlook</span> <span class="w" data-s="8064" data-e="8363">and</span> <span class="w" data-s="8448" data-e="8619">new</span> <span class="w" data-s="8661" data-e="8832">ideas.</span></p><p class="zh">梅在城里学过经济学，回家时带着光明的前景和一脑子新想法。</p></div>
+<div class="pair" data-s0="9779" data-s1="13491"><p class="en"><span class="w" data-s="9779" data-e="9950">In</span> <span class="w" data-s="9992" data-e="10120">her</span> <span class="w" data-s="10163" data-e="10291">first</span> <span class="w" data-s="10334" data-e="10547">week</span> <span class="w" data-s="10590" data-e="10846">she</span> <span class="w" data-s="10888" data-e="11016">had</span> <span class="w target" data-s="11059" data-e="11443" title="俯瞰，俯视；忽略，忽视">overlooked</span> <span class="w" data-s="11486" data-e="11614">the</span> <span class="w" data-s="11656" data-e="11784">price</span> <span class="w" data-s="11827" data-e="11998">of</span> <span class="w" data-s="12040" data-e="12168">sugar</span> <span class="w" data-s="12211" data-e="12510">and</span> <span class="w" data-s="12552" data-e="12723">the</span> <span class="w" data-s="12766" data-e="12894">mood</span> <span class="w" data-s="12936" data-e="13064">of</span> <span class="w" data-s="13107" data-e="13150">the</span> <span class="w" data-s="13192" data-e="13491">workers.</span></p><p class="zh">头一个星期，她就忽略了两件事：糖的价钱和工人们的心情。</p></div>
+<div class="pair" data-s0="13704" data-s1="18696"><p class="en"><span class="w" data-s="13704" data-e="14515">Daily</span> <span class="w target" data-s="14558" data-e="14899" title="">output</span> <span class="w" data-s="14942" data-e="15112">was</span> <span class="w" data-s="15155" data-e="15326">three</span> <span class="w" data-s="15368" data-e="15624">hundred</span> <span class="w" data-s="15667" data-e="16008">jars,</span> <span class="w" data-s="16264" data-e="16478">and</span> <span class="w" data-s="16606" data-e="16904">the</span> <span class="w" data-s="16947" data-e="17032">family</span> <span class="w target" data-s="17075" data-e="17544" title="">income</span> <span class="w" data-s="17587" data-e="18014">depended</span> <span class="w" data-s="18056" data-e="18270">on</span> <span class="w" data-s="18312" data-e="18440">every</span> <span class="w" data-s="18483" data-e="18696">one.</span></p><p class="zh">厂里每天产出三百罐，全家的收入就靠这一罐一罐。</p></div>
+<div class="pair" data-s0="18995" data-s1="23432"><p class="en"><span class="w" data-s="18995" data-e="19166">That</span> <span class="w" data-s="19208" data-e="19422">winter</span> <span class="w" data-s="19464" data-e="19763">an</span> <span class="w target" data-s="19806" data-e="20147" title="(暴力、疾病等坏事的)爆发，突然发生">outbreak</span> <span class="w" data-s="20190" data-e="20275">of</span> <span class="w" data-s="20318" data-e="20446">flu</span> <span class="w" data-s="20488" data-e="20787">kept</span> <span class="w" data-s="20830" data-e="21000">half</span> <span class="w" data-s="21043" data-e="21299">the</span> <span class="w" data-s="21342" data-e="21555">workers</span> <span class="w" data-s="21598" data-e="21726">at</span> <span class="w" data-s="21768" data-e="21896">home,</span> <span class="w" data-s="22110" data-e="22280">and</span> <span class="w" data-s="22536" data-e="22664">the</span> <span class="w target" data-s="22707" data-e="22878" title="结果;效果">outcome</span> <span class="w" data-s="22920" data-e="23176">looked</span> <span class="w" data-s="23219" data-e="23432">poor.</span></p><p class="zh">那年冬天一场流感暴发，一半工人都留在家里，这一年的结果看起来很糟。</p></div>
+<div class="pair" data-s0="24415" data-s1="30644"><p class="en"><span class="w" data-s="24415" data-e="24500">A</span> <span class="w" data-s="24543" data-e="24799">rival</span> <span class="w" data-s="24841" data-e="25268">factory</span> <span class="w" data-s="25311" data-e="25524">across</span> <span class="w" data-s="25567" data-e="25823">the</span> <span class="w" data-s="25865" data-e="25993">river</span> <span class="w" data-s="26036" data-e="26292">began</span> <span class="w" data-s="26335" data-e="26548">to</span> <span class="w target" data-s="26591" data-e="26932" title="超过;赶上">overtake</span> <span class="w" data-s="26975" data-e="27188">them,</span> <span class="w" data-s="27401" data-e="27572">and</span> <span class="w" data-s="27700" data-e="27956">her</span> <span class="w" data-s="27999" data-e="28255">uncle,</span> <span class="w" data-s="28383" data-e="28681">once</span> <span class="w target" data-s="28767" data-e="29236" title="">generous,</span> <span class="w" data-s="29407" data-e="29919">stopped</span> <span class="w" data-s="29961" data-e="30388">lending</span> <span class="w" data-s="30431" data-e="30644">money.</span></p><p class="zh">河对岸的对手厂开始赶超他们，一向慷慨的叔叔也不再借钱了。</p></div>
+<div class="pair" data-s0="30857" data-s1="33503"><p class="en"><span class="w" data-s="30857" data-e="31497">Mei</span> <span class="w" data-s="31540" data-e="31625">was</span> <span class="w" data-s="31668" data-e="31796">not</span> <span class="w target" data-s="31839" data-e="32223" title="贪吃的;贪婪的">greedy,</span> <span class="w" data-s="32351" data-e="32521">but</span> <span class="w" data-s="32649" data-e="32777">she</span> <span class="w" data-s="32820" data-e="33076">hated</span> <span class="w" data-s="33119" data-e="33289">to</span> <span class="w" data-s="33332" data-e="33503">lose.</span></p><p class="zh">梅并不贪婪，但她讨厌输。</p></div>
+<div class="pair" data-s0="34197" data-s1="37184"><p class="en"><span class="w" data-s="34197" data-e="34325">She</span> <span class="w" data-s="34368" data-e="34539">worked</span> <span class="w target" data-s="34581" data-e="35051" title="加班；加班的时间">overtime</span> <span class="w" data-s="35093" data-e="35392">and</span> <span class="w" data-s="35435" data-e="35947">stayed</span> <span class="w" data-s="35989" data-e="36075">in</span> <span class="w" data-s="36117" data-e="36160">the</span> <span class="w" data-s="36203" data-e="36331">office</span> <span class="w" data-s="36373" data-e="36715">until</span> <span class="w" data-s="36757" data-e="37184">midnight.</span></p><p class="zh">她开始加班，在办公室一直待到半夜。</p></div>
+<div class="pair" data-s0="37397" data-s1="41579"><p class="en"><span class="w" data-s="37397" data-e="38080">Change</span> <span class="w" data-s="38123" data-e="38293">did</span> <span class="w" data-s="38336" data-e="38464">not</span> <span class="w" data-s="38507" data-e="38677">come</span> <span class="w target" data-s="38720" data-e="39104" title="忽然，一夜之间；在夜间，在晚上 adj.忽然的，一夜之间的；夜间的">overnight,</span> <span class="w" data-s="39275" data-e="39445">but</span> <span class="w" data-s="39701" data-e="39829">she</span> <span class="w" data-s="39872" data-e="39957">was</span> <span class="w" data-s="40000" data-e="40128">ready</span> <span class="w" data-s="40171" data-e="40384">to</span> <span class="w target" data-s="40427" data-e="40811" title="克服，战胜">overcome</span> <span class="w" data-s="40853" data-e="41024">her</span> <span class="w" data-s="41067" data-e="41195">own</span> <span class="w" data-s="41237" data-e="41579">pride.</span></p><p class="zh">改变不是一夜之间来的，但她已经准备好战胜自己的骄傲。</p></div>
+<div class="pair" data-s0="42199" data-s1="48087"><p class="en"><span class="w" data-s="42199" data-e="42327">An</span> <span class="w" data-s="42369" data-e="42497">old</span> <span class="w target" data-s="42540" data-e="42924" title="经济学家；经济专家">economist</span> <span class="w" data-s="42967" data-e="43180">on</span> <span class="w" data-s="43223" data-e="43265">the</span> <span class="w" data-s="43308" data-e="43393">same</span> <span class="w target" data-s="43436" data-e="43820" title="大街，林荫大道；方法，途径">avenue</span> <span class="w" data-s="43863" data-e="43948">gave</span> <span class="w" data-s="43991" data-e="44161">her</span> <span class="w" data-s="44204" data-e="44289">one</span> <span class="w" data-s="44332" data-e="44503">piece</span> <span class="w" data-s="44545" data-e="44673">of</span> <span class="w" data-s="44716" data-e="44887">advice:</span> <span class="w" data-s="45313" data-e="45697">&quot;Be</span> <span class="w target" data-s="45740" data-e="46337" title="经济的；实惠的；节俭的；简洁的">economical.</span> <span class="w" data-s="46679" data-e="46849">Buy</span> <span class="w" data-s="46892" data-e="47063">less,</span> <span class="w" data-s="47319" data-e="47532">fix</span> <span class="w" data-s="47703" data-e="48087">more.&quot;</span></p><p class="zh">同一条大街上的一位老经济学家给了她一句建议：“要节俭。少买，多修。”</p></div>
+<div class="pair" data-s0="48556" data-s1="54444"><p class="en"><span class="w" data-s="48556" data-e="49111">She</span> <span class="w" data-s="49153" data-e="49324">found</span> <span class="w" data-s="49367" data-e="49537">a</span> <span class="w" data-s="49580" data-e="50007">second-hand</span> <span class="w" data-s="50049" data-e="50263">machine</span> <span class="w" data-s="50305" data-e="50604">that</span> <span class="w" data-s="50647" data-e="50775">was</span> <span class="w" data-s="50817" data-e="51073">cheaper</span> <span class="w" data-s="51116" data-e="51244">to</span> <span class="w target" data-s="51287" data-e="51543" title="运转，工作；操作；控制；使运行；动手术 第六单元">operate,</span> <span class="w" data-s="51713" data-e="51884">and</span> <span class="w" data-s="52225" data-e="52396">two</span> <span class="w" data-s="52439" data-e="52823">workers</span> <span class="w" data-s="52865" data-e="52993">to</span> <span class="w target" data-s="53036" data-e="53463" title="(熟练地)操作，使用；(暗中)控制，操纵；影响">manipulate</span> <span class="w" data-s="53505" data-e="53633">the</span> <span class="w" data-s="53676" data-e="53761">heavy</span> <span class="w target" data-s="53804" data-e="54060" title="模具；铸模；(独特)类型，个性，风格 v.(用 模具)浇铸，塑造；对……影响重大；将……塑 造成">mould</span> <span class="w" data-s="54103" data-e="54273">with</span> <span class="w" data-s="54316" data-e="54444">her.</span></p><p class="zh">她找到一台二手机器，运转起来更省钱，还请了两名工人和她一起操作沉重的模具。</p></div>
+<div class="pair" data-s0="55267" data-s1="59662"><p class="en"><span class="w" data-s="55267" data-e="55395">The</span> <span class="w" data-s="55438" data-e="55566">old</span> <span class="w" data-s="55608" data-e="55779">iron</span> <span class="w target" data-s="55822" data-e="56120" title="酒吧；(长方形)条，块；带；棒 v.(用铁条或 木条)封，堵；阻挡；拦住；禁止">bar</span> <span class="w" data-s="56163" data-e="56419">in</span> <span class="w" data-s="56462" data-e="56504">the</span> <span class="w" data-s="56547" data-e="56846">doorway,</span> <span class="w" data-s="57016" data-e="57230">which</span> <span class="w" data-s="57358" data-e="57528">had</span> <span class="w" data-s="57571" data-e="57784">blocked</span> <span class="w" data-s="57827" data-e="57955">the</span> <span class="w" data-s="57998" data-e="58040">door</span> <span class="w" data-s="58083" data-e="58254">for</span> <span class="w" data-s="58296" data-e="58467">years,</span> <span class="w" data-s="58766" data-e="59064">was</span> <span class="w" data-s="59150" data-e="59320">taken</span> <span class="w" data-s="59363" data-e="59662">away.</span></p><p class="zh">门框上那根挡了多年的旧铁条，终于被取了下来。</p></div>
+<div class="pair" data-s0="59918" data-s1="65166"><p class="en"><span class="w" data-s="59918" data-e="60643">The</span> <span class="w target" data-s="60686" data-e="61070" title="屏障；障碍物；阻力；关卡；分界线；隔阂">barrier</span> <span class="w" data-s="61112" data-e="61283">between</span> <span class="w" data-s="61326" data-e="61496">the</span> <span class="w" data-s="61539" data-e="61710">office</span> <span class="w" data-s="61752" data-e="61966">and</span> <span class="w" data-s="62008" data-e="62094">the</span> <span class="w" data-s="62136" data-e="62392">workshop</span> <span class="w" data-s="62435" data-e="62648">fell</span> <span class="w" data-s="62691" data-e="62904">with</span> <span class="w" data-s="62947" data-e="63075">it,</span> <span class="w" data-s="63203" data-e="63331">and</span> <span class="w" data-s="63630" data-e="63715">the</span> <span class="w" data-s="63758" data-e="63843">two</span> <span class="w" data-s="63886" data-e="64056">sides</span> <span class="w" data-s="64099" data-e="64440">began</span> <span class="w" data-s="64483" data-e="64696">to</span> <span class="w target" data-s="64739" data-e="65166" title="合作；协作">cooperate.</span></p><p class="zh">办公室和车间之间的屏障也随之倒下，两边开始合作。</p></div>
+<div class="pair" data-s0="65422" data-s1="69944"><p class="en"><span class="w" data-s="65422" data-e="65550">She</span> <span class="w" data-s="65592" data-e="65763">asked</span> <span class="w" data-s="65806" data-e="65934">a</span> <span class="w" data-s="65976" data-e="66275">neighbouring</span> <span class="w" data-s="66318" data-e="66446">firm</span> <span class="w" data-s="66488" data-e="66702">to</span> <span class="w target" data-s="66744" data-e="67171" title="合作；协作">collaborate</span> <span class="w" data-s="67214" data-e="67342">on</span> <span class="w" data-s="67384" data-e="67726">delivery,</span> <span class="w" data-s="67896" data-e="68067">and</span> <span class="w" data-s="68238" data-e="68622">together</span> <span class="w" data-s="68664" data-e="68920">they</span> <span class="w" data-s="68963" data-e="69091">opened</span> <span class="w" data-s="69134" data-e="69304">a</span> <span class="w" data-s="69347" data-e="69475">small</span> <span class="w target" data-s="69518" data-e="69944" title="出口，出路；分销店；发泄方式">outlet.</span></p><p class="zh">她请隔壁厂子合作送货，两家一起开了家小小的分销店。</p></div>
+<div class="pair" data-s0="70675" data-s1="76520"><p class="en"><span class="w" data-s="70675" data-e="70760">The</span> <span class="w target" data-s="70803" data-e="71016" title="工业；生产制造；行业；勤奋；勤劳">industry</span> <span class="w" data-s="71059" data-e="71357">was</span> <span class="w" data-s="71400" data-e="71613">slow,</span> <span class="w" data-s="71955" data-e="72211">and</span> <span class="w target" data-s="72381" data-e="73107" title="生产率；生产效率">productivity</span> <span class="w" data-s="73149" data-e="73320">rose</span> <span class="w" data-s="73363" data-e="73704">by</span> <span class="w" data-s="73747" data-e="73875">a</span> <span class="w" data-s="73917" data-e="74003">few</span> <span class="w" data-s="74045" data-e="74216">jars</span> <span class="w" data-s="74259" data-e="74472">a</span> <span class="w" data-s="74515" data-e="74600">day,</span> <span class="w" data-s="74771" data-e="75027">but</span> <span class="w" data-s="75325" data-e="75496">the</span> <span class="w target" data-s="75539" data-e="75880" title="(到期)未付的，未做的；延误的">overdue</span> <span class="w" data-s="75923" data-e="76221">debts</span> <span class="w" data-s="76264" data-e="76349">were</span> <span class="w" data-s="76392" data-e="76520">paid.</span></p><p class="zh">这个行业进展缓慢，生产力每天只多出几罐，但拖欠的债慢慢还清了。</p></div>
+<div class="pair" data-s0="76861" data-s1="82195"><p class="en"><span class="w" data-s="76861" data-e="77459">By</span> <span class="w" data-s="77501" data-e="77715">spring</span> <span class="w" data-s="77757" data-e="78099">the</span> <span class="w" data-s="78141" data-e="78312">local</span> <span class="w target" data-s="78355" data-e="78739" title="经济；经济情况；经济结构；(就经济体制而 言)国家；经济制度">economy</span> <span class="w" data-s="78781" data-e="78995">had</span> <span class="w" data-s="79037" data-e="79251">turned,</span> <span class="w" data-s="79464" data-e="79848">and</span> <span class="w" data-s="79976" data-e="80104">the</span> <span class="w" data-s="80147" data-e="80445">factory</span> <span class="w" data-s="80488" data-e="80659">began</span> <span class="w" data-s="80701" data-e="80915">to</span> <span class="w target" data-s="80957" data-e="81213" title="生产；制造，造出；出示；展现；使出现 n. 产品；(尤指)农产品">produce</span> <span class="w" data-s="81256" data-e="81427">more</span> <span class="w" data-s="81469" data-e="81768">jam</span> <span class="w" data-s="81811" data-e="82024">than</span> <span class="w" data-s="82067" data-e="82195">ever.</span></p><p class="zh">到了春天，当地经济好转，厂里产的果酱比以往任何时候都多。</p></div>
+<div class="pair" data-s0="82451" data-s1="85651"><p class="en"><span class="w target" data-s="82451" data-e="82621" title="">Gross</span> <span class="w target" data-s="82664" data-e="83005" title="">income</span> <span class="w" data-s="83048" data-e="83219">was</span> <span class="w" data-s="83261" data-e="83432">still</span> <span class="w" data-s="83475" data-e="83688">small,</span> <span class="w" data-s="83987" data-e="84157">but</span> <span class="w" data-s="84456" data-e="84669">nobody</span> <span class="w" data-s="84712" data-e="85224">counted</span> <span class="w" data-s="85267" data-e="85395">only</span> <span class="w" data-s="85437" data-e="85651">money.</span></p><p class="zh">总收入仍然不多，但家里没人只算钱。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">avenue</span>
+          <span class="ipa">/&#x27;ævənu:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">大街，林荫大道；方法，途径</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood on a wide avenue at the edge of town</div>          <div class="mnem"><span class="lbl">记</span>venue 想成 Venus，维纳斯是美 神，就是很美的女人。你今天在哪里遇见了一 个(a)维纳斯(Venus)，在“大街”上遇见的啊。</div>          <div class="root"><span class="lbl">根</span>a(向) + venue(来，拉丁 venire) → 通向某处的路 → 大街</div>          <div class="zt"><span class="lbl">真题</span>Dutt aims to open up fresh avenues for women post-doctors to join in research work. Dutt 旨在为女性博士后参与研究工作开辟新的途径。</div>          <div class="fam"><span class="lbl">族</span>venue n. 场地 / street n. 街道</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">income</span>
+          <span class="ipa">/&#x27;ınk^m/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the family income depended on every one</div>          <div class="root"><span class="lbl">根</span>in(进来) + come(来) → 进到手里的钱 → 收入</div>          <div class="zt"><span class="lbl">真题</span>As incomes rise among low-income consumers, the potential for further grain consumption is huge. 随着低收入消费者收入 的增加，粮食消费的潜力是巨大的。(2016) (140)</div>          <div class="fam"><span class="lbl">族</span>come in 进来 / outcome n. 结果</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">gross</span>
+          <span class="ipa">/grəus/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Gross income was still small</div>          <div class="mnem"><span class="lbl">记</span>发音类似“割肉死”。古代的凌 迟是民间所说的“千刀万剐”，将人身上的肉一 刀刀割去，这是很“严重的”处罚。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：gross income 总收入 → 总的，毛的</div>          <div class="zt"><span class="lbl">真题</span>The main measure of economic progress is the gross national product(GNP). 衡量经济 发展的主要标准是国民生产总值(GNP)。</div>          <div class="fam"><span class="lbl">族</span>grossly adv. 严重地 / net adj. 净的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">outcome</span>
+          <span class="ipa">/&#x27;autkam/</span>
+          <span class="pos">n.</span>
+          <span class="cn">结果;效果</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the outcome looked poor</div>          <div class="root"><span class="lbl">根</span>out(出来) + come(来) → 最后出来的东西 → 结果</div>          <div class="zt"><span class="lbl">真题</span>The outcome of the game should not be more important than the process of learning the sport. 比赛的结果不应比学习这项运动的 过程更重要。</div>          <div class="fam"><span class="lbl">族</span>come out 出来 / income n. 收入</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">outbreak</span>
+          <span class="ipa">/&#x27;autbrerk/</span>
+          <span class="pos"></span>
+          <span class="cn">(暴力、疾病等坏事的)爆发，突然发生</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an outbreak of flu kept half the workers at home</div>          <div class="mnem"><span class="lbl">记</span>out(出来)+ break(打)→打出 来→爆发。</div>          <div class="root"><span class="lbl">根</span>out(出来) + break(破) → 破出来 → 爆发</div>          <div class="zt"><span class="lbl">真题</span>Due to this arctic outbreak and concerns for the safety of USPS employees, the Postal Service is suspending delivery Jan. 由于寒潮爆 发和对美国邮政员工安全的担忧，邮政服务将 于一月份暂停投递。</div>          <div class="fam"><span class="lbl">族</span>break out 爆发 / outburst n. 爆发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">outlet</span>
+          <span class="ipa">/&#x27;autlet/</span>
+          <span class="pos">n.</span>
+          <span class="cn">出口，出路；分销店；发泄方式</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>opened a small outlet</div>          <div class="mnem"><span class="lbl">记</span>让(let)它出来(out)，需要一个 “出口”啊。</div>          <div class="root"><span class="lbl">根</span>out(出) + let(让) → 让出来的地方 → 出口，分销店</div>          <div class="zt"><span class="lbl">真题</span>Lion dance is more than just tradition, it provides a creative outlet. 舞狮不仅仅是传统， 它还提供了一种创造性的发泄方式。(2023)</div>          <div class="fam"><span class="lbl">族</span>let out 放出 / outlet store n. 折扣店</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">outlook</span>
+          <span class="ipa">/&#x27;autluk/</span>
+          <span class="pos">n.</span>
+          <span class="cn">观点；前景；景色；世界观；人生观</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a bright outlook and new ideas</div>          <div class="mnem"><span class="lbl">记</span>该单词其实就是“往外(out)看 (look)”啊，那看到的不就是“风景，景色”吗？你 看东西的立场不就是你的“观点”和“人生观”吗？</div>          <div class="root"><span class="lbl">根</span>out(向外) + look(看) → 向外看到的 → 观点；前景</div>          <div class="zt"><span class="lbl">真题</span>Professor Goel has a much rosier outlook on the future of AI. 戈埃尔教授对人工智能的 前景更加乐观。 第六单元</div>          <div class="fam"><span class="lbl">族</span>lookout n. 瞭望 / look out 当心</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">output</span>
+          <span class="ipa">/&#x27;autput/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Daily output was three hundred jars</div>          <div class="mnem"><span class="lbl">记</span>往外(out)放(put)的→产量，输 出量。</div>          <div class="root"><span class="lbl">根</span>out(出) + put(放) → 放出来的量 → 产量</div>          <div class="zt"><span class="lbl">真题</span>Focusing on output alone can have unintended consequences. 只关注产出可能会产 生意想不到的后果。(2022)</div>          <div class="fam"><span class="lbl">族</span>input n. 输入 / put out 生产</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">overcome</span>
+          <span class="ipa">/iəuvə&#x27;kam/</span>
+          <span class="pos">v.</span>
+          <span class="cn">克服，战胜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>ready to overcome her own pride</div>          <div class="mnem"><span class="lbl">记</span>从上面(over)来(come)，你飞 着来到现场，飞是需要“克服”空气阻力的。</div>          <div class="root"><span class="lbl">根</span>over(越过) + come(来) → 越过障碍走过来 → 克服</div>          <div class="zt"><span class="lbl">真题</span>Focusing on effort is effective in helping children overcome frustration and achieve success. 专注于努力对帮助孩子克服挫折并取 得成功是有效的。(2016)</div>          <div class="fam"><span class="lbl">族</span>overcame v. 克服(过去式) / conquer v. 战胜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">overlook</span>
+          <span class="ipa">/əuvə&#x27;luk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">俯瞰，俯视；忽略，忽视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she had overlooked the price of sugar</div>          <div class="mnem"><span class="lbl">记</span>从上面（over）看（look），就是 “俯视，俯瞰”；并且由于没有深入基层，也容易 “忽略，忽视”很多重要的问题。</div>          <div class="root"><span class="lbl">根</span>over(在上) + look(看) → 从上往下看 → 俯瞰；忽略</div>          <div class="zt"><span class="lbl">真题</span>The wide diversity of Asian Americans was overlooked. 亚裔美国人的广泛多样性被忽 视了。(2020)</div>          <div class="fam"><span class="lbl">族</span>look over 检查 / oversight n. 疏忽</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">overnight</span>
+          <span class="ipa">/iəuvər&#x27;nait, &#x27;əuvərnait/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">忽然，一夜之间；在夜间，在晚上 adj.忽然的，一夜之间的；夜间的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Change did not come overnight</div>          <div class="root"><span class="lbl">根</span>over(跨越) + night(夜) → 跨过一夜 → 一夜之间</div>          <div class="zt"><span class="lbl">真题</span>How did Hetty Green become rich overnight? 海蒂·格林是如何一夜暴富的？(2014)</div>          <div class="fam"><span class="lbl">族</span>overnight stay n. 过夜 / night n. 夜晚</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">overtake</span>
+          <span class="ipa">/iəuvər&#x27;terk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">超过;赶上</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to overtake them</div>          <div class="mnem"><span class="lbl">记</span>从上面(over)拿着(take)，看过 雄鹰从上面直冲下来抓小动物的样子吗？雄鹰 一定要“赶上”这个小动物，要不怎么抓住它呢？</div>          <div class="root"><span class="lbl">根</span>over(越过) + take(拿) → 超过去拿 → 赶上，超过</div>          <div class="zt"><span class="lbl">真题</span>Decades ago, Kodak anticipated that digital photography would overtake film. 几+ (141) 年前，柯达就预见到数码摄影将取代胶片摄影。</div>          <div class="fam"><span class="lbl">族</span>took over 接管 / overtook v. 超过(过去式)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">overtime</span>
+          <span class="ipa">/&#x27;əuvərtaim/</span>
+          <span class="pos">n.</span>
+          <span class="cn">加班；加班的时间</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She worked overtime</div>          <div class="root"><span class="lbl">根</span>over(超过) + time(时间) → 超过正常时间 → 加班</div>          <div class="zt"><span class="lbl">真题</span>He thinks he deserves extra pay for overtime. 他认为他应该得到加班费。(2016)</div>          <div class="fam"><span class="lbl">族</span>part-time adj. 兼职的 / full-time adj. 全职的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">overdue</span>
+          <span class="ipa">/iəuvə&#x27;dju:/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(到期)未付的，未做的；延误的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the overdue debts were paid</div>          <div class="mnem"><span class="lbl">记</span>上面(over)有很多的因为(due)， 因为有很多原因，所以“延误”了。</div>          <div class="root"><span class="lbl">根</span>over(超过) + due(到期的) → 超过期限的 → 延误的</div>          <div class="zt"><span class="lbl">真题</span>That&#x27;s an important development, one that&#x27;s long overdue. 那是一项重要的进展，一项 姗姗来迟的进展。</div>          <div class="fam"><span class="lbl">族</span>due adj. 到期的 / due date n. 到期日</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">economy</span>
+          <span class="ipa">/1&#x27;ka:nəmi/</span>
+          <span class="pos">n.</span>
+          <span class="cn">经济；经济情况；经济结构；(就经济体制而 言)国家；经济制度</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the local economy had turned</div>          <div class="root"><span class="lbl">根</span>eco(家，希腊 oikos) + nomy(管理) → 管家之道 → 经济</div>          <div class="zt"><span class="lbl">真题</span>They organize a series of seminars on world economy. 他们组织了一系列关于世界经 济的研讨会。</div>          <div class="fam"><span class="lbl">族</span>economic adj. 经济的 / economize v. 节约</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">economics</span>
+          <span class="ipa">/i:kə&#x27;na:mıks/</span>
+          <span class="pos">n.</span>
+          <span class="cn">经济学；经济情况</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mei had studied economics in the city</div>          <div class="root"><span class="lbl">根</span>economy(经济) + ics(学科) → 经济学</div>          <div class="zt"><span class="lbl">真题</span>She rented her economics and statistics textbooks for about $ 20 each. 她租的经济学 和统计学课本每本大约 20 美元。(2018)</div>          <div class="fam"><span class="lbl">族</span>economist n. 经济学家 / economical adj. 节俭的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">economist</span>
+          <span class="ipa">/ı&#x27;ka:nəmist/</span>
+          <span class="pos"></span>
+          <span class="cn">经济学家；经济专家</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>An old economist on the same avenue</div>          <div class="root"><span class="lbl">根</span>economy(经济) + ist(人) → 研究经济的人 → 经济学家</div>          <div class="zt"><span class="lbl">真题</span>It is the concern of contemporary economists. 这是当代经济学家关注的问题。(2015)</div>          <div class="fam"><span class="lbl">族</span>economy n. 经济 / economics n. 经济学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">economical</span>
+          <span class="ipa">/iekə&#x27;na:mıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">经济的；实惠的；节俭的；简洁的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Be economical. Buy less, fix more</div>          <div class="mnem"><span class="lbl">记</span>这个单词最后一个音节发音类 似“抠”，抠就是小气啊，不愿意花钱→节俭的。</div>          <div class="root"><span class="lbl">根</span>economy(节约) + cal → 会过日子的 → 节俭的</div>          <div class="zt"><span class="lbl">真题</span>It should become more economical, and should not be powered by the gasoline engine. 它应该变得更经济，而且不应该由汽油发动机 驱动。</div>          <div class="fam"><span class="lbl">族</span>economically adv. 节约地 / economy n. 经济</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">generous</span>
+          <span class="ipa">/&#x27;dzenərəs/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her uncle, once generous, stopped lending money</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“姐弄肉丝”。 去姐姐家做客，姐姐给你炒了一大盘鱼香肉丝， 姐姐是不是很“慷慨的”？</div>          <div class="root"><span class="lbl">根</span>gener(出生，拉丁 genus) + ous → 出身高贵的 → 慷慨的</div>          <div class="zt"><span class="lbl">真题</span>Colleges often offer the most generous packages during freshman year as a way to attract new students. 为了吸引新生，大学通常 会在大一学年提供最慷慨的福利。(2022)</div>          <div class="fam"><span class="lbl">族</span>generosity n. 慷慨 / generously adv. 大方地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">greedy</span>
+          <span class="ipa">/&#x27;gri:di/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">贪吃的;贪婪的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mei was not greedy</div>          <div class="mnem"><span class="lbl">记</span>那只绿色的(gree想成 green） 怪物，就要撑“死”了(dy想成 die 死)→贪吃的。</div>          <div class="root"><span class="lbl">根</span>greed(贪心) + y → 贪心的</div>          <div class="zt"><span class="lbl">真题</span>Mr. Spears was known as a greedy man in his community. 斯皮尔斯先生在他所在的社 区里被认为是一个贪婪的人。</div>          <div class="fam"><span class="lbl">族</span>greed n. 贪婪 / greedily adv. 贪婪地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">produce</span>
+          <span class="ipa">/prə&#x27;du:s,&#x27;prəudu:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">生产；制造，造出；出示；展现；使出现 n. 产品；(尤指)农产品</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to produce more jam than ever</div>          <div class="root"><span class="lbl">根</span>pro(向前) + duc(引导) + e → 向前引出来 → 生产</div>          <div class="zt"><span class="lbl">真题</span>A quarter of this year&#x27;s American grain harvest will be used to produce bio-fuel for cars.今年美国谷物收成的四分之一将用于生产 汽车生物燃料。(2016)</div>          <div class="fam"><span class="lbl">族</span>product n. 产品 / production n. 生产</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">productivity</span>
+          <span class="ipa">/ipra:dak&#x27;tivəti/</span>
+          <span class="pos"></span>
+          <span class="cn">生产率；生产效率</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>productivity rose by a few jars a day</div>          <div class="root"><span class="lbl">根</span>product(产品) + ivity(能力) → 出产品的能力 → 生产力</div>          <div class="zt"><span class="lbl">真题</span>The unions will try to increase productivity.工会将努力提高生产力。</div>          <div class="fam"><span class="lbl">族</span>productive adj. 多产的 / product n. 产品</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">industry</span>
+          <span class="ipa">/&#x27;indəstri/</span>
+          <span class="pos"></span>
+          <span class="cn">工业；生产制造；行业；勤奋；勤劳</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The industry was slow</div>          <div class="mnem"><span class="lbl">记</span>industry意为“工业，产业，行 业”，你说哪个行业不辛苦？所以该单词还有一 个意思是“勤奋，勤劳”。</div>          <div class="root"><span class="lbl">根</span>indu(在内) + stry(建造) → 在里面建造 → 工业；勤奋</div>          <div class="zt"><span class="lbl">真题</span>The food industry plays a major role in fighting obesity. 食品工业在对抗肥胖方面扮演 着重要角色。(2021)</div>          <div class="fam"><span class="lbl">族</span>industrial adj. 工业的 / industrious adj. 勤奋的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">mould</span>
+          <span class="ipa">/məuld/</span>
+          <span class="pos">n.</span>
+          <span class="cn">模具；铸模；(独特)类型，个性，风格 v.(用 模具)浇铸，塑造；对……影响重大；将……塑 造成</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>to manipulate the heavy mould with her</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“模的”，那就 是用“模具”做的呗。</div>          <div class="root"><span class="lbl">根</span>联想：发音像“模的” → 用模具做出来的 → 模具；塑造</div>          <div class="zt"><span class="lbl">真题</span>A clay mould is used for casting bronze statues. 用黏土模具来浇铸青铜塑像。</div>          <div class="fam"><span class="lbl">族</span>mould v. 塑造 / moulded adj. 模制的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">manipulate</span>
+          <span class="ipa">/mə&#x27;nipjulert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(熟练地)操作，使用；(暗中)控制，操纵；影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>two workers to manipulate the heavy mould</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“摸你扑了 它”。这里的它不要想成是人，就想成工作吧。 你干着一份工作，还想扑向另一份工作，说明你 能“熟练地操作”(要不然两份工作一起做，会把 人弄疯的）。</div>          <div class="root"><span class="lbl">根</span>mani(手) + pul(拉) + ate → 用手摆弄 → 操作</div>          <div class="zt"><span class="lbl">真题</span>Several studies have implied that emotional intelligence can be used to manipulate others for personal gains. 几项研究表明，情商可以用 来操纵他人以谋取个人利益。(2022)</div>          <div class="fam"><span class="lbl">族</span>manipulation n. 操纵 / manual adj. 手工的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">operate</span>
+          <span class="ipa">/&#x27;a:pəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">运转，工作；操作；控制；使运行；动手术 第六单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>that was cheaper to operate</div>          <div class="root"><span class="lbl">根</span>oper(工作，拉丁 opus) + ate → 干活 → 运转；动手术</div>          <div class="zt"><span class="lbl">真题</span>Those who want to use computers should know how computers operate. 那些想要使用电 脑的人应该知道电脑是如何运转的。</div>          <div class="fam"><span class="lbl">族</span>operation n. 操作；手术 / operator n. 操作员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">cooperate</span>
+          <span class="ipa">/kəu&#x27;a:pəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">合作；协作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the two sides began to cooperate</div>          <div class="root"><span class="lbl">根</span>co(共同) + operate(工作) → 一起干 → 合作</div>          <div class="zt"><span class="lbl">真题</span>They cooperated well with the police. 他 们与警方合作得很好。(2022)</div>          <div class="fam"><span class="lbl">族</span>cooperation n. 合作 / cooperative adj. 合作的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">collaborate</span>
+          <span class="ipa">/kə&#x27;læbəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">合作；协作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked a neighbouring firm to collaborate on delivery</div>          <div class="mnem"><span class="lbl">记</span>col(一起)+labor(劳动)十ate (动词后缀)→一起劳动→合作。</div>          <div class="root"><span class="lbl">根</span>col(一起) + labor(劳动) + ate → 一起劳动 → 合作</div>          <div class="zt"><span class="lbl">真题</span>They collaborated on building the first space coffee machine. 他们合作建造了第一台 太空咖啡机。</div>          <div class="fam"><span class="lbl">族</span>collaboration n. 合作 / colleague n. 同事</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">bar</span>
+          <span class="ipa">/ba:r/</span>
+          <span class="pos">n.</span>
+          <span class="cn">酒吧；(长方形)条，块；带；棒 v.(用铁条或 木条)封，堵；阻挡；拦住；禁止</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old iron bar in the doorway</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a bar of chocolate 一条巧克力 → 条，棒</div>          <div class="fam"><span class="lbl">族</span>bar n. 酒吧 / barrier n. 屏障</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">barrier</span>
+          <span class="ipa">/&#x27;bæriər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">屏障；障碍物；阻力；关卡；分界线；隔阂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The barrier between the office and the workshop</div>          <div class="mnem"><span class="lbl">记</span>我们知道bar的意思是“酒吧”， 事实上这个单词还意为“棒，木条”，因为西部电 影里的酒吧的门都是用木棒定制的。barrier就 是用木条做的东西→障碍物。</div>          <div class="root"><span class="lbl">根</span>bar(横木) + rier → 用横木拦起来 → 障碍物</div>          <div class="zt"><span class="lbl">真题</span>Language barriers can be a big obstacle. 语言障碍是一个很大的障碍。(2023)</div>          <div class="fam"><span class="lbl">族</span>bar n. 横木 / block v. 阻挡</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 6 · Day 37</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

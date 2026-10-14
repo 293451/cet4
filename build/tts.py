@@ -98,7 +98,15 @@ def synthesize(key: str, text: str, speed: float) -> tuple[bytes, list]:
 
 
 def _is_word_char(c: str) -> bool:
-    return c.isalnum() or c in "'’"
+    """
+    字母数字算词字符。**撇号和连字符不算** —— 这是实测踩出来的：
+
+    MiniMax 把 "Nina's" 拆成 ['N', 'ina', "'", 's']，撇号是**独立条目**。
+    如果把它当词内字符，原文的 core（'ninas'）和音节流（"Nina's"）就对不上，
+    第一个词就 break，后面全崩 —— 实测 Day 20 只还原出 9/273 词。
+    所以匹配时把撇号/连字符当分隔符跳过，双方都不带它们，自然对齐。
+    """
+    return c.isalnum()
 
 
 def merge_syllables(syllables: list, text: str) -> list[dict]:
@@ -148,7 +156,7 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
         # 引号的处理和原文不完全一致，一次错位就会让后面**全部**失败
         # （实测 Day 31 只还原出 2/241 词）。
         # 所以给自己留一点回旋：最多向前找 LOOKAHEAD 个字符宽度的窗口。
-        LOOKAHEAD = 12
+        LOOKAHEAD = 40
         match = None
         for probe in range(0, LOOKAHEAD + 1):
             p = j + probe
@@ -183,7 +191,38 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
                     "end": stream_time[last][1],
                 }
             )
+            # 跳过紧邻的重复条目。
+            #
+            # MiniMax 对**数字**会吐出重复条目：原文 "in 1960. He" 里
+            # 音节流是 [... 'in', ' ', '1960', '1960', ' ', 'He' ...]
+            # 匹配完第一个 1960 后指针停在第二个上，下一个词 He 就卡住了
+            # （实测 Day 20 只还原出 9/273 词）。
+            #
+            # ⚠️ 判据必须严格：吃掉的那段要**正好等于本词**，且后面紧跟词边界。
+            #    早期版本只看前缀就判重复，结果处理 "for forty years" 时
+            #    把 'for' 的重复误判成 'for'+'ty'，连 'ty' 一起吃掉，
+            #    导致 forty 整词丢失（实测 Day 11/12 因此各差 1 词）。
             j = q
+            dup = [c.lower() for c in want if _is_word_char(c)]
+            if dup:
+                p = j
+                while p < len(stream) and not _is_word_char(stream[p]):
+                    p += 1
+                k2 = 0
+                while p < len(stream) and k2 < len(dup):
+                    c = stream[p]
+                    if not _is_word_char(c):
+                        # 词内不允许出现分隔符，否则不算同一词
+                        break
+                    if c.lower() == dup[k2]:
+                        k2 += 1
+                        p += 1
+                    else:
+                        break
+                # 完整吃掉且到达词边界 —— 才算真的重复
+                at_boundary = p >= len(stream) or not _is_word_char(stream[p])
+                if k2 == len(dup) and at_boundary:
+                    j = p
         # 找不到就跳过这个词，指针不动 —— 让下一个词还有机会对齐
 
     return words
