@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 65 · The Table on the Plain</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 65 · 12/16 · Unit 10 第 1921-1950 词</div>
+  <h1>The Table on the Plain<span class="cn">平原上的餐桌</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-65.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4181"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="256">eating</span> <span class="w" data-s="299" data-e="555">house</span> <span class="w" data-s="597" data-e="853">stands</span> <span class="w" data-s="896" data-e="1195">alone</span> <span class="w" data-s="1237" data-e="1536">on</span> <span class="w" data-s="1579" data-e="1621">a</span> <span class="w" data-s="1664" data-e="1749">wide,</span> <span class="w" data-s="2048" data-e="2219">flat</span> <span class="w target" data-s="2261" data-e="2560" title="大平原，朴实无华的东西 adj.普通的，朴 素的，无装饰的；直接的；直截了当的">plain,</span> <span class="w" data-s="2859" data-e="3157">two</span> <span class="w" data-s="3243" data-e="3456">hours</span> <span class="w" data-s="3499" data-e="3840">from</span> <span class="w" data-s="3883" data-e="4053">the</span> <span class="w" data-s="4096" data-e="4181">sea.</span></p><p class="zh">这家小饭馆孤零零地立在平坦的大平原上，离海两小时车程。</p></div>
+<div class="pair" data-s0="4480" data-s1="8661"><p class="en"><span class="w" data-s="4480" data-e="5461">Behind</span> <span class="w" data-s="5504" data-e="5675">the</span> <span class="w" data-s="5717" data-e="5845">counter</span> <span class="w" data-s="5888" data-e="6315">hangs</span> <span class="w" data-s="6357" data-e="6400">an</span> <span class="w" data-s="6443" data-e="6571">old</span> <span class="w" data-s="6613" data-e="6827">picture</span> <span class="w" data-s="6869" data-e="7125">of</span> <span class="w" data-s="7168" data-e="7509">Marta&#x27;s</span> <span class="w" data-s="7552" data-e="7637">mother,</span> <span class="w target" data-s="7851" data-e="8320" title="画；油漆；绘画">painted</span> <span class="w" data-s="8363" data-e="8491">in</span> <span class="w" data-s="8533" data-e="8661">1978.</span></p><p class="zh">柜台后面的墙上挂着一张玛尔塔母亲的老照片，是 1978 年画的。</p></div>
+<div class="pair" data-s0="9988" data-s1="13529"><p class="en"><span class="w" data-s="9988" data-e="10073">The</span> <span class="w" data-s="10116" data-e="10457">colours</span> <span class="w" data-s="10500" data-e="10585">are</span> <span class="w" data-s="10628" data-e="10756">still</span> <span class="w target" data-s="10799" data-e="11140" title="生动的，逼真的；鲜艳的">vivid,</span> <span class="w" data-s="11353" data-e="11481">and</span> <span class="w" data-s="11737" data-e="11908">the</span> <span class="w" data-s="11951" data-e="12036">face</span> <span class="w" data-s="12079" data-e="12377">seems</span> <span class="w" data-s="12420" data-e="12548">to</span> <span class="w target" data-s="12591" data-e="12975" title="使具活力；使生气勃勃 adj.有生命的；有 活力的；有生气的">animate</span> <span class="w" data-s="13017" data-e="13103">the</span> <span class="w" data-s="13145" data-e="13273">whole</span> <span class="w" data-s="13316" data-e="13529">room.</span></p><p class="zh">颜色依旧鲜艳，那张脸仿佛让整个屋子都活了起来。</p></div>
+<div class="pair" data-s0="13743" data-s1="17625"><p class="en"><span class="w" data-s="13743" data-e="14852">Marta</span> <span class="w" data-s="14895" data-e="14980">says</span> <span class="w" data-s="15023" data-e="15236">the</span> <span class="w" data-s="15279" data-e="15407">picture</span> <span class="w" data-s="15449" data-e="15748">helped</span> <span class="w" data-s="15791" data-e="15961">the</span> <span class="w" data-s="16004" data-e="16132">family</span> <span class="w target" data-s="16175" data-e="16687" title="幸免于，幸存，生还">survive</span> <span class="w" data-s="16729" data-e="16900">three</span> <span class="w" data-s="16943" data-e="17199">hard</span> <span class="w" data-s="17241" data-e="17625">winters.</span></p><p class="zh">玛尔塔说，这张照片帮一家人熬过了三个艰难的冬天。</p></div>
+<div class="pair" data-s0="18354" data-s1="21768"><p class="en"><span class="w" data-s="18354" data-e="18525">Every</span> <span class="w" data-s="18568" data-e="18824">spring</span> <span class="w" data-s="18866" data-e="19250">she</span> <span class="w" data-s="19293" data-e="19592">tries</span> <span class="w" data-s="19634" data-e="19762">to</span> <span class="w target" data-s="19805" data-e="20018" title="复活，苏醒">revive</span> <span class="w" data-s="20061" data-e="20232">the</span> <span class="w target" data-s="20274" data-e="20573" title="">recipes</span> <span class="w" data-s="20616" data-e="20829">written</span> <span class="w" data-s="20872" data-e="21042">in</span> <span class="w" data-s="21085" data-e="21128">her</span> <span class="w" data-s="21170" data-e="21469">mother&#x27;s</span> <span class="w" data-s="21512" data-e="21768">notebook.</span></p><p class="zh">每年春天，她都试着把母亲笔记本上记下的食谱重新做出来。</p></div>
+<div class="pair" data-s0="21981" data-s1="27186"><p class="en"><span class="w" data-s="21981" data-e="22664">There</span> <span class="w" data-s="22706" data-e="22877">is</span> <span class="w target" data-s="22920" data-e="23176" title="猪肉">pork,</span> <span class="w target" data-s="23304" data-e="23773" title="牛肉；抱怨">beef</span> <span class="w" data-s="23816" data-e="24029">and</span> <span class="w target" data-s="24072" data-e="24413" title="">mutton</span> <span class="w" data-s="24456" data-e="24626">in</span> <span class="w" data-s="24669" data-e="24754">the</span> <span class="w" data-s="24797" data-e="24925">cold</span> <span class="w" data-s="24968" data-e="25181">room,</span> <span class="w" data-s="25394" data-e="25693">and</span> <span class="w target" data-s="25736" data-e="26418" title="海鲜">seafood</span> <span class="w" data-s="26461" data-e="26674">on</span> <span class="w" data-s="26717" data-e="27186">Fridays.</span></p><p class="zh">冷藏间里有猪肉、牛肉和羊肉；每到星期五还有海鲜。</p></div>
+<div class="pair" data-s0="27799" data-s1="31255"><p class="en"><span class="w" data-s="27799" data-e="27884">She</span> <span class="w" data-s="27927" data-e="28183">cuts</span> <span class="w" data-s="28225" data-e="28311">the</span> <span class="w" data-s="28353" data-e="28439">meat</span> <span class="w" data-s="28481" data-e="28652">into</span> <span class="w" data-s="28695" data-e="28823">thin</span> <span class="w target" data-s="28865" data-e="29292" title="薄片，小块，部分v.切，割，划">slices</span> <span class="w" data-s="29335" data-e="29676">and</span> <span class="w" data-s="29804" data-e="30188">drops</span> <span class="w" data-s="30231" data-e="30359">them</span> <span class="w" data-s="30401" data-e="30529">into</span> <span class="w" data-s="30572" data-e="30743">a</span> <span class="w" data-s="30785" data-e="30828">hot</span> <span class="w target" data-s="30871" data-e="31255" title="调味汁；酱">sauce.</span></p><p class="zh">她把肉切成薄片，丢进一锅热腾腾的酱汁里。</p></div>
+<div class="pair" data-s0="31425" data-s1="36161"><p class="en"><span class="w" data-s="31425" data-e="32065">On</span> <span class="w" data-s="32108" data-e="32236">the</span> <span class="w" data-s="32279" data-e="32407">side</span> <span class="w" data-s="32449" data-e="32705">she</span> <span class="w" data-s="32748" data-e="32961">puts</span> <span class="w" data-s="33004" data-e="33047">a</span> <span class="w" data-s="33089" data-e="33217">bowl</span> <span class="w" data-s="33260" data-e="33345">of</span> <span class="w target" data-s="33388" data-e="33644" title="油炸土豆条；芯片；(木头、玻璃等的)缺口，碎 片；筹码">chips,</span> <span class="w" data-s="33815" data-e="34071">an</span> <span class="w target" data-s="34113" data-e="34455" title="洋葱，洋葱头">onion</span> <span class="w" data-s="34497" data-e="34839">salad</span> <span class="w" data-s="34881" data-e="35095">and</span> <span class="w" data-s="35265" data-e="35436">a</span> <span class="w" data-s="35479" data-e="35521">plate</span> <span class="w" data-s="35564" data-e="35735">of</span> <span class="w target" data-s="35777" data-e="36161" title="零食，点心；小吃；快餐；易办到的事；小菜 一碟">snacks.</span></p><p class="zh">旁边再摆上一碗薯条、一份洋葱沙拉和一碟小零食。</p></div>
+<div class="pair" data-s0="36687" data-s1="41082"><p class="en"><span class="w target" data-s="36687" data-e="37029" title="&amp;. η.猜测，推测">Guests</span> <span class="w target" data-s="37071" data-e="37583" title="咀嚼，嚼碎">chew</span> <span class="w" data-s="37626" data-e="37882">slowly,</span> <span class="w target" data-s="38223" data-e="38821" title="舔;掠过；(火舌)舔食 n. 舔">lick</span> <span class="w" data-s="38863" data-e="38991">their</span> <span class="w" data-s="39034" data-e="39375">fingers</span> <span class="w" data-s="39418" data-e="39631">and</span> <span class="w" data-s="39674" data-e="39930">wipe</span> <span class="w" data-s="39973" data-e="40101">them</span> <span class="w" data-s="40143" data-e="40271">with</span> <span class="w" data-s="40314" data-e="40399">a</span> <span class="w" data-s="40442" data-e="40527">paper</span> <span class="w target" data-s="40570" data-e="41082" title="餐巾;餐巾纸">napkin.</span></p><p class="zh">客人慢慢咀嚼，最后舔舔手指，再用纸巾擦干净。</p></div>
+<div class="pair" data-s0="41253" data-s1="46202"><p class="en"><span class="w" data-s="41253" data-e="41594">They</span> <span class="w target" data-s="41722" data-e="42021" title="进餐；用饭">dine</span> <span class="w" data-s="42063" data-e="42277">at</span> <span class="w" data-s="42319" data-e="42405">the</span> <span class="w" data-s="42447" data-e="42533">long</span> <span class="w" data-s="42575" data-e="43045">wooden</span> <span class="w" data-s="43087" data-e="43258">table,</span> <span class="w" data-s="43514" data-e="43685">and</span> <span class="w" data-s="43727" data-e="44069">in</span> <span class="w" data-s="44111" data-e="44282">summer</span> <span class="w" data-s="44325" data-e="44623">they</span> <span class="w" data-s="44666" data-e="44837">eat</span> <span class="w" data-s="44879" data-e="45007">out</span> <span class="w" data-s="45050" data-e="45178">on</span> <span class="w" data-s="45221" data-e="45263">a</span> <span class="w target" data-s="45306" data-e="45605" title="郊游，野餐 v. 野餐">picnic</span> <span class="w" data-s="45647" data-e="45775">by</span> <span class="w" data-s="45818" data-e="45946">the</span> <span class="w" data-s="45989" data-e="46202">lake.</span></p><p class="zh">他们在长木桌边吃饭；到了夏天，就跑到湖边野餐。</p></div>
+<div class="pair" data-s0="46760" data-s1="49790"><p class="en"><span class="w" data-s="46760" data-e="46846">One</span> <span class="w" data-s="46888" data-e="47230">July</span> <span class="w" data-s="47272" data-e="47528">afternoon</span> <span class="w" data-s="47571" data-e="47870">her</span> <span class="w" data-s="47912" data-e="48339">grandson</span> <span class="w target" data-s="48382" data-e="48808" title="跳水；(头和两臂先入水)俯冲 .(头和双 臂先入水的)跳水，潜水，俯冲；突降，暴跌">dived</span> <span class="w" data-s="48851" data-e="48936">from</span> <span class="w" data-s="48979" data-e="49064">a</span> <span class="w" data-s="49107" data-e="49192">rock</span> <span class="w" data-s="49235" data-e="49491">into</span> <span class="w" data-s="49534" data-e="49662">the</span> <span class="w" data-s="49704" data-e="49790">water.</span></p><p class="zh">七月的一个下午，她的外孙从岩石上跳进水里。</p></div>
+<div class="pair" data-s0="50046" data-s1="53843"><p class="en"><span class="w" data-s="50046" data-e="50216">It</span> <span class="w" data-s="50430" data-e="50899">was</span> <span class="w" data-s="50942" data-e="51112">deep</span> <span class="w" data-s="51155" data-e="51326">and</span> <span class="w" data-s="51368" data-e="51496">cold,</span> <span class="w" data-s="51752" data-e="51966">and</span> <span class="w" data-s="52136" data-e="52307">for</span> <span class="w" data-s="52350" data-e="52435">a</span> <span class="w" data-s="52478" data-e="52606">second</span> <span class="w" data-s="52648" data-e="52862">he</span> <span class="w" data-s="52904" data-e="53032">was</span> <span class="w" data-s="53075" data-e="53118">sure</span> <span class="w" data-s="53160" data-e="53416">he</span> <span class="w" data-s="53459" data-e="53587">would</span> <span class="w target" data-s="53630" data-e="53843" title="淹死，溺死；沉浸于">drown.</span></p><p class="zh">水又深又凉，有一瞬间他确信自己会淹死。</p></div>
+<div class="pair" data-s0="54056" data-s1="58238"><p class="en"><span class="w" data-s="54056" data-e="54312">He</span> <span class="w" data-s="54611" data-e="54910">came</span> <span class="w" data-s="54952" data-e="55123">up</span> <span class="w" data-s="55166" data-e="55550">coughing,</span> <span class="w" data-s="55635" data-e="55848">and</span> <span class="w" data-s="56104" data-e="56488">rain</span> <span class="w" data-s="56531" data-e="56830">began</span> <span class="w" data-s="56872" data-e="57043">to</span> <span class="w target" data-s="57086" data-e="57256" title="倾倒；倒(饮料等);倾泻；倾盆而下">pour</span> <span class="w" data-s="57299" data-e="57512">on</span> <span class="w" data-s="57555" data-e="57598">the</span> <span class="w target" data-s="57640" data-e="57896" title="郊游，野餐 v. 野餐">picnic</span> <span class="w" data-s="57939" data-e="58238">cloth.</span></p><p class="zh">他咳着水浮了上来，雨也开始往野餐布上倾倒。</p></div>
+<div class="pair" data-s0="58795" data-s1="62763"><p class="en"><span class="w" data-s="58795" data-e="58923">That</span> <span class="w" data-s="58965" data-e="59179">year</span> <span class="w" data-s="59221" data-e="59435">the</span> <span class="w" data-s="59477" data-e="59605">price</span> <span class="w" data-s="59648" data-e="59819">of</span> <span class="w" data-s="59861" data-e="59989">meat</span> <span class="w target" data-s="60032" data-e="60501" title="使突然前冲(或下落)；骤降，猛跌 n.(突然 的)坠落；跳水，快速游泳；(价值或数量的)骤然 下跌">plunged,</span> <span class="w" data-s="60629" data-e="60928">but</span> <span class="w" data-s="61099" data-e="61525">Marta</span> <span class="w" data-s="61568" data-e="61696">still</span> <span class="w target" data-s="61739" data-e="62208" title="抱怨;埋怨;发牢骚">complained</span> <span class="w" data-s="62251" data-e="62421">about</span> <span class="w" data-s="62464" data-e="62635">the</span> <span class="w" data-s="62677" data-e="62763">cost.</span></p><p class="zh">那年肉价猛跌，可玛尔塔还是抱怨成本太高。</p></div>
+<div class="pair" data-s0="63104" data-s1="66688"><p class="en"><span class="w" data-s="63104" data-e="63915">What</span> <span class="w target" data-s="63957" data-e="64341" title="使困惑，使迷惑n. 令人费解的人或事物， 难题">puzzled</span> <span class="w" data-s="64384" data-e="64469">the</span> <span class="w" data-s="64512" data-e="64597">family</span> <span class="w" data-s="64640" data-e="64939">most</span> <span class="w" data-s="64981" data-e="65365">was</span> <span class="w" data-s="65408" data-e="65707">one</span> <span class="w" data-s="65749" data-e="65963">page</span> <span class="w" data-s="66005" data-e="66261">of</span> <span class="w" data-s="66304" data-e="66347">the</span> <span class="w" data-s="66389" data-e="66688">notebook.</span></p><p class="zh">最让一家人想不通的，是笔记本上的某一页。</p></div>
+<div class="pair" data-s0="66859" data-s1="69376"><p class="en"><span class="w" data-s="66859" data-e="67755">Nobody</span> <span class="w" data-s="67797" data-e="67883">could</span> <span class="w target" data-s="67925" data-e="68053" title="&amp;. η.猜测，推测">guess</span> <span class="w" data-s="68096" data-e="68395">what</span> <span class="w" data-s="68437" data-e="68565">the</span> <span class="w" data-s="68608" data-e="68736">last</span> <span class="w" data-s="68779" data-e="69035">line</span> <span class="w" data-s="69077" data-e="69376">meant.</span></p><p class="zh">谁也没法猜出最后一行写的是什么。</p></div>
+<div class="pair" data-s0="70029" data-s1="74765"><p class="en"><span class="w" data-s="70029" data-e="70157">Then</span> <span class="w" data-s="70199" data-e="70327">a</span> <span class="w" data-s="70370" data-e="70498">young</span> <span class="w" data-s="70541" data-e="70754">cook</span> <span class="w" data-s="70797" data-e="71138">from</span> <span class="w" data-s="71181" data-e="71223">the</span> <span class="w" data-s="71266" data-e="71394">city</span> <span class="w" data-s="71437" data-e="71693">made</span> <span class="w" data-s="71735" data-e="71863">a</span> <span class="w target" data-s="71906" data-e="72205" title="根本的；彻底的；完全的 n. 激进分子；游 离基">radical</span> <span class="w" data-s="72247" data-e="72461">change:</span> <span class="w" data-s="72845" data-e="73357">he</span> <span class="w" data-s="73399" data-e="73655">cooked</span> <span class="w" data-s="73698" data-e="73741">the</span> <span class="w" data-s="73783" data-e="73997">dish</span> <span class="w" data-s="74039" data-e="74295">for</span> <span class="w" data-s="74338" data-e="74509">eight</span> <span class="w" data-s="74551" data-e="74765">hours.</span></p><p class="zh">后来一位城里来的年轻厨师做了一次彻底的改动：他把这道菜煮了八个小时。</p></div>
+<div class="pair" data-s0="75063" data-s1="79757"><p class="en"><span class="w" data-s="75063" data-e="76215">Now</span> <span class="w target" data-s="76258" data-e="76727" title="&amp;. η.猜测，推测">guests</span> <span class="w" data-s="76770" data-e="76898">of</span> <span class="w" data-s="76941" data-e="77154">every</span> <span class="w target" data-s="77197" data-e="77581" title="人种的，种族的 v. 造反，反叛 n. 造反者，叛乱者；反对者">racial</span> <span class="w" data-s="77623" data-e="77965">background</span> <span class="w" data-s="78007" data-e="78263">drive</span> <span class="w" data-s="78306" data-e="78775">out</span> <span class="w" data-s="78818" data-e="79031">from</span> <span class="w" data-s="79074" data-e="79159">the</span> <span class="w" data-s="79202" data-e="79330">city</span> <span class="w" data-s="79373" data-e="79543">for</span> <span class="w" data-s="79586" data-e="79757">it.</span></p><p class="zh">如今各种族背景的客人都会从城里开车来吃这一口。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">animate</span>
+          <span class="ipa">/&#x27;ænimeit, &#x27;ænimət/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使具活力；使生气勃勃 adj.有生命的；有 活力的；有生气的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the face seems to animate the whole room</div>          <div class="mnem"><span class="lbl">记</span>animal动物，我们都很熟悉。 动物，不就是会动的物吗？那 animate的意思 就很明显了，“使动，使有生气”。</div>          <div class="root"><span class="lbl">根</span>anim(生命，气息) + ate(使…) → 使有生命 → 使有生气</div>          <div class="fam"><span class="lbl">族</span>animation n. 动画 / animal n. 动物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">vivid</span>
+          <span class="ipa">/&#x27;v1vıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">生动的，逼真的；鲜艳的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The colours are still vivid</div>          <div class="mnem"><span class="lbl">记</span>把viv想象成表情包里的抱抱 (一个小孩晃动着两条小胳膊)，是不是很“生动 的”？</div>          <div class="root"><span class="lbl">根</span>viv(活的) + id → 像活的一样 → 生动的</div>          <div class="zt"><span class="lbl">真题</span>A vivid example of such replay can be seen in a video researchers made recently about sleep disorders. 在研究人员最近制作的一段关 于睡眠障碍的视频中，可以看到这种回放的生 动例子。</div>          <div class="fam"><span class="lbl">族</span>vividly adv. 生动地 / revive v. 复活</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">survive</span>
+          <span class="ipa">/sə&#x27;vaiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">幸免于，幸存，生还</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>helped the family survive three hard winters</div>          <div class="mnem"><span class="lbl">记</span>把 viv 想象成一个小孩的样子， i是身子，vv是两个小胳膊，所以这个词根的意 思就是“活的，动的”。sur表示“在……上”， 在……上活下来，就是“幸存，生还”的意思。</div>          <div class="root"><span class="lbl">根</span>sur(超过) + viv(活) + e → 活过来 → 幸存</div>          <div class="zt"><span class="lbl">真题</span>Remember, failure is inevitable, and every failure you survive is a learning experience.记住，失败是不可避免的，你艰难渡 过的每一次失败都是一次学习的经历。(2023)</div>          <div class="fam"><span class="lbl">族</span>survival n. 幸存 / survivor n. 幸存者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">revive</span>
+          <span class="ipa">/rt&#x27;vaiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">复活，苏醒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she tries to revive the recipes</div>          <div class="mnem"><span class="lbl">记</span>重新(re)活(vive)一遍→复活， 苏醒。</div>          <div class="root"><span class="lbl">根</span>re(再) + vive(活) → 再活一次 → 复活，苏醒</div>          <div class="fam"><span class="lbl">族</span>revival n. 复兴 / survive v. 幸存</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">paint</span>
+          <span class="ipa">/peint/</span>
+          <span class="pos">v.</span>
+          <span class="cn">画；油漆；绘画</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>painted in 1978</div>          <div class="root"><span class="lbl">根</span>靠搭配记：paint a picture 画画 / paint the wall 刷墙</div>          <div class="zt"><span class="lbl">真题</span>Life Reimagined paints a picture of middle age that is far from gloomy.《重新想象 的生活》描绘了一幅远非悲观的中年图景。(2017)</div>          <div class="fam"><span class="lbl">族</span>painter n. 画家 / painting n. 绘画</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">plain</span>
+          <span class="ipa">/plein/</span>
+          <span class="pos">n.</span>
+          <span class="cn">大平原，朴实无华的东西 adj.普通的，朴 素的，无装饰的；直接的；直截了当的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>on a wide, flat plain</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“扑来”。一下子 扑过来，是不是太直接了？→直接的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：扑来 → 一下子扑过来 → 直接的；平原</div>          <div class="zt"><span class="lbl">真题</span>Consider the many geographic features of the country: mountains, steep grades, wetlands, rivers，deserts and plains. 想想这个国家的许多 地理特征：山脉、陡坡、湿地、河流、沙漠和平原。</div>          <div class="fam"><span class="lbl">族</span>plainly adv. 明显地 / complain v. 抱怨</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">complain</span>
+          <span class="ipa">/kəm&#x27;pleın/</span>
+          <span class="pos">v.</span>
+          <span class="cn">抱怨;埋怨;发牢骚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Marta still complained about the cost</div>          <div class="root"><span class="lbl">根</span>com(加强) + plain(诉苦) → 一个劲儿诉苦 → 抱怨</div>          <div class="zt"><span class="lbl">真题</span>Some of the people who work in Songdo complain about boredom in the workplace. — 些在松岛工作的人抱怨工作场所无聊。(2019)</div>          <div class="fam"><span class="lbl">族</span>complaint n. 抱怨 / complainer n. 爱抱怨的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">plunge</span>
+          <span class="ipa">/pland3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使突然前冲(或下落)；骤降，猛跌 n.(突然 的)坠落；跳水，快速游泳；(价值或数量的)骤然 下跌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the price of meat plunged</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“扑浪急”。在 水里扑浪急，你得先“冲入”水中啊！</div>          <div class="root"><span class="lbl">根</span>谐音联想：扑浪急 → 一头扑进浪里 → 猛冲，骤降</div>          <div class="zt"><span class="lbl">真题</span>People the world over are afraid of a further plunge in oil prices. 全世界的人都担心 油价会进一步下跌。(2016)</div>          <div class="fam"><span class="lbl">族</span>plunging adj. 骤降的 / plunge into 投入</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">dive</span>
+          <span class="ipa">/daiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">跳水；(头和两臂先入水)俯冲 .(头和双 臂先入水的)跳水，潜水，俯冲；突降，暴跌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her grandson dived from a rock into the water</div>          <div class="root"><span class="lbl">根</span>靠搭配记：dive into the water 跳入水中 / take a dive 暴跌</div>          <div class="zt"><span class="lbl">真题</span>She knew that her chemistry grade may take a dive as a result. 她知道她的化学成绩可 能会因此一落千丈。(2018)</div>          <div class="fam"><span class="lbl">族</span>diver n. 潜水员 / diving n. 跳水</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">drown</span>
+          <span class="ipa">/draun/</span>
+          <span class="pos">v.</span>
+          <span class="cn">淹死，溺死；沉浸于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he was sure he would drown</div>          <div class="mnem"><span class="lbl">记</span>和dive(扎入)一起记忆。一只 鸭子一头扎入了水中，结果不小心撞(drown发 音类似“撞”)上了一个石头，“淹死”了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：drown in debt 债台高筑 / drown out 淹没声音</div>          <div class="zt"><span class="lbl">真题</span>Today&#x27;s young adults are also drowning in credit-card debt. 今天的年轻人也被信用卡 债务淹没了。</div>          <div class="fam"><span class="lbl">族</span>drowning n. 溺水 / drowned adj. 淹死的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">pork</span>
+          <span class="ipa">/pə:rk/</span>
+          <span class="pos"></span>
+          <span class="cn">猪肉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There is pork, beef and mutton in the cold room</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“剖开”。把 “猪肉”剖开。</div>          <div class="root"><span class="lbl">根</span>谐音联想：剖开 → 把猪肉剖开</div>          <div class="zt"><span class="lbl">真题</span>And in May Burger King introduced barbecue(烧烤) pork ribs at $7 for eight. 5 月，汉堡王推出了烤猪肋排，8块排骨售价7 美元。</div>          <div class="fam"><span class="lbl">族</span>pork chop 猪排 / bacon n. 培根</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">beef</span>
+          <span class="ipa">/bi:f/</span>
+          <span class="pos">n.</span>
+          <span class="cn">牛肉；抱怨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There is pork, beef and mutton in the cold room</div>          <div class="mnem"><span class="lbl">记</span>蜜蜂(bee)附在(f)牛肉上，这叫 蜜汁“牛肉”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：beef steak 牛排 / beef about 抱怨</div>          <div class="zt"><span class="lbl">真题</span>For example, pound for pound, beef requires 15 times more feed to raise than carp. 例如，按磅数换算，喂养一磅牛肉比一磅鲤鱼需 要多15 倍的饲料。(2022)</div>          <div class="fam"><span class="lbl">族</span>beefy adj. 结实的 / beefsteak n. 牛排</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">mutton</span>
+          <span class="ipa">/&#x27;mΔtn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There is pork, beef and mutton in the cold room</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“妈吞”。妈妈 爱吃“羊肉”，一见羊肉就吞口水了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：妈吞 → 妈妈见羊肉就吞口水</div>          <div class="fam"><span class="lbl">族</span>lamb n. 羔羊肉 / sheep n. 绵羊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">seafood</span>
+          <span class="ipa">/&#x27;si:fu:d/</span>
+          <span class="pos"></span>
+          <span class="cn">海鲜</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and seafood on Fridays</div>          <div class="root"><span class="lbl">根</span>sea(海) + food(食物) → 海里的食物 → 海鲜</div>          <div class="zt"><span class="lbl">真题</span>Shrimp continues to be among the most popular seafoods worldwide. 虾仍然是世界上 最受欢迎的海鲜之一。(2022)</div>          <div class="fam"><span class="lbl">族</span>seaside n. 海边 / fish n. 鱼</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">slice</span>
+          <span class="ipa">/slais/</span>
+          <span class="pos">n.</span>
+          <span class="cn">薄片，小块，部分v.切，割，划</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She cuts the meat into thin slices</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a slice of bread 一片面包 / slice the meat 切肉</div>          <div class="zt"><span class="lbl">真题</span>There were fewer calories because it was sliced very thin. 卡路里更少，因为它被切得很薄。</div>          <div class="fam"><span class="lbl">族</span>sliced adj. 切片的 / slice up 切成片</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">chip</span>
+          <span class="ipa">/t∫ip/</span>
+          <span class="pos">n.</span>
+          <span class="cn">油炸土豆条；芯片；(木头、玻璃等的)缺口，碎 片；筹码</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a bowl of chips</div>          <div class="mnem"><span class="lbl">记</span>零食的包装上常会见到这个单 词，就是“薯条”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：fish and chips 炸鱼薯条 / a chip of wood 木屑</div>          <div class="zt"><span class="lbl">真题</span>Performance is your best bargaining chip (筹码) when you are seeking a raise. 当你要求 加薪时，业绩是你最好的谈判筹码。</div>          <div class="fam"><span class="lbl">族</span>chips n. 薯条 / chop v. 剁</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">onion</span>
+          <span class="ipa">/&#x27;Anjən/</span>
+          <span class="pos"></span>
+          <span class="cn">洋葱，洋葱头</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an onion salad</div>          <div class="mnem"><span class="lbl">记</span>听过洋葱头这个说法吧？这个 单词就拆分为：上面(on)我(i)的上面(on)，我 上面有个“洋葱”，所以叫“洋葱头”啊。</div>          <div class="root"><span class="lbl">根</span>联想：切它时辣眼睛，一层一层往上叠 → 洋葱</div>          <div class="zt"><span class="lbl">真题</span>Experts observe that “textbooks come in layers，something like an onion.”专家说：“教 科书是分层的，有点像洋葱。”</div>          <div class="fam"><span class="lbl">族</span>garlic n. 大蒜 / leek n. 韭葱</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">snack</span>
+          <span class="ipa">/snæk/</span>
+          <span class="pos">n.</span>
+          <span class="cn">零食，点心；小吃；快餐；易办到的事；小菜 一碟</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a plate of snacks</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“snake(蛇)”。 蛇的饭量很大，能吞下大象，你也就是它的一个 “点心，小吃”而已。</div>          <div class="root"><span class="lbl">根</span>谐音联想：snake(蛇) → 蛇眼里的小点心</div>          <div class="zt"><span class="lbl">真题</span>We get almost 25% of our daily calories (244) from snacks. 我们每天获得的热量中的大约 25%来自零食。(2020)</div>          <div class="fam"><span class="lbl">族</span>snack bar n. 小吃店 / nibble v. 小口吃</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">sauce</span>
+          <span class="ipa">/so:s/</span>
+          <span class="pos">n.</span>
+          <span class="cn">调味汁；酱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drops them into a hot sauce</div>          <div class="root"><span class="lbl">根</span>靠搭配记：soy sauce 酱油 / tomato sauce 番茄酱</div>          <div class="zt"><span class="lbl">真题</span>Locked in hot kitchens, Carême created his four“mother sauces”，锁在炎热的厨房里， 卡莱姆创造了他的四种“母亲酱”。</div>          <div class="fam"><span class="lbl">族</span>saucepan n. 平底锅 / saucer n. 茶托</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">recipe</span>
+          <span class="ipa">/&#x27;resəpi/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the recipes written in her mother&#x27;s notebook</div>          <div class="mnem"><span class="lbl">记</span>re 表示“重复”；cipe发音类似 “食谱”。一再地提到食谱，还是“食谱”啊。</div>          <div class="root"><span class="lbl">根</span>re(再) + cipe(拿) → 照着再拿一遍 → 食谱</div>          <div class="zt"><span class="lbl">真题</span>Reformulating recipes is one way to improve public health. 重新制订食谱是改善公 众健康的一种方法。</div>          <div class="fam"><span class="lbl">族</span>receipt n. 收据 / receive v. 收到</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">dine</span>
+          <span class="ipa">/daın/</span>
+          <span class="pos">v.</span>
+          <span class="cn">进餐；用饭</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>They dine at the long wooden table</div>          <div class="mnem"><span class="lbl">记</span>dinner我们很熟悉，正餐，晚 餐，dine就是“进餐”。</div>          <div class="root"><span class="lbl">根</span>din(餐) + e → 吃正餐；和 dinner 一起记</div>          <div class="zt"><span class="lbl">真题</span>They help improve the quality of the restaurants they dine in. 它们帮助提高他们就 餐的餐馆的质量。(2016)</div>          <div class="fam"><span class="lbl">族</span>dinner n. 正餐 / dining room 餐厅</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">picnic</span>
+          <span class="ipa">/&#x27;pıknık/</span>
+          <span class="pos">n.</span>
+          <span class="cn">郊游，野餐 v. 野餐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>they eat out on a picnic by the lake</div>          <div class="mnem"><span class="lbl">记</span>采摘（pic想成 pick）时你磕 (nic)到了腿。设想你和朋友周末出去“郊游，野 餐”，爬山摘野果子时，磕到了腿。</div>          <div class="root"><span class="lbl">根</span>联想：pick(摘) 野果 + nic → 出去摘野果 → 野餐</div>          <div class="zt"><span class="lbl">真题</span>It turns parks into picnic sites. 它把公园 变成了野餐地。(2022)</div>          <div class="fam"><span class="lbl">族</span>picnicker n. 野餐者 / outing n. 郊游</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">chew</span>
+          <span class="ipa">/t∫u:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">咀嚼，嚼碎</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Guests chew slowly</div>          <div class="mnem"><span class="lbl">记</span>chewing gum，我们很熟悉，口 香糖。那 chew 就是“咀嚼”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：chewing gum 口香糖 / chew food 嚼东西</div>          <div class="zt"><span class="lbl">真题</span>Doctors warned against chewing tobacco 第十单元 as a substitute for smoking. 医生们警告不要用 咀嚼烟草来代替吸烟。</div>          <div class="fam"><span class="lbl">族</span>chewy adj. 有嚼劲的 / chewing gum 口香糖</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">lick</span>
+          <span class="ipa">/ltk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">舔;掠过；(火舌)舔食 n. 舔</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>lick their fingers</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“立刻”。你家 的狗狗大热天出去跑了一圈，极其口渴，你给它 倒了一盆水，它立刻就“舔”起来了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：立刻 → 狗渴了立刻就舔</div>          <div class="fam"><span class="lbl">族</span>lick up 舔光 / lick one&#x27;s lips 舔嘴唇</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">napkin</span>
+          <span class="ipa">/&#x27;næpkın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">餐巾;餐巾纸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wipe them with a paper napkin</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“奶扑啃”。就 像一个人吃东西风卷残云的感觉，吃完了，手 上、嘴上还是需要用“餐巾纸”擦拭一下的。</div>          <div class="root"><span class="lbl">根</span>nap(布) + kin(小) → 一小块布 → 餐巾</div>          <div class="fam"><span class="lbl">族</span>tablecloth n. 桌布 / nappy n. 尿布</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">pour</span>
+          <span class="ipa">/pe:r/</span>
+          <span class="pos">v.</span>
+          <span class="cn">倾倒；倒(饮料等);倾泻；倾盆而下</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rain began to pour on the picnic cloth</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“泼”。大雨下 得就像泼下来一样→倾泻。</div>          <div class="root"><span class="lbl">根</span>谐音联想：泼 → 大雨像泼下来一样 → 倾倒</div>          <div class="zt"><span class="lbl">真题</span>Tea is poured into a cup from a teapot. 茶是从茶壶倒进杯子里的。</div>          <div class="fam"><span class="lbl">族</span>pour out 倒出 / pouring adj. 倾盆的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">puzzle</span>
+          <span class="ipa">/&#x27;pazl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使困惑，使迷惑n. 令人费解的人或事物， 难题</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>What puzzled the family most</div>          <div class="mnem"><span class="lbl">记</span>趴（pu）在那儿睡着了（zz），被 “难题”困住，睡着了。 (245)</div>          <div class="root"><span class="lbl">根</span>谐音联想：趴在那儿睡了 → 被难题困住</div>          <div class="zt"><span class="lbl">真题</span>Their functioning is still a puzzle to be solved.它们的功能仍然是一个有待解决的难 题。(2016)</div>          <div class="fam"><span class="lbl">族</span>puzzled adj. 困惑的 / puzzling adj. 令人费解的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">guess</span>
+          <span class="ipa">/ges/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp;. η.猜测，推测</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody could guess what the last line meant</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“该死”！设想 一个场景：你总是让我猜。今天又让我猜你吃 了几个包子。我会说：“该死，又让我猜！”</div>          <div class="root"><span class="lbl">根</span>谐音联想：该死 → 又让我猜</div>          <div class="zt"><span class="lbl">真题</span>They&#x27;re shown a picture of one of their co-workers and asked to guess that person&#x27;s name.研究人员给他们展示了一位同事的照 片，并要求他们猜出那个人的名字。(2016)</div>          <div class="fam"><span class="lbl">族</span>guesswork n. 猜测 / by guess 凭猜测</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">radical</span>
+          <span class="ipa">/&#x27;rædıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">根本的；彻底的；完全的 n. 激进分子；游 离基</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>made a radical change</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆成ra(拼音类似 “让”)+di(弟弟)+cal(发音类似“扣”)，连在一 起就是：让弟弟扣(篮)。设想弟弟那么小，你就 让他学扣篮，太“激进”了。</div>          <div class="root"><span class="lbl">根</span>radic(根) + al → 从根上来的 → 根本的，彻底的</div>          <div class="zt"><span class="lbl">真题</span>A new technology has the potential to change modern society in radical ways. —项新 技术有可能彻底改变现代社会。(2018)</div>          <div class="fam"><span class="lbl">族</span>radically adv. 彻底地 / radish n. 萝卜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">racial</span>
+          <span class="ipa">/&#x27;rerʃl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">人种的，种族的 v. 造反，反叛 n. 造反者，叛乱者；反对者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>guests of every racial background</div>          <div class="mnem"><span class="lbl">记</span>来回(re再，又)十敲响铃声(把 bel想成bell)，报警的铃声反复敲响，警告全城 的人发生“叛乱”！</div>          <div class="root"><span class="lbl">根</span>race(种族) + ial(形容词后缀) → 种族的</div>          <div class="zt"><span class="lbl">真题</span>It isn&#x27;t a requirement that teachers share the same racial or ethnic background as their students. 它并不是要求老师和学生有相同的种 族或民族背景。(2020)</div>          <div class="fam"><span class="lbl">族</span>race n. 种族 / racism n. 种族主义</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 65</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

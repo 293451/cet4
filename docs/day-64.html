@@ -1,0 +1,699 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 64 · The Old Hangar at Fairview Field</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 64 · 12/15 · Unit 10 第 1891-1920 词</div>
+  <h1>The Old Hangar at Fairview Field<span class="cn">费尔维尤机场的旧机库</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-64.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2987"><p class="en"><span class="w" data-s="43" data-e="384">Fairview</span> <span class="w" data-s="427" data-e="640">Field</span> <span class="w" data-s="683" data-e="939">is</span> <span class="w" data-s="981" data-e="1024">a</span> <span class="w" data-s="1067" data-e="1237">small</span> <span class="w target" data-s="1280" data-e="1664" title="航空站；航空港；机场">airport</span> <span class="w" data-s="1707" data-e="1963">at</span> <span class="w" data-s="2005" data-e="2133">the</span> <span class="w" data-s="2176" data-e="2261">edge</span> <span class="w" data-s="2304" data-e="2432">of</span> <span class="w" data-s="2475" data-e="2517">a</span> <span class="w" data-s="2560" data-e="2645">wide</span> <span class="w" data-s="2688" data-e="2987">plain.</span></p><p class="zh">费尔维尤机场很小，坐落在广阔平原的边缘。</p></div>
+<div class="pair" data-s0="3328" data-s1="6485"><p class="en"><span class="w" data-s="3328" data-e="4224">Nora</span> <span class="w" data-s="4267" data-e="4651">repairs</span> <span class="w target" data-s="4693" data-e="5035" title="">aircraft</span> <span class="w" data-s="5077" data-e="5333">in</span> <span class="w" data-s="5376" data-e="5461">an</span> <span class="w" data-s="5504" data-e="5589">old</span> <span class="w" data-s="5632" data-e="5973">wooden</span> <span class="w" data-s="6016" data-e="6315">hangar</span> <span class="w" data-s="6357" data-e="6485">there.</span></p><p class="zh">诺拉在那儿一座旧木机库里修飞机。</p></div>
+<div class="pair" data-s0="6656" data-s1="10325"><p class="en"><span class="w" data-s="6656" data-e="7211">She</span> <span class="w" data-s="7339" data-e="7552">learned</span> <span class="w" data-s="7595" data-e="7765">her</span> <span class="w target" data-s="7808" data-e="7936" title="手艺；工艺；技巧；技能；技艺；诡计；手腕；骗 术 v.(尤指用手工)精心制作">craft</span> <span class="w" data-s="7979" data-e="8277">from</span> <span class="w" data-s="8320" data-e="8448">an</span> <span class="w" data-s="8491" data-e="8704">uncle</span> <span class="w" data-s="8747" data-e="8917">who</span> <span class="w" data-s="8960" data-e="9088">spent</span> <span class="w" data-s="9131" data-e="9515">forty</span> <span class="w" data-s="9557" data-e="9643">years</span> <span class="w" data-s="9685" data-e="9941">in</span> <span class="w target" data-s="9984" data-e="10325" title="航空，航空工业">aviation.</span></p><p class="zh">她的手艺是跟舅舅学的，那位舅舅在航空业干了四十年。</p></div>
+<div class="pair" data-s0="11021" data-s1="14136"><p class="en"><span class="w" data-s="11021" data-e="11235">Every</span> <span class="w target" data-s="11277" data-e="11448" title="四分之一；季度；城区；营房 v. 分为四份； 提供食宿">quarter</span> <span class="w" data-s="11491" data-e="11789">she</span> <span class="w" data-s="11832" data-e="12045">walks</span> <span class="w" data-s="12088" data-e="12216">the</span> <span class="w" data-s="12259" data-e="12387">same</span> <span class="w" data-s="12429" data-e="12643">line</span> <span class="w" data-s="12685" data-e="12813">of</span> <span class="w" data-s="12856" data-e="13112">planes</span> <span class="w" data-s="13155" data-e="13325">and</span> <span class="w" data-s="13368" data-e="13667">checks</span> <span class="w" data-s="13709" data-e="13837">every</span> <span class="w target" data-s="13880" data-e="14136" title="飞行；飞机的航程；班机，航班">flight.</span></p><p class="zh">每个季度她都沿着同一排飞机走一遭，检查每一个航班。</p></div>
+<div class="pair" data-s0="14349" data-s1="17336"><p class="en"><span class="w" data-s="14349" data-e="14477">In</span> <span class="w" data-s="14776" data-e="14861">the</span> <span class="w" data-s="14904" data-e="14989">morning</span> <span class="w" data-s="15032" data-e="15245">a</span> <span class="w target" data-s="15288" data-e="15416" title="喷气式飞机；喷射流；喷射口；喷嘴">jet</span> <span class="w" data-s="15459" data-e="15629">from</span> <span class="w" data-s="15672" data-e="15757">a</span> <span class="w" data-s="15800" data-e="15885">big</span> <span class="w target" data-s="15928" data-e="16227" title="航空公司">airline</span> <span class="w" data-s="16269" data-e="16611">rolls</span> <span class="w" data-s="16653" data-e="16739">up</span> <span class="w" data-s="16781" data-e="16867">to</span> <span class="w" data-s="16909" data-e="16952">the</span> <span class="w target" data-s="16995" data-e="17336" title="航空站；航空终点站；终点站 adj. 晚期的； 不治的；不可救药的；无可挽回的；末端的">terminal.</span></p><p class="zh">早晨，一架大型航空公司的喷气式飞机缓缓滑到航站楼前。</p></div>
+<div class="pair" data-s0="17464" data-s1="20920"><p class="en"><span class="w" data-s="17464" data-e="17720">At</span> <span class="w" data-s="17763" data-e="18104">noon</span> <span class="w" data-s="18147" data-e="18445">the</span> <span class="w target" data-s="18488" data-e="18787" title="(飞机的)起飞">take-off</span> <span class="w" data-s="18829" data-e="18957">of</span> <span class="w" data-s="19000" data-e="19043">a</span> <span class="w target" data-s="19085" data-e="19555" title="直升机">helicopter</span> <span class="w" data-s="19597" data-e="19853">shakes</span> <span class="w" data-s="19896" data-e="20024">the</span> <span class="w" data-s="20067" data-e="20237">grass</span> <span class="w" data-s="20280" data-e="20451">by</span> <span class="w" data-s="20493" data-e="20621">the</span> <span class="w" data-s="20664" data-e="20920">runway.</span></p><p class="zh">中午，一架直升机的起飞震得跑道边的草直晃。</p></div>
+<div class="pair" data-s0="21219" data-s1="23181"><p class="en"><span class="w" data-s="21219" data-e="21347">A</span> <span class="w" data-s="21389" data-e="21688">poster</span> <span class="w" data-s="21731" data-e="21859">of</span> <span class="w" data-s="21901" data-e="21944">The</span> <span class="w target" data-s="21987" data-e="22285" title="终结者；终止者">Terminator</span> <span class="w" data-s="22328" data-e="22712">hangs</span> <span class="w" data-s="22755" data-e="22840">above</span> <span class="w" data-s="22883" data-e="23011">her</span> <span class="w" data-s="23053" data-e="23181">tools.</span></p><p class="zh">她的工具上方贴着《终结者》的海报。</p></div>
+<div class="pair" data-s0="23523" data-s1="26637"><p class="en"><span class="w" data-s="23523" data-e="23821">A</span> <span class="w" data-s="24163" data-e="24419">grey</span> <span class="w target" data-s="24461" data-e="24675" title="鸽子 (242)">pigeon</span> <span class="w" data-s="24717" data-e="24888">lives</span> <span class="w" data-s="24931" data-e="25059">under</span> <span class="w" data-s="25101" data-e="25229">the</span> <span class="w" data-s="25272" data-e="25443">roof</span> <span class="w" data-s="25485" data-e="25784">and</span> <span class="w" data-s="25955" data-e="26253">watches</span> <span class="w" data-s="26296" data-e="26467">her</span> <span class="w" data-s="26509" data-e="26637">work.</span></p><p class="zh">一只灰鸽子住在屋顶下，看着她干活。</p></div>
+<div class="pair" data-s0="27475" data-s1="31101"><p class="en"><span class="w" data-s="27475" data-e="27603">One</span> <span class="w" data-s="27645" data-e="27859">cold</span> <span class="w" data-s="27901" data-e="28371">Tuesday</span> <span class="w" data-s="28413" data-e="28627">a</span> <span class="w target" data-s="28669" data-e="29053" title="牙医，牙医诊所">dentist</span> <span class="w" data-s="29096" data-e="29224">from</span> <span class="w" data-s="29267" data-e="29352">the</span> <span class="w" data-s="29395" data-e="29565">coast</span> <span class="w" data-s="29608" data-e="29949">arrived</span> <span class="w" data-s="29992" data-e="30205">with</span> <span class="w" data-s="30248" data-e="30333">a</span> <span class="w" data-s="30376" data-e="30461">heavy</span> <span class="w" data-s="30504" data-e="30760">black</span> <span class="w" data-s="30803" data-e="31101">bag.</span></p><p class="zh">一个寒冷的星期二，一位从海边来的牙医拎着一只沉甸甸的黑包到了。</p></div>
+<div class="pair" data-s0="31443" data-s1="34856"><p class="en"><span class="w" data-s="31443" data-e="31997">An</span> <span class="w" data-s="32040" data-e="32168">hour</span> <span class="w" data-s="32211" data-e="32424">later</span> <span class="w" data-s="32467" data-e="32680">a</span> <span class="w" data-s="32723" data-e="32936">second</span> <span class="w" data-s="32979" data-e="33491">traveler</span> <span class="w" data-s="33533" data-e="33661">came</span> <span class="w" data-s="33704" data-e="33875">in</span> <span class="w" data-s="33917" data-e="34088">with</span> <span class="w" data-s="34131" data-e="34216">an</span> <span class="w target" data-s="34259" data-e="34643" title="(~to,for)同一的，同样的">identical</span> <span class="w" data-s="34685" data-e="34856">bag.</span></p><p class="zh">一小时后，第二位旅客进来，拎着一只一模一样的包。</p></div>
+<div class="pair" data-s0="35197" data-s1="37971"><p class="en"><span class="w" data-s="35197" data-e="35923">Nora</span> <span class="w" data-s="35965" data-e="36051">had</span> <span class="w" data-s="36093" data-e="36221">to</span> <span class="w target" data-s="36264" data-e="36648" title="">identify</span> <span class="w" data-s="36691" data-e="36904">which</span> <span class="w" data-s="36947" data-e="37160">bag</span> <span class="w" data-s="37203" data-e="37715">belonged</span> <span class="w" data-s="37757" data-e="37800">to</span> <span class="w" data-s="37843" data-e="37971">whom.</span></p><p class="zh">诺拉必须辨认出哪只包是谁的。</p></div>
+<div class="pair" data-s0="38616" data-s1="41858"><p class="en"><span class="w" data-s="38616" data-e="38829">Both</span> <span class="w" data-s="38872" data-e="39042">were</span> <span class="w" data-s="39085" data-e="39213">old</span> <span class="w" data-s="39256" data-e="39512">and</span> <span class="w" data-s="39554" data-e="39768">worn,</span> <span class="w" data-s="39981" data-e="40152">with</span> <span class="w" data-s="40365" data-e="40578">nothing</span> <span class="w target" data-s="40621" data-e="41474" title="可辨认的；可以确认的 (241) 第十单元">identifiable</span> <span class="w" data-s="41517" data-e="41688">on</span> <span class="w" data-s="41730" data-e="41858">them.</span></p><p class="zh">两只包都又旧又破，上面没有任何可辨认的标记。</p></div>
+<div class="pair" data-s0="42029" data-s1="44674"><p class="en"><span class="w" data-s="42029" data-e="42754">The</span> <span class="w" data-s="42797" data-e="42968">people</span> <span class="w" data-s="43010" data-e="43224">of</span> <span class="w" data-s="43266" data-e="43352">the</span> <span class="w" data-s="43394" data-e="43480">town</span> <span class="w target" data-s="43522" data-e="43992" title="&amp; v. 崇拜，敬奉">worship</span> <span class="w" data-s="44034" data-e="44205">this</span> <span class="w" data-s="44248" data-e="44461">little</span> <span class="w" data-s="44504" data-e="44674">field.</span></p><p class="zh">镇上的人崇拜这一小片机场。</p></div>
+<div class="pair" data-s0="44973" data-s1="48216"><p class="en"><span class="w" data-s="44973" data-e="45613">On</span> <span class="w" data-s="45656" data-e="46125">Sundays</span> <span class="w" data-s="46168" data-e="46381">they</span> <span class="w" data-s="46424" data-e="46594">stand</span> <span class="w" data-s="46637" data-e="46850">by</span> <span class="w" data-s="46893" data-e="46978">the</span> <span class="w" data-s="47021" data-e="47192">fence</span> <span class="w" data-s="47234" data-e="47448">like</span> <span class="w" data-s="47490" data-e="47618">a</span> <span class="w target" data-s="47661" data-e="47832" title="兽群，牧群 v. 放牧；驱赶(兽群)">herd</span> <span class="w" data-s="47874" data-e="47960">of</span> <span class="w" data-s="48002" data-e="48216">sheep.</span></p><p class="zh">星期天他们就站在围栏边，像一群羊。</p></div>
+<div class="pair" data-s0="48429" data-s1="50904"><p class="en"><span class="w" data-s="48429" data-e="49282">Nora</span> <span class="w" data-s="49325" data-e="49496">is</span> <span class="w target" data-s="49538" data-e="49794" title="斜坡，斜面v.(使)倾斜，(使)倾向于">inclined</span> <span class="w" data-s="49837" data-e="50008">to</span> <span class="w" data-s="50050" data-e="50136">love</span> <span class="w" data-s="50178" data-e="50349">it</span> <span class="w" data-s="50392" data-e="50477">just</span> <span class="w" data-s="50520" data-e="50733">as</span> <span class="w" data-s="50776" data-e="50904">much.</span></p><p class="zh">诺拉也差不多一样爱它。</p></div>
+<div class="pair" data-s0="51638" data-s1="54326"><p class="en"><span class="w" data-s="51638" data-e="51766">But</span> <span class="w" data-s="51808" data-e="51936">last</span> <span class="w" data-s="51979" data-e="52192">winter</span> <span class="w" data-s="52235" data-e="52576">the</span> <span class="w target" data-s="52619" data-e="52875" title="航空公司">airline</span> <span class="w target" data-s="52918" data-e="53216" title="下降，衰落；谢绝η.减少，下降，衰落">declined</span> <span class="w" data-s="53259" data-e="53472">to</span> <span class="w" data-s="53515" data-e="53600">keep</span> <span class="w" data-s="53643" data-e="53771">its</span> <span class="w" data-s="53814" data-e="53942">morning</span> <span class="w target" data-s="53984" data-e="54326" title="飞行；飞机的航程；班机，航班">flight.</span></p><p class="zh">可去年冬天，那家航空公司谢绝了继续开早班航班。</p></div>
+<div class="pair" data-s0="54496" data-s1="57398"><p class="en"><span class="w" data-s="54496" data-e="54667">The</span> <span class="w" data-s="55179" data-e="55520">manager</span> <span class="w" data-s="55563" data-e="55691">asked</span> <span class="w" data-s="55734" data-e="55947">her</span> <span class="w" data-s="55990" data-e="56075">to</span> <span class="w" data-s="56118" data-e="56160">list</span> <span class="w" data-s="56203" data-e="56416">every</span> <span class="w target" data-s="56459" data-e="56928" title="缺点，缺陷">shortcoming</span> <span class="w" data-s="56971" data-e="57142">of</span> <span class="w" data-s="57184" data-e="57270">the</span> <span class="w" data-s="57312" data-e="57398">field.</span></p><p class="zh">经理让她把这座机场的每一个缺点都列出来。</p></div>
+<div class="pair" data-s0="58039" data-s1="60257"><p class="en"><span class="w" data-s="58039" data-e="58167">The</span> <span class="w" data-s="58209" data-e="58337">biggest</span> <span class="w target" data-s="58380" data-e="58849" title="劣势；不利因素；损失">disadvantage</span> <span class="w" data-s="58892" data-e="59233">was</span> <span class="w" data-s="59276" data-e="59404">the</span> <span class="w" data-s="59447" data-e="59575">distance</span> <span class="w" data-s="59617" data-e="59959">from</span> <span class="w" data-s="60001" data-e="60087">the</span> <span class="w" data-s="60129" data-e="60257">city.</span></p><p class="zh">最大的劣势是它离城里太远。</p></div>
+<div class="pair" data-s0="60471" data-s1="63116"><p class="en"><span class="w" data-s="60471" data-e="61324">Another</span> <span class="w target" data-s="61367" data-e="61708" title="">drawback</span> <span class="w" data-s="61751" data-e="62007">was</span> <span class="w" data-s="62049" data-e="62092">the</span> <span class="w" data-s="62135" data-e="62263">old</span> <span class="w" data-s="62305" data-e="62604">control</span> <span class="w" data-s="62647" data-e="63116">tower.</span></p><p class="zh">另一个缺点是一座老控制塔。</p></div>
+<div class="pair" data-s0="63244" data-s1="65847"><p class="en"><span class="w" data-s="63244" data-e="63969">Rain</span> <span class="w" data-s="64012" data-e="64225">could</span> <span class="w target" data-s="64268" data-e="64567" title="削弱;变弱">weaken</span> <span class="w" data-s="64609" data-e="64695">the</span> <span class="w" data-s="64737" data-e="64951">radio</span> <span class="w" data-s="64993" data-e="65335">signal</span> <span class="w" data-s="65377" data-e="65548">and</span> <span class="w" data-s="65591" data-e="65676">the</span> <span class="w" data-s="65719" data-e="65847">lights.</span></p><p class="zh">雨水会削弱无线电信号和跑道上的灯。</p></div>
+<div class="pair" data-s0="66060" data-s1="68919"><p class="en"><span class="w" data-s="66060" data-e="66828">Every</span> <span class="w target" data-s="66871" data-e="67340" title="挫折；阻碍">setback</span> <span class="w" data-s="67383" data-e="67639">made</span> <span class="w" data-s="67681" data-e="67809">the</span> <span class="w" data-s="67852" data-e="67980">little</span> <span class="w target" data-s="68023" data-e="68364" title="航空站；航空港；机场">airport</span> <span class="w" data-s="68407" data-e="68620">look</span> <span class="w" data-s="68663" data-e="68919">smaller.</span></p><p class="zh">每一次挫折都让这个小机场显得更小。</p></div>
+<div class="pair" data-s0="69656" data-s1="71149"><p class="en"><span class="w" data-s="69656" data-e="69741">The</span> <span class="w" data-s="69784" data-e="69954">only</span> <span class="w" data-s="69997" data-e="70210">real</span> <span class="w target" data-s="70253" data-e="70765" title="障碍；干扰；阻碍；绊脚石">obstacle</span> <span class="w" data-s="70808" data-e="70936">was</span> <span class="w" data-s="70978" data-e="71149">money.</span></p><p class="zh">唯一真正的障碍是钱。</p></div>
+<div class="pair" data-s0="71362" data-s1="74221"><p class="en"><span class="w" data-s="71362" data-e="72258">Snow</span> <span class="w" data-s="72301" data-e="72514">and</span> <span class="w" data-s="72557" data-e="72600">wind</span> <span class="w" data-s="72642" data-e="72984">would</span> <span class="w target" data-s="73026" data-e="73282" title="阻碍；妨碍；阻挡">hinder</span> <span class="w" data-s="73325" data-e="73581">repair</span> <span class="w" data-s="73624" data-e="73837">work</span> <span class="w" data-s="73880" data-e="74050">in</span> <span class="w" data-s="74093" data-e="74221">winter.</span></p><p class="zh">雪和风会妨碍冬天的一切维修。</p></div>
+<div class="pair" data-s0="74477" data-s1="79981"><p class="en"><span class="w" data-s="74477" data-e="74690">The</span> <span class="w" data-s="75117" data-e="75330">small</span> <span class="w" data-s="75373" data-e="75672">staff</span> <span class="w" data-s="75714" data-e="76013">had</span> <span class="w" data-s="76056" data-e="76184">lived</span> <span class="w" data-s="76226" data-e="76440">with</span> <span class="w target" data-s="76482" data-e="76866" title="艰难，困苦">hardship:</span> <span class="w" data-s="77122" data-e="77634">low</span> <span class="w" data-s="77677" data-e="77933">pay,</span> <span class="w" data-s="78189" data-e="78573">cold</span> <span class="w" data-s="78616" data-e="79085">rooms,</span> <span class="w" data-s="79256" data-e="79554">long</span> <span class="w" data-s="79682" data-e="79981">hours.</span></p><p class="zh">多年来，这几个员工一直过着苦日子：工资低、屋子冷、工时长得没边。</p></div>
+<div class="pair" data-s0="80797" data-s1="84978"><p class="en"><span class="w" data-s="80797" data-e="80925">So</span> <span class="w" data-s="80968" data-e="81266">Nora</span> <span class="w" data-s="81309" data-e="81480">and</span> <span class="w" data-s="81522" data-e="81650">two</span> <span class="w" data-s="81693" data-e="82034">helpers</span> <span class="w target" data-s="82077" data-e="82802" title="用导线给(建筑物、设备等)接通电源">wired</span> <span class="w" data-s="82845" data-e="82973">the</span> <span class="w" data-s="83016" data-e="83144">control</span> <span class="w" data-s="83186" data-e="83485">room</span> <span class="w" data-s="83528" data-e="83826">themselves</span> <span class="w" data-s="83869" data-e="84210">in</span> <span class="w" data-s="84253" data-e="84680">six</span> <span class="w" data-s="84722" data-e="84978">days.</span></p><p class="zh">于是诺拉和两个帮手自己动手，六天就给控制室接好了电线。</p></div>
+<div class="pair" data-s0="85277" data-s1="89885"><p class="en"><span class="w" data-s="85277" data-e="85874">In</span> <span class="w" data-s="85917" data-e="86216">April</span> <span class="w" data-s="86258" data-e="86472">the</span> <span class="w target" data-s="86856" data-e="87197" title="航空公司">airline</span> <span class="w" data-s="87240" data-e="87581">agreed</span> <span class="w" data-s="87624" data-e="87709">to</span> <span class="w" data-s="87752" data-e="87880">stay,</span> <span class="w" data-s="88093" data-e="88306">and</span> <span class="w" data-s="88477" data-e="88690">the</span> <span class="w" data-s="88733" data-e="88861">morning</span> <span class="w target" data-s="88904" data-e="89202" title="喷气式飞机；喷射流；喷射口；喷嘴">jet</span> <span class="w" data-s="89245" data-e="89416">still</span> <span class="w" data-s="89586" data-e="89885">comes.</span></p><p class="zh">四月，那家航空公司同意留下来，早晨的喷气机照旧飞来。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">quarter</span>
+          <span class="ipa">/&#x27;kwə:rtər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">四分之一；季度；城区；营房 v. 分为四份； 提供食宿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every quarter she walks the same line of planes</div>          <div class="root"><span class="lbl">根</span>quart(第四) + er → 第四份 → 四分之一；按四个季度走 → 季度</div>          <div class="zt"><span class="lbl">真题</span>When you consider that equals a quarter of the world catch, you begin to see the size of the problem. 当你认为那相当于世界捕捞量的 四分之一时，你就开始看到问题的严重性了。</div>          <div class="fam"><span class="lbl">族</span>quarterly adj. 每季度的 / quartet n. 四重奏</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">craft</span>
+          <span class="ipa">/kra:ft/</span>
+          <span class="pos">n.</span>
+          <span class="cn">手艺；工艺；技巧；技能；技艺；诡计；手腕；骗 术 v.(尤指用手工)精心制作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She learned her craft from an uncle</div>          <div class="root"><span class="lbl">根</span>靠搭配记：arts and crafts 手工艺 / a man of craft 手艺人</div>          <div class="zt"><span class="lbl">真题</span>It takes many hours to craft a single sign. 制作一个标志需要好几个小时。</div>          <div class="fam"><span class="lbl">族</span>craftsman n. 工匠 / crafty adj. 狡猾的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">aircraft</span>
+          <span class="ipa">/&#x27;eəkra:ft/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nora repairs aircraft in an old wooden hangar</div>          <div class="mnem"><span class="lbl">记</span>air（空中的）十 craft（工艺、手 艺)→空中的工艺→飞机。</div>          <div class="root"><span class="lbl">根</span>air(空中的) + craft(工艺) → 空中的工艺品 → 飞机</div>          <div class="zt"><span class="lbl">真题</span>He owns a fleet of aircraft. 他拥有一支机 队。(2018)</div>          <div class="fam"><span class="lbl">族</span>spacecraft n. 航天器 / craft n. 手艺</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">airport</span>
+          <span class="ipa">/&#x27;eəpo:rt/</span>
+          <span class="pos"></span>
+          <span class="cn">航空站；航空港；机场</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Fairview Field is a small airport at the edge of a wide plain</div>          <div class="root"><span class="lbl">根</span>air(空中的) + port(港口) → 空中的港口 → 机场</div>          <div class="zt"><span class="lbl">真题</span>The plane is going tò land at another airport. 飞机将在另一个机场降落。</div>          <div class="fam"><span class="lbl">族</span>seaport n. 海港 / port n. 港口</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">aviation</span>
+          <span class="ipa">/ieivi&#x27;er∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">航空，航空工业</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an uncle who spent forty years in aviation</div>          <div class="root"><span class="lbl">根</span>avi(鸟) + ation(名词后缀) → 像鸟一样飞 → 航空</div>          <div class="zt"><span class="lbl">真题</span>It uses the latest aviation technology. 它 采用最新的航空技术。(2018)</div>          <div class="fam"><span class="lbl">族</span>aviator n. 飞行员 / avian adj. 鸟类的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">jet</span>
+          <span class="ipa">/dzet/</span>
+          <span class="pos"></span>
+          <span class="cn">喷气式飞机；喷射流；喷射口；喷嘴</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In the morning a jet from a big airline rolls up to the terminal</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“接它”。它从 天上掉下来了，接住它。它是什么？→喷气式 飞机。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：jet engine 喷气发动机 / jet lag 时差反应</div>          <div class="zt"><span class="lbl">真题</span>The giant jet will be forced to land. 巨型 喷气式飞机将被迫降落。</div>          <div class="fam"><span class="lbl">族</span>jettison v. 抛弃 / jetliner n. 喷气客机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">terminal</span>
+          <span class="ipa">/&#x27;t3:rminl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">航空站；航空终点站；终点站 adj. 晚期的； 不治的；不可救药的；无可挽回的；末端的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>rolls up to the terminal</div>          <div class="root"><span class="lbl">根</span>termin(界限，终点) + al → 到终点的地方 → 航站楼</div>          <div class="zt"><span class="lbl">真题</span>I&#x27;ve been asked to rate my “store experience&quot; on the EFTPOS terminal before I can pay.在付款前，我被要求在销售点电子转账 终端系统上对我的“店铺体验”进行评分。 (2021)</div>          <div class="fam"><span class="lbl">族</span>terminate v. 终止 / terminator n. 终结者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">terminator</span>
+          <span class="ipa">/&#x27;t3:rməneitər/</span>
+          <span class="pos"></span>
+          <span class="cn">终结者；终止者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A poster of The Terminator hangs above her tools</div>          <div class="mnem"><span class="lbl">记</span>施瓦辛格主演的《终结者》，就 是 The Terminator。</div>          <div class="root"><span class="lbl">根</span>termin(终点) + ator(做…的人) → 让一切到终点的人</div>          <div class="fam"><span class="lbl">族</span>terminate v. 终止 / terminal n. 终点站</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">take-off</span>
+          <span class="ipa">/&#x27;terk o:f/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(飞机的)起飞</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At noon the take-off of a helicopter shakes the grass by the runway</div>          <div class="root"><span class="lbl">根</span>take(拿) + off(离开) → 离地而去 → 起飞</div>          <div class="zt"><span class="lbl">真题</span>All airlines ban(禁止) such devices from being used during “critical&quot; stages of flight, particularly take-off and landing. 所有航空公 司都禁止此类设备在飞行的“关键”阶段使用， 特别是在起飞和着陆阶段。</div>          <div class="fam"><span class="lbl">族</span>takeoff n. 起飞 / landing n. 着陆</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">airline</span>
+          <span class="ipa">/&#x27;eəlain/</span>
+          <span class="pos">n.</span>
+          <span class="cn">航空公司</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a jet from a big airline</div>          <div class="mnem"><span class="lbl">记</span>air(空气)+line(线)→都在空 气中飞成一条线了，肯定是很多飞机→航空 公司。</div>          <div class="root"><span class="lbl">根</span>air(空中) + line(线) → 在天上飞成一条线 → 航空公司</div>          <div class="zt"><span class="lbl">真题</span>“Our job as designers is to reinforce the airline&#x27;s brand and make it more recognizable,&quot; he says.他说：“作为设计师，我们的工作就是强化 航空公司的品牌，使其更容易被认出来。”(2020)</div>          <div class="fam"><span class="lbl">族</span>airliner n. 客机 / airway n. 航线</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">flight</span>
+          <span class="ipa">/flait/</span>
+          <span class="pos">n.</span>
+          <span class="cn">飞行；飞机的航程；班机，航班</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>checks every flight</div>          <div class="mnem"><span class="lbl">记</span>f(飞)+light(光)→飞行速度 就像光一样的航班→航班。</div>          <div class="root"><span class="lbl">根</span>fly(飞) 的名词形式 → 飞行；航班</div>          <div class="zt"><span class="lbl">真题</span>Long queues, delayed flights and over- crowding at airports have become almost as much a topic for conversation in Britain. 在英 国，机场排长队、航班延误和过度拥挤几乎已经 成为人们谈论的话题。(2016)</div>          <div class="fam"><span class="lbl">族</span>fly v. 飞 / flying adj. 飞行的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">helicopter</span>
+          <span class="ipa">/&#x27;helıka:ptər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">直升机</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the take-off of a helicopter</div>          <div class="root"><span class="lbl">根</span>helico(螺旋) + pter(翅膀) → 会转的翅膀 → 直升机</div>          <div class="zt"><span class="lbl">真题</span>A pilot from Virginia removed his son&#x27;s loose tooth using a helicopter. 维吉尼亚州的一 名飞行员用直升机拔下了他儿子松动的牙齿。 (2019)</div>          <div class="fam"><span class="lbl">族</span>heliport n. 直升机机场 / pterodactyl n. 翼龙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">dentist</span>
+          <span class="ipa">/&#x27;dentist/</span>
+          <span class="pos"></span>
+          <span class="cn">牙医，牙医诊所</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a dentist from the coast arrived with a heavy black bag</div>          <div class="mnem"><span class="lbl">记</span>词根 dent 表示“牙齿”，ist 表示 “人”→医治牙齿的人→牙医。</div>          <div class="root"><span class="lbl">根</span>dent(牙齿) + ist(人) → 管牙齿的人 → 牙医</div>          <div class="fam"><span class="lbl">族</span>dental adj. 牙科的 / dentistry n. 牙科学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">identical</span>
+          <span class="ipa">/ar&#x27;dentıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">(~to,for)同一的，同样的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a second traveler came in with an identical bag</div>          <div class="mnem"><span class="lbl">记</span>i(大写I，我)+ den(发音类似 “等”)+tical(发音类似“梯口”)→我在楼梯口 等着，突然看到一个和我穿同样衣服的人→同 样的。</div>          <div class="root"><span class="lbl">根</span>ident(相同) + ical(形容词后缀) → 同一个样子的 → 同样的</div>          <div class="zt"><span class="lbl">真题</span>Last year, a study from Aston University in the UK used nearly identical parameters(参数) to our study and found similar results. 去年,英 国阿斯顿大学的一项研究使用了与我们的研究 几乎相同的参数，并发现了类似的结果。(2018)</div>          <div class="fam"><span class="lbl">族</span>identity n. 身份 / identify v. 辨认</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">identify</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nora had to identify which bag belonged to whom</div>          <div class="root"><span class="lbl">根</span>ident(相同) + ify(使…) → 认出是同一个 → 辨认</div>          <div class="fam"><span class="lbl">族</span>identity n. 身份 / identification n. 身份证明</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">identifiable</span>
+          <span class="ipa">/aidentı&#x27;farəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可辨认的；可以确认的 (241) 第十单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with nothing identifiable on them</div>          <div class="root"><span class="lbl">根</span>identify(辨认) + able(可…的) → 可以认出来的</div>          <div class="zt"><span class="lbl">真题</span>It was easily identifiable from afar. 从远 处来看，它就很容易辨认出来了。</div>          <div class="fam"><span class="lbl">族</span>identify v. 辨认 / identification n. 辨认</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">decline</span>
+          <span class="ipa">/dr&#x27;klaın/</span>
+          <span class="pos">v.</span>
+          <span class="cn">下降，衰落；谢绝η.减少，下降，衰落</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the airline declined to keep its morning flight</div>          <div class="mnem"><span class="lbl">记</span>词根 cline的意思是“倾斜”；de 表示“往下”。往下倾斜，所以decline的意思是 “下降，衰落”。</div>          <div class="root"><span class="lbl">根</span>de(向下) + clin(倾斜) + e → 往下斜 → 下降；谢绝</div>          <div class="zt"><span class="lbl">真题</span>Research has revealed an enormous decline in reading. 研究显示，阅读量大幅下降。 (2021)</div>          <div class="fam"><span class="lbl">族</span>incline v. 倾向 / declining adj. 下降的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">incline</span>
+          <span class="ipa">/&#x27;ınklaın, ın&#x27;klaın/</span>
+          <span class="pos"></span>
+          <span class="cn">斜坡，斜面v.(使)倾斜，(使)倾向于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nora is inclined to love it just as much</div>          <div class="mnem"><span class="lbl">记</span>in可以表示“往上”（比如 increase);cline表示“倾斜”。往上倾斜，就是上 升倾向，固定搭配是 be inclined to do sth.,意思 是“倾向于做某事”。</div>          <div class="root"><span class="lbl">根</span>in(向上) + clin(倾斜) + e → 心里往上倾 → 倾向于</div>          <div class="zt"><span class="lbl">真题</span>Men not only cry for shorter periods than women, but they also are less inclined to explain their tears. 男人不仅哭的时间比女人 短，而且他们也不太愿意解释自己的眼泪。</div>          <div class="fam"><span class="lbl">族</span>be inclined to do 倾向于做 / inclination n. 倾向</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">worship</span>
+          <span class="ipa">/&#x27;w3:∫ip/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp; v. 崇拜，敬奉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The people of the town worship this little field</div>          <div class="mnem"><span class="lbl">记</span>warship 军舰，普通人看见神圣 的军舰，会张大嘴巴(O)，从内心升起莫名的“崇 拜(worship)”。</div>          <div class="root"><span class="lbl">根</span>worth(价值) + ship(状态) → 把它当成有价值的 → 崇拜</div>          <div class="zt"><span class="lbl">真题</span>In ancient times, many nations worshipped different gods. 在古代，很多民族崇拜不同的神灵。</div>          <div class="fam"><span class="lbl">族</span>worshipper n. 崇拜者 / worshipping n. 敬拜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">hardship</span>
+          <span class="ipa">/&#x27;ha:rd∫ıp/</span>
+          <span class="pos"></span>
+          <span class="cn">艰难，困苦</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The small staff had lived with hardship</div>          <div class="root"><span class="lbl">根</span>hard(艰难的) + ship(状态) → 艰难的状态 → 困苦</div>          <div class="zt"><span class="lbl">真题</span>Most people will experience some form of financial hardship at some point in their lives.大多数人在他们生命中的某个时候都会 经历某种形式的经济困难。</div>          <div class="fam"><span class="lbl">族</span>hard adj. 艰难的 / hardy adj. 坚强的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">wire</span>
+          <span class="ipa">/&#x27;waiər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">用导线给(建筑物、设备等)接通电源</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>So Nora and two helpers wired the control room themselves</div>          <div class="mnem"><span class="lbl">记</span>wi(想成 we，我们)十re(阿姨) →我们把阿姨的“电线”藏了起来。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：wire the house 给房子布线 / wire n. 电线</div>          <div class="zt"><span class="lbl">真题</span>With wired set-ups, the fear is that a burglar(入室盗贼)might be able to shut your system down simply by cutting the right cable. 对于有线设置，人们担心窃贼可能只需剪断正 确的电缆即可关闭您的系统。</div>          <div class="fam"><span class="lbl">族</span>wireless adj. 无线的 / wiring n. 布线</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">weaken</span>
+          <span class="ipa">/&#x27;wi:kən/</span>
+          <span class="pos">v.</span>
+          <span class="cn">削弱;变弱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rain could weaken the radio signal and the lights</div>          <div class="root"><span class="lbl">根</span>weak(弱的) + en(使…) → 使变弱 → 削弱</div>          <div class="zt"><span class="lbl">真题</span>Stress will weaken the body&#x27;s defense against germs. 压力会削弱身体对病菌的防御 能力。 (使……)→使虚弱的→削弱。</div>          <div class="fam"><span class="lbl">族</span>weak adj. 虚弱的 / weakness n. 弱点</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">shortcoming</span>
+          <span class="ipa">/&#x27;∫o:rtkamin/</span>
+          <span class="pos">n.</span>
+          <span class="cn">缺点，缺陷</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>list every shortcoming of the field</div>          <div class="root"><span class="lbl">根</span>short(不足) + coming(到来) → 短处 → 缺点</div>          <div class="zt"><span class="lbl">真题</span>Humility leads to an honest view of one&#x27;s own advantages and shortcomings. 谦逊会让人 们诚实地看待自己的优点和缺点。</div>          <div class="fam"><span class="lbl">族</span>shortage n. 短缺 / come short of 达不到</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">disadvantage</span>
+          <span class="ipa">/disəd&#x27;væntıd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">劣势；不利因素；损失</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The biggest disadvantage was the distance from the city</div>          <div class="mnem"><span class="lbl">记</span>往后（back）拉（draw，如 draw the attention)。当你做事情时，拉你后腿的东 西就是你的“缺点，不利条件”。</div>          <div class="root"><span class="lbl">根</span>dis(不) + advantage(优势) → 没有优势 → 劣势</div>          <div class="zt"><span class="lbl">真题</span>Perhaps the biggest disadvantage of taking an online class is the absence of face-to- face interaction between the teacher and the students. 也许在线课程最大的缺点是老师和学 生之间缺乏面对面的互动。(2022)</div>          <div class="fam"><span class="lbl">族</span>advantage n. 优势 / disadvantaged adj. 处于劣势的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">drawback</span>
+          <span class="ipa">/&#x27;drə:bæk/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Another drawback was the old control tower</div>          <div class="root"><span class="lbl">根</span>draw(拉) + back(后) → 把你往后拉的东西 → 缺点</div>          <div class="fam"><span class="lbl">族</span>draw back 后退 / pros and cons 利弊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">setback</span>
+          <span class="ipa">/&#x27;setbæk/</span>
+          <span class="pos">n.</span>
+          <span class="cn">挫折；阻碍</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every setback made the little airport look smaller</div>          <div class="mnem"><span class="lbl">记</span>weak（虚弱的，无力的）十en</div>          <div class="root"><span class="lbl">根</span>set(放) + back(后) → 把你往后推一下 → 挫折</div>          <div class="zt"><span class="lbl">真题</span>But curiosity can also be dangerous, 无线电发射和接收系统；无线电报 leading to setbacks or even downfalls. 但好奇 心也可能是危险的，它会导致挫折甚至失败。 (2021)</div>          <div class="fam"><span class="lbl">族</span>set back 阻碍 / setback n. 挫折</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">obstacle</span>
+          <span class="ipa">/&#x27;a:bstəkl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">障碍；干扰；阻碍；绊脚石</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The only real obstacle was money</div>          <div class="root"><span class="lbl">根</span>ob(在…前面) + sta(站) + cle → 站在前面挡路 → 障碍</div>          <div class="zt"><span class="lbl">真题</span>Though there are plans to add translations, language barriers can be a big obstacle. 虽然有 增加翻译的计划，但语言障碍可能是一个很大 的阻碍。(2023)</div>          <div class="fam"><span class="lbl">族</span>obstruct v. 阻塞 / obstinate adj. 固执的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">hinder</span>
+          <span class="ipa">/&#x27;hındər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">阻碍；妨碍；阻挡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Snow and wind would hinder repair work in winter</div>          <div class="mnem"><span class="lbl">记</span>hind(后面)十er(表示人)→想 象一个人在背后阻碍你前进→阻碍。</div>          <div class="root"><span class="lbl">根</span>hind(后面) + er → 在后面拖住你 → 阻碍</div>          <div class="zt"><span class="lbl">真题</span>A fixed mindset can also hinder communication and progress in the workplace. 思维定势也会阻碍职场中的沟通和进步。</div>          <div class="fam"><span class="lbl">族</span>hindrance n. 障碍 / hinder sb from 阻止某人做</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">herd</span>
+          <span class="ipa">/h3:rd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">兽群，牧群 v. 放牧；驱赶(兽群)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On Sundays they stand by the fence like a herd of sheep</div>          <div class="mnem"><span class="lbl">记</span>她(her)的(d)一群羊。她是“放</div>          <div class="root"><span class="lbl">根</span>谐音联想：她的(de) → 她的一群羊 → 兽群</div>          <div class="zt"><span class="lbl">真题</span>They want to get back to their herds. 他 们想回到牛群身边。</div>          <div class="fam"><span class="lbl">族</span>herdsman n. 牧人 / flock n. 羊群</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">pigeon</span>
+          <span class="ipa">/&#x27;pıd3ın/</span>
+          <span class="pos"></span>
+          <span class="cn">鸽子 (242)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A grey pigeon lives under the roof</div>          <div class="root"><span class="lbl">根</span>靠搭配记：carrier pigeon 信鸽 / pigeon hole 鸽子窝</div>          <div class="zt"><span class="lbl">真题</span>Despite having a brain no bigger than the tip of your index finger, pigeons have a very impressive visual memory.尽管鸽子的大脑还 没有你的食指尖大，但它们的视觉记忆力却非 常惊人。(2017)</div>          <div class="fam"><span class="lbl">族</span>dove n. 鸽 / pigeonhole n. 分类格</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 64</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

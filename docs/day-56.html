@@ -1,0 +1,690 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 56 · The Girl Who Copied the Old Letters</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 56 · 12/7 · Unit 9 第 1651-1680 词</div>
+  <h1>The Girl Who Copied the Old Letters<span class="cn">抄旧信的女孩</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-56.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3328"><p class="en"><span class="w" data-s="43" data-e="256">Red</span> <span class="w" data-s="299" data-e="512">Ash</span> <span class="w" data-s="555" data-e="853">is</span> <span class="w" data-s="981" data-e="1067">a</span> <span class="w" data-s="1109" data-e="1280">small</span> <span class="w target" data-s="1323" data-e="1749" title="区；地区，区域">district</span> <span class="w" data-s="1792" data-e="2091">at</span> <span class="w" data-s="2133" data-e="2261">the</span> <span class="w" data-s="2304" data-e="2389">foot</span> <span class="w" data-s="2432" data-e="2560">of</span> <span class="w" data-s="2603" data-e="2645">an</span> <span class="w" data-s="2688" data-e="2773">old</span> <span class="w target" data-s="2816" data-e="3328" title="火山">volcano.</span></p><p class="zh">红灰镇是一座小镇，坐落在一座老火山的山脚下。</p></div>
+<div class="pair" data-s0="3499" data-s1="10411"><p class="en"><span class="w" data-s="3499" data-e="4395">Mira</span> <span class="w" data-s="4437" data-e="4565">works</span> <span class="w" data-s="4608" data-e="4779">in</span> <span class="w" data-s="4821" data-e="4907">a</span> <span class="w" data-s="4949" data-e="5333">newspaper</span> <span class="w" data-s="5376" data-e="5547">office</span> <span class="w" data-s="5589" data-e="5845">there:</span> <span class="w" data-s="6101" data-e="6656">one</span> <span class="w target" data-s="6699" data-e="6997" title="昏暗的；看不清楚的；前景暗淡的，不乐 观的">dim</span> <span class="w" data-s="7040" data-e="7253">room,</span> <span class="w" data-s="7467" data-e="7851">one</span> <span class="w" data-s="7893" data-e="8107">wide</span> <span class="w" data-s="8149" data-e="8533">window,</span> <span class="w" data-s="8747" data-e="8960">and</span> <span class="w" data-s="9131" data-e="9301">an</span> <span class="w" data-s="9344" data-e="9472">iron</span> <span class="w target" data-s="9515" data-e="10027" title="">column</span> <span class="w" data-s="10069" data-e="10112">by</span> <span class="w" data-s="10155" data-e="10240">the</span> <span class="w" data-s="10283" data-e="10411">door.</span></p><p class="zh">米拉在那儿的一家报社上班：一间昏暗的屋子，一扇宽窗，门边立着一根铁柱子。</p></div>
+<div class="pair" data-s0="10624" data-s1="13312"><p class="en"><span class="w" data-s="10624" data-e="11563">Fifty</span> <span class="w" data-s="11605" data-e="11733">years</span> <span class="w" data-s="11776" data-e="11989">ago</span> <span class="w" data-s="12032" data-e="12331">a</span> <span class="w target" data-s="12416" data-e="12757" title="灾难，灾祸">disaster</span> <span class="w" data-s="12800" data-e="13056">hit</span> <span class="w" data-s="13099" data-e="13184">the</span> <span class="w" data-s="13227" data-e="13312">town.</span></p><p class="zh">五十年前，一场灾难袭击了这座小镇。</p></div>
+<div class="pair" data-s0="14005" data-s1="19509"><p class="en"><span class="w" data-s="14005" data-e="14176">After</span> <span class="w" data-s="14218" data-e="14432">the</span> <span class="w" data-s="14474" data-e="14816">eruption</span> <span class="w" data-s="14858" data-e="15029">came</span> <span class="w" data-s="15072" data-e="15200">a</span> <span class="w target" data-s="15242" data-e="15584" title="饥荒，饥饿">famine</span> <span class="w" data-s="15626" data-e="15754">and</span> <span class="w" data-s="15797" data-e="15925">long</span> <span class="w" data-s="15968" data-e="16224">months</span> <span class="w" data-s="16266" data-e="16437">of</span> <span class="w target" data-s="16480" data-e="16778" title="悲痛，痛苦v.使痛苦，使悲伤">distress,</span> <span class="w" data-s="17077" data-e="17333">and</span> <span class="w" data-s="17546" data-e="17717">the</span> <span class="w target" data-s="17760" data-e="17973" title="">labour</span> <span class="w" data-s="18016" data-e="18144">of</span> <span class="w" data-s="18186" data-e="18442">rebuilding</span> <span class="w" data-s="18485" data-e="18784">fell</span> <span class="w" data-s="18826" data-e="18997">on</span> <span class="w" data-s="19040" data-e="19210">every</span> <span class="w target" data-s="19253" data-e="19509" title="饥荒，饥饿">family.</span></p><p class="zh">火山喷发之后是饥荒和长达数月的悲痛，重建的劳动落在每一户人家身上。</p></div>
+<div class="pair" data-s0="19808" data-s1="24416"><p class="en"><span class="w" data-s="19808" data-e="20789">Mira&#x27;s</span> <span class="w" data-s="20832" data-e="21173">grandfather</span> <span class="w" data-s="21216" data-e="21472">was</span> <span class="w" data-s="21514" data-e="21600">a</span> <span class="w target" data-s="21642" data-e="21941" title="勤劳的，细致的，潜心的 n.劳动；工作">diligent</span> <span class="w" data-s="21984" data-e="22368">reporter</span> <span class="w" data-s="22410" data-e="22581">then,</span> <span class="w" data-s="22709" data-e="22880">and</span> <span class="w" data-s="23050" data-e="23221">he</span> <span class="w" data-s="23264" data-e="23349">wrote</span> <span class="w" data-s="23392" data-e="23562">down</span> <span class="w" data-s="23605" data-e="24032">everything</span> <span class="w" data-s="24074" data-e="24245">he</span> <span class="w" data-s="24288" data-e="24416">saw.</span></p><p class="zh">米拉的祖父当年是个勤劳的记者，他把自己看到的一切都记了下来。</p></div>
+<div class="pair" data-s0="24842" data-s1="30176"><p class="en"><span class="w" data-s="24842" data-e="24928">The</span> <span class="w" data-s="24970" data-e="25098">town</span> <span class="w" data-s="25141" data-e="25397">still</span> <span class="w" data-s="25440" data-e="25696">keeps</span> <span class="w" data-s="25738" data-e="25824">his</span> <span class="w" data-s="25866" data-e="26122">letters,</span> <span class="w" data-s="26293" data-e="26464">but</span> <span class="w" data-s="26762" data-e="26890">his</span> <span class="w target" data-s="26933" data-e="27232" title="手写；书写；笔迹；书法">handwriting</span> <span class="w" data-s="27274" data-e="27530">is</span> <span class="w" data-s="27573" data-e="27701">thin</span> <span class="w" data-s="27744" data-e="28000">and</span> <span class="w target" data-s="28042" data-e="28256" title="模糊的，不清楚的">vague,</span> <span class="w" data-s="28512" data-e="28640">and</span> <span class="w" data-s="28896" data-e="29024">most</span> <span class="w" data-s="29066" data-e="29408">readers</span> <span class="w" data-s="29450" data-e="29664">cannot</span> <span class="w" data-s="29706" data-e="29920">follow</span> <span class="w" data-s="29962" data-e="30176">it.</span></p><p class="zh">镇上至今留着他的信件，可他的笔迹又细又模糊，多数读者根本读不下去。</p></div>
+<div class="pair" data-s0="30859" data-s1="32523"><p class="en"><span class="w" data-s="30859" data-e="30987">So</span> <span class="w" data-s="31029" data-e="31413">Mira&#x27;s</span> <span class="w" data-s="31456" data-e="31541">job</span> <span class="w" data-s="31584" data-e="31797">is</span> <span class="w" data-s="31840" data-e="31968">to</span> <span class="w target" data-s="32011" data-e="32352" title="模仿，仿制">imitate</span> <span class="w" data-s="32395" data-e="32523">it.</span></p><p class="zh">于是米拉的工作就是模仿这笔迹。</p></div>
+<div class="pair" data-s0="32651" data-s1="38112"><p class="en"><span class="w" data-s="32651" data-e="32864">She</span> <span class="w" data-s="33376" data-e="33504">does</span> <span class="w" data-s="33547" data-e="33632">not</span> <span class="w target" data-s="33675" data-e="34016" title="假扮；装扮；伪装n. 伪装物">disguise</span> <span class="w" data-s="34059" data-e="34187">her</span> <span class="w" data-s="34229" data-e="34357">own</span> <span class="w" data-s="34400" data-e="34528">name;</span> <span class="w" data-s="34827" data-e="35339">she</span> <span class="w target" data-s="35381" data-e="35851" title="模仿，假装">simulates</span> <span class="w" data-s="35893" data-e="36064">the</span> <span class="w" data-s="36107" data-e="36235">old</span> <span class="w" data-s="36277" data-e="36533">letters</span> <span class="w" data-s="36576" data-e="36789">only</span> <span class="w" data-s="36832" data-e="37045">for</span> <span class="w" data-s="37088" data-e="37259">one</span> <span class="w" data-s="37301" data-e="37685">weekly</span> <span class="w target" data-s="37728" data-e="38112" title="">column.</span></p><p class="zh">她并不伪装自己的名字；她只为每周的一个专栏模拟这些旧信。</p></div>
+<div class="pair" data-s0="38586" data-s1="43621"><p class="en"><span class="w" data-s="38586" data-e="38672">She</span> <span class="w target" data-s="38714" data-e="38970" title="水龙头；旋塞；轻拍；轻敲；轻扣 v. 轻敲；轻 拍；轻叩；开发，发掘，利用(资源、形势)">taps</span> <span class="w" data-s="39013" data-e="39141">the</span> <span class="w" data-s="39184" data-e="39312">paper,</span> <span class="w target" data-s="39568" data-e="40250" title="轻拍，爱抚">pats</span> <span class="w" data-s="40293" data-e="40378">it</span> <span class="w" data-s="40421" data-e="40506">flat,</span> <span class="w" data-s="40805" data-e="41018">and</span> <span class="w" data-s="41189" data-e="41530">copies</span> <span class="w" data-s="41573" data-e="41744">each</span> <span class="w" data-s="41786" data-e="42042">line</span> <span class="w" data-s="42085" data-e="42298">with</span> <span class="w" data-s="42341" data-e="42426">a</span> <span class="w" data-s="42469" data-e="42554">pen</span> <span class="w" data-s="42597" data-e="42810">that</span> <span class="w" data-s="42853" data-e="42938">is</span> <span class="w" data-s="42981" data-e="43109">always</span> <span class="w target" data-s="43152" data-e="43621" title="手边的；便于使用的,方便的">handy.</span></p><p class="zh">她轻敲纸面，把它拍平，用一支总在手边的笔一行行抄写。</p></div>
+<div class="pair" data-s0="43749" data-s1="49040"><p class="en"><span class="w" data-s="43749" data-e="44133">For</span> <span class="w target" data-s="44346" data-e="44816" title="方便，便利；方便的东西">convenience,</span> <span class="w" data-s="45029" data-e="45285">the</span> <span class="w" data-s="45413" data-e="45669">letters</span> <span class="w" data-s="45712" data-e="45840">live</span> <span class="w" data-s="45882" data-e="46010">in</span> <span class="w" data-s="46053" data-e="46096">a</span> <span class="w" data-s="46138" data-e="46224">box</span> <span class="w" data-s="46266" data-e="46693">beside</span> <span class="w" data-s="46736" data-e="46864">her</span> <span class="w" data-s="46906" data-e="47205">desk,</span> <span class="w" data-s="47418" data-e="47546">and</span> <span class="w" data-s="47674" data-e="47888">her</span> <span class="w" data-s="47930" data-e="48016">first</span> <span class="w target" data-s="48058" data-e="48400" title="草稿；草案;草图；汇票 v.起草;草拟">draft</span> <span class="w" data-s="48442" data-e="48613">is</span> <span class="w" data-s="48656" data-e="48826">never</span> <span class="w" data-s="48869" data-e="49040">clean.</span></p><p class="zh">为了方便，这些信就放在她桌旁的箱子里，而她的初稿从来都不干净。</p></div>
+<div class="pair" data-s0="49728" data-s1="53354"><p class="en"><span class="w" data-s="49728" data-e="50069">Mira</span> <span class="w" data-s="50112" data-e="50197">is</span> <span class="w target" data-s="50240" data-e="50496" title="热情的；热心的；思维敏捷的；机灵的；机智 的；灵敏的；敏锐的；强烈的；浓厚的；深厚的">keen</span> <span class="w" data-s="50538" data-e="50624">on</span> <span class="w" data-s="50666" data-e="50794">this</span> <span class="w" data-s="50837" data-e="50965">work,</span> <span class="w" data-s="51178" data-e="51349">and</span> <span class="w target" data-s="51605" data-e="51861" title="激情，热情">passion</span> <span class="w" data-s="51904" data-e="52416">keeps</span> <span class="w" data-s="52458" data-e="52544">her</span> <span class="w" data-s="52586" data-e="52672">at</span> <span class="w" data-s="52714" data-e="52757">the</span> <span class="w" data-s="52800" data-e="53013">desk</span> <span class="w" data-s="53056" data-e="53184">for</span> <span class="w" data-s="53226" data-e="53354">hours.</span></p><p class="zh">米拉热爱这份工作，热情让她在桌前坐上好几个小时。</p></div>
+<div class="pair" data-s0="53653" data-s1="57280"><p class="en"><span class="w" data-s="53653" data-e="54250">Her</span> <span class="w" data-s="54293" data-e="54592">editor</span> <span class="w target" data-s="54634" data-e="54890" title="鞭策；激励；刺激；鼓舞 η. 马刺；鞭策；激励 on. 让人群的欢呼声激励你前进。">spurs</span> <span class="w" data-s="54933" data-e="55104">her</span> <span class="w" data-s="55146" data-e="55317">on,</span> <span class="w" data-s="55445" data-e="55658">and</span> <span class="w" data-s="55957" data-e="56298">readers&#x27;</span> <span class="w" data-s="56384" data-e="56597">letters</span> <span class="w target" data-s="56640" data-e="57109" title="促进，促使；激发；激励；使(身体，生物系统) 兴奋，刺激">stimulate</span> <span class="w" data-s="57152" data-e="57280">her.</span></p><p class="zh">编辑鞭策她，读者的来信激励她。</p></div>
+<div class="pair" data-s0="57787" data-s1="62480"><p class="en"><span class="w" data-s="57787" data-e="58000">Yet</span> <span class="w" data-s="58043" data-e="58128">she</span> <span class="w" data-s="58171" data-e="58299">is</span> <span class="w target" data-s="58341" data-e="58640" title="">doubtful</span> <span class="w" data-s="58683" data-e="58811">about</span> <span class="w" data-s="58853" data-e="59067">one</span> <span class="w" data-s="59109" data-e="59323">thing:</span> <span class="w" data-s="59920" data-e="60261">can</span> <span class="w" data-s="60304" data-e="60475">she</span> <span class="w target" data-s="60517" data-e="60773" title="使确信；使相信；使信服；说服">convince</span> <span class="w" data-s="60816" data-e="61029">anyone</span> <span class="w" data-s="61072" data-e="61371">that</span> <span class="w" data-s="61413" data-e="61499">a</span> <span class="w target" data-s="61541" data-e="61797" title="饥荒，饥饿">famine</span> <span class="w" data-s="61840" data-e="61925">is</span> <span class="w" data-s="61968" data-e="62053">more</span> <span class="w" data-s="62096" data-e="62267">than</span> <span class="w" data-s="62309" data-e="62480">numbers?</span></p><p class="zh">可有一件事她始终心存疑虑：她能让人相信饥荒不只是几个数字吗？</p></div>
+<div class="pair" data-s0="62779" data-s1="64400"><p class="en"><span class="w" data-s="62779" data-e="63504">Small</span> <span class="w" data-s="63547" data-e="63717">things</span> <span class="w target" data-s="63760" data-e="64187" title="打扰，扰乱；弄乱；使烦恼">disturb</span> <span class="w" data-s="64229" data-e="64400">her.</span></p><p class="zh">小事也会打扰她。</p></div>
+<div class="pair" data-s0="64528" data-s1="67600"><p class="en"><span class="w" data-s="64528" data-e="65253">The</span> <span class="w" data-s="65296" data-e="65424">heavy</span> <span class="w" data-s="65467" data-e="65851">smell</span> <span class="w" data-s="65893" data-e="66021">of</span> <span class="w" data-s="66064" data-e="66192">old</span> <span class="w" data-s="66235" data-e="66405">oil</span> <span class="w" data-s="66448" data-e="66917">fills</span> <span class="w" data-s="66960" data-e="67045">her</span> <span class="w" data-s="67088" data-e="67173">with</span> <span class="w target" data-s="67216" data-e="67600" title="">disgust.</span></p><p class="zh">旧机油的气味让她满心厌恶。</p></div>
+<div class="pair" data-s0="68336" data-s1="71877"><p class="en"><span class="w" data-s="68336" data-e="68464">When</span> <span class="w" data-s="68506" data-e="68634">the</span> <span class="w" data-s="68677" data-e="68805">lamp</span> <span class="w" data-s="68848" data-e="69061">burns</span> <span class="w" data-s="69104" data-e="69274">low,</span> <span class="w" data-s="69530" data-e="69744">she</span> <span class="w" data-s="70085" data-e="70341">cannot</span> <span class="w" data-s="70384" data-e="70682">judge</span> <span class="w" data-s="70725" data-e="70810">the</span> <span class="w target" data-s="70853" data-e="71237" title="维度，范围，规模，尺寸">dimensions</span> <span class="w" data-s="71280" data-e="71408">of</span> <span class="w" data-s="71450" data-e="71578">her</span> <span class="w" data-s="71621" data-e="71706">own</span> <span class="w" data-s="71749" data-e="71877">words.</span></p><p class="zh">灯芯烧低的时候，她辨不出自己笔下字句的尺寸。</p></div>
+<div class="pair" data-s0="72261" data-s1="78490"><p class="en"><span class="w" data-s="72261" data-e="72901">Some</span> <span class="w" data-s="72944" data-e="73413">evenings</span> <span class="w" data-s="73456" data-e="73584">she</span> <span class="w" data-s="73626" data-e="73840">sits</span> <span class="w" data-s="73882" data-e="74096">still</span> <span class="w" data-s="74138" data-e="74480">and</span> <span class="w" data-s="74650" data-e="74949">watches</span> <span class="w" data-s="74992" data-e="75120">the</span> <span class="w" data-s="75162" data-e="75461">smoke</span> <span class="w target" data-s="75504" data-e="75802" title="流动v. 漂流">drift</span> <span class="w" data-s="75845" data-e="75973">over</span> <span class="w" data-s="76016" data-e="76144">the</span> <span class="w" data-s="76186" data-e="76485">roofs,</span> <span class="w" data-s="76570" data-e="77040">toward</span> <span class="w" data-s="77082" data-e="77253">a</span> <span class="w target" data-s="77296" data-e="77637" title="目的地，终点，目标">destination</span> <span class="w" data-s="77680" data-e="77936">she</span> <span class="w" data-s="77978" data-e="78106">can</span> <span class="w" data-s="78149" data-e="78277">only</span> <span class="w" data-s="78320" data-e="78490">guess.</span></p><p class="zh">有些傍晚，她静静地坐着，看烟从屋顶上飘过，飘向一个她只能猜测的目的地。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">disguise</span>
+          <span class="ipa">/dıs&#x27;gaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">假扮；装扮；伪装n. 伪装物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She does not disguise her own name</div>          <div class="mnem"><span class="lbl">记</span>该单词用汉语拼音来记忆：弟 弟(di)似(s)gui(鬼)。弟弟像鬼一样，那弟弟不 是鬼啊，为什么像鬼呢？→假扮，伪装。</div>          <div class="root"><span class="lbl">根</span>dis(否定) + guise(样子) → 换成不是自己的样子</div>          <div class="zt"><span class="lbl">真题</span>I hate it because it&#x27;s an obligation disguised as an option. 我讨厌它，因为它是一 种伪装成选择的义务。(2016)</div>          <div class="fam"><span class="lbl">族</span>disguised adj. 伪装的 / guise n. 外表</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">simulate</span>
+          <span class="ipa">/&#x27;simjulert/</span>
+          <span class="pos">v.</span>
+          <span class="cn">模仿，假装</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she simulates the old letters only for one weekly column</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为：simu（四目，就是 四眼，以前对近视眼的蔑称)十late(迟到)，连到 一起就是四眼迟到，我们小时候是不是经常模 仿那些狼狈的学生的样子，所以你连一个眼睛 近视的同学迟到的样子都会“模仿”。</div>          <div class="root"><span class="lbl">根</span>simul(相同) + ate(动词后缀) → 做得和真的一样</div>          <div class="zt"><span class="lbl">真题</span>Over the centuries, they have simulated dialogues in a number of ways. 几个世纪以来， 他们以多种方式模拟对话。(2019)</div>          <div class="fam"><span class="lbl">族</span>simulation n. 模拟 / similar adj. 相似的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">stimulate</span>
+          <span class="ipa">/&#x27;stimjuleit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">促进，促使；激发；激励；使(身体，生物系统) 兴奋，刺激</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and readers&#x27; letters stimulate her</div>          <div class="mnem"><span class="lbl">记</span>stimulate 比 simulate多了一 个字母t，想象成他，你模仿他，不就刺激了他 吗？所以该单词意为“刺激”。</div>          <div class="root"><span class="lbl">根</span>stimul(刺) + ate → 扎一下让人动起来 → 激发</div>          <div class="zt"><span class="lbl">真题</span>A person who is unable to stimulate others&#x27; curiosity or make their life enjoyable may appear somewhat boring. 一个人如果不能 激发别人的好奇心或使他们的生活愉快，这个 人可能会显得有些无聊。</div>          <div class="fam"><span class="lbl">族</span>stimulation n. 刺激 / stimulus n. 刺激物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">spur</span>
+          <span class="ipa">/sp3:r/</span>
+          <span class="pos">v.</span>
+          <span class="cn">鞭策；激励；刺激；鼓舞 η. 马刺；鞭策；激励 on. 让人群的欢呼声激励你前进。</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her editor spurs her on</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“死破”。别人说 “看你穿的衣服，死破(很破)，还不好好学习？” 是不是在“鞭策”你，“刺激”你？</div>          <div class="root"><span class="lbl">根</span>靠搭配记：spur sb. on 鞭策某人前进</div>          <div class="fam"><span class="lbl">族</span>spur n. 马刺 / spurred adj. 受激励的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">imitate</span>
+          <span class="ipa">/&#x27;ımiteit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">模仿，仿制</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mira&#x27;s job is to imitate it</div>          <div class="mnem"><span class="lbl">记</span>im（想成I&#x27;m)；it（它)；ate (吃)。连在一起就是我是它的主人，它整天跟 着我，我吃饭的动作它都要“模仿”。</div>          <div class="root"><span class="lbl">根</span>imit(像) + ate → 做得像 → 模仿</div>          <div class="zt"><span class="lbl">真题</span>The dancers move in harmony as they imitate the animal&#x27;s natural movements in the wild.舞者们在模仿野生动物的自然动作时，动 作很和谐。(2023)</div>          <div class="fam"><span class="lbl">族</span>imitation n. 模仿 / imitative adj. 模仿的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">tap</span>
+          <span class="ipa">/tæp/</span>
+          <span class="pos"></span>
+          <span class="cn">水龙头；旋塞；轻拍；轻敲；轻扣 v. 轻敲；轻 拍；轻叩；开发，发掘，利用(资源、形势)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She taps the paper</div>          <div class="mnem"><span class="lbl">记</span>单词可以联想为：他(ta)拍(p)， 就是听着音乐轻轻打着拍子的感觉→轻拍。</div>          <div class="root"><span class="lbl">根</span>谐音联想：他(ta)拍(p) → 轻轻拍打</div>          <div class="zt"><span class="lbl">真题</span>Scientists have tried to tap Internet donors，too，with mixed success.科学家们也 试图利用互联网捐助者，但结果喜忧参半。 (2019)</div>          <div class="fam"><span class="lbl">族</span>tap n. 水龙头 / tapping n. 轻敲</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">pat</span>
+          <span class="ipa">/pæt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">轻拍，爱抚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>pats it flat</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“拍她”，那就是 “轻拍”的意思。</div>          <div class="root"><span class="lbl">根</span>谐音联想：拍她 → 轻拍，爱抚</div>          <div class="zt"><span class="lbl">真题</span>The music would sound not quite right: attempts to pat the beat off just so. 音乐听起 来不太对劲：试着把节拍拍下来。</div>          <div class="fam"><span class="lbl">族</span>pat n. 轻拍 / patted v. 轻拍(过去式)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">passion</span>
+          <span class="ipa">/&#x27;pæ∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">激情，热情</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and passion keeps her at the desk for hours</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“拍心（胸 膛)”。设想一个人说话的时候总是拍着胸脯， 他多么有“激情”啊！</div>          <div class="root"><span class="lbl">根</span>pass(感受) + ion → 强烈的感受 → 激情</div>          <div class="zt"><span class="lbl">真题</span>Many people believe that passion and commitment are the foundations of strong romantic relationships. 许多人认为激情和承诺 是牢固的恋爱关系的基础。(2021)</div>          <div class="fam"><span class="lbl">族</span>passionate adj. 热情的 / passionately adv. 热烈地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">keen</span>
+          <span class="ipa">/ki:n/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">热情的；热心的；思维敏捷的；机灵的；机智 的；灵敏的；敏锐的；强烈的；浓厚的；深厚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mira is keen on this work</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“凯恩”，他是 英格兰著名足球运动员，球迷看到他就会→热 切的；渴望的。 (210) 今天你做别人不愿意做的事情，明天你 第九单元 就能做到别人做不到的事情！</div>          <div class="root"><span class="lbl">根</span>靠搭配记：be keen on 热衷于 / be keen to do 渴望做</div>          <div class="zt"><span class="lbl">真题</span>They are keen on high technology. 他们 热衷于高科技。(2017)</div>          <div class="fam"><span class="lbl">族</span>keenly adv. 敏锐地 / keenness n. 敏锐</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">convenience</span>
+          <span class="ipa">/kən&#x27;vi:niəns/</span>
+          <span class="pos"></span>
+          <span class="cn">方便，便利；方便的东西</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>For convenience, the letters live in a box beside her desk</div>          <div class="mnem"><span class="lbl">记</span>都(con)为您(venien的谐音)。 现在各个商家是不是都是为了您的“方便”，让 您网上订票、用手机买衣服？</div>          <div class="root"><span class="lbl">根</span>con(共同) + ven(来) + ience → 一切都为你而来</div>          <div class="zt"><span class="lbl">真题</span>A growing number of U. S. bike riders are attracted to electric bikes for convenience, health benefits. 越来越多的美国自行车爱好者 被电动自行车所吸引，因为它们方便、对健康有 好处。(2020)</div>          <div class="fam"><span class="lbl">族</span>convenient adj. 方便的 / conveniently adv. 方便地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">handy</span>
+          <span class="ipa">/&#x27;hændi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">手边的；便于使用的,方便的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a pen that is always handy</div>          <div class="root"><span class="lbl">根</span>hand(手) + y → 就在手边的 → 方便的</div>          <div class="zt"><span class="lbl">真题</span>Taking whatever materials are handy and tinkering with them is a simple way to engage those important “maker”skills. 使用任何手边 的材料，并对它们进行修修补补是一种简单的 方法，可以让你获得那些重要的“制作者”技能。</div>          <div class="fam"><span class="lbl">族</span>hand n. 手 / handful n. 一把</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">handwriting</span>
+          <span class="ipa">/&#x27;hændraitı/</span>
+          <span class="pos">n.</span>
+          <span class="cn">手写；书写；笔迹；书法</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his handwriting is thin and vague</div>          <div class="root"><span class="lbl">根</span>hand(手) + writing(书写) → 手写出来的字</div>          <div class="zt"><span class="lbl">真题</span>His handwriting has a unique style. 他的 书法风格独特。</div>          <div class="fam"><span class="lbl">族</span>handwrite v. 手写 / written adj. 书面的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">convince</span>
+          <span class="ipa">/kən&#x27;vins/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使确信；使相信；使信服；说服</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>can she convince anyone that a famine is more than numbers</div>          <div class="mnem"><span class="lbl">记</span>一起(con)吻死(vince的谐音） 你。我们都使劲地亲吻你，只是向你证明，使你 “确信”，我们真的爱你。</div>          <div class="root"><span class="lbl">根</span>con(完全) + vince(征服) → 从心里征服对方 → 使确信</div>          <div class="zt"><span class="lbl">真题</span>It convinced the public that fashionable clothes should be made durable. 它使公众相 信，时尚的衣服应该经久耐穿。</div>          <div class="fam"><span class="lbl">族</span>convincing adj. 有说服力的 / conviction n. 确信</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">doubtful</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Yet she is doubtful about one thing</div>          <div class="root"><span class="lbl">根</span>doubt(怀疑) + ful(充满…的) → 满是怀疑的</div>          <div class="fam"><span class="lbl">族</span>doubt n./v. 怀疑 / undoubtedly adv. 无疑地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">destination</span>
+          <span class="ipa">/idestı&#x27;nei∫n/</span>
+          <span class="pos"></span>
+          <span class="cn">目的地，终点，目标</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>toward a destination she can only guess</div>          <div class="root"><span class="lbl">根</span>destin(注定) + ation → 注定要去的地方</div>          <div class="zt"><span class="lbl">真题</span>Venice is one of the hottest tourist destinations in the world. 威尼斯是世界上最热 门的旅游胜地之一。(2018)</div>          <div class="fam"><span class="lbl">族</span>destine v. 注定 / destiny n. 命运</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">diligent</span>
+          <span class="ipa">/&#x27;dılıdzənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">勤劳的，细致的，潜心的 n.劳动；工作</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mira&#x27;s grandfather was a diligent reporter then</div>          <div class="mnem"><span class="lbl">记</span>该单词读音类似“累不”？请 问，正在“劳动”的你累不？</div>          <div class="root"><span class="lbl">根</span>谐音联想：累不(di-li-gent)？勤劳当然累</div>          <div class="zt"><span class="lbl">真题</span>In turn, that created a pool of labour for factories.反过来，那又为工厂创造了大量劳动 力。(2017)</div>          <div class="fam"><span class="lbl">族</span>diligence n. 勤奋 / diligently adv. 勤勉地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">labour</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the labour of rebuilding fell on every family</div>          <div class="root"><span class="lbl">根</span>靠搭配记：labour force 劳动力 / hard labour 苦工</div>          <div class="fam"><span class="lbl">族</span>labourer n. 劳工 / labor v. 劳动(美式拼写)</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">disaster</span>
+          <span class="ipa">/dı&#x27;zæstər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">灾难，灾祸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Fifty years ago a disaster hit the town</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“地砸死他”。 这真是个“灾难”啊！</div>          <div class="root"><span class="lbl">根</span>dis(坏) + aster(星) → 星位不好 → 灾难</div>          <div class="zt"><span class="lbl">真题</span>Natural disasters can wreck a community&#x27;s infrastructure, disrupting systems for months or years.自然灾害可以摧毁一个社区的基础设 施，破坏系统数月或数年。(2019)</div>          <div class="fam"><span class="lbl">族</span>disastrous adj. 灾难性的 / disastrously adv. 灾难性地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">famine</span>
+          <span class="ipa">/&#x27;fæmin/</span>
+          <span class="pos">n.</span>
+          <span class="cn">饥荒，饥饿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>After the eruption came a famine</div>          <div class="mnem"><span class="lbl">记</span>单词拆分为：远的(fa发音类似 far)，我的(mine)亲人。我的叔叔在遥远的非洲 打工，那里的人很多都处在“饥饿”中。</div>          <div class="root"><span class="lbl">根</span>谐音联想：far(远) + mine(我的) → 远方亲人在挨饿</div>          <div class="zt"><span class="lbl">真题</span>Yet occurrences of shortages and droughts 212 (干旱) are causing famine and distress in some areas.然而，粮食短缺和干旱的发生正在一些地 区造成饥荒和灾难。</div>          <div class="fam"><span class="lbl">族</span>famished adj. 极饿的 / hunger n. 饥饿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">volcano</span>
+          <span class="ipa">/va:l&#x27;keinəu/</span>
+          <span class="pos">n.</span>
+          <span class="cn">火山</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a small district at the foot of an old volcano</div>          <div class="root"><span class="lbl">根</span>来自火神 Vulcan(伏尔甘) → 火神的山</div>          <div class="zt"><span class="lbl">真题</span>They nest on the volcano&#x27;s slopes. 它们 在火山的斜坡上筑巢。</div>          <div class="fam"><span class="lbl">族</span>volcanic adj. 火山的 / eruption n. 喷发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">vague</span>
+          <span class="ipa">/veig/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">模糊的，不清楚的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and vague, and most readers cannot follow it</div>          <div class="mnem"><span class="lbl">记</span>这个单词可用发音来记忆。你 打电话时一直喊：喂，哥！喂，哥！为什么？电 话听不清楚啊→模糊的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：喂，哥！电话听不清 → 模糊的</div>          <div class="zt"><span class="lbl">真题</span>Most people will be able to give a vague description of their main meals. 大多数人都能 对他们的主食给出一个模糊的描述。(2021)</div>          <div class="fam"><span class="lbl">族</span>vaguely adv. 含糊地 / vagueness n. 含糊</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">dim</span>
+          <span class="ipa">/dım/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">昏暗的；看不清楚的；前景暗淡的，不乐 观的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one dim room</div>          <div class="mnem"><span class="lbl">记</span>di(同 bi)表示“两个，双”。dim 连在一起就是两个(di)妹妹(m)，你对面就站了 一个人，怎么看成两个了呢？→昏暗的；看不清 楚的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：看成两个妹妹(m)了 → 昏暗看不清楚</div>          <div class="zt"><span class="lbl">真题</span>Time was—and not so many years ago, either—when the average citizen took a pretty dim view of banks and banking. 当时不是 很多年前，普通公民还对银行和银行业持相当 悲观的看法。</div>          <div class="fam"><span class="lbl">族</span>dimly adv. 昏暗地 / dimness n. 昏暗</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">distress</span>
+          <span class="ipa">/dı&#x27;stres/</span>
+          <span class="pos">n.</span>
+          <span class="cn">悲痛，痛苦v.使痛苦，使悲伤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>long months of distress</div>          <div class="mnem"><span class="lbl">记</span>di（同 bi）表示“两个，双”； stress表示“压力”。两种压力，一种压力是压 第九单元 力，两种压力就变成“痛苦”了。</div>          <div class="root"><span class="lbl">根</span>di(二) + stress(压力) → 双重压力 → 痛苦</div>          <div class="zt"><span class="lbl">真题</span>The author later realized he had caused great distress to his father. 作者后来意识到， 他给他的父亲带来了巨大的痛苦。</div>          <div class="fam"><span class="lbl">族</span>distressed adj. 痛苦的 / stressful adj. 有压力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">district</span>
+          <span class="ipa">/&#x27;distrıkt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">区；地区，区域</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Red Ash is a small district</div>          <div class="mnem"><span class="lbl">记</span>两个(di)地方都很严格(strict 严格的)。疫情期间，要遵守国家的法纪法规。 从重庆去北京，要求都很严格的。重庆、北京都 属于“地区，区域”。</div>          <div class="root"><span class="lbl">根</span>di(二) + strict(严格) → 处处都要守规矩的地方</div>          <div class="zt"><span class="lbl">真题</span>The school district, he said, was facing a crisis.他说，这个学区正面临危机。(2018)</div>          <div class="fam"><span class="lbl">族</span>area n. 地区 / regional adj. 区域的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">disgust</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fills her with disgust</div>          <div class="root"><span class="lbl">根</span>dis(不) + gust(味道) → 味道不对 → 厌恶</div>          <div class="fam"><span class="lbl">族</span>disgusting adj. 令人厌恶的 / disgusted adj. 感到厌恶的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">disturb</span>
+          <span class="ipa">/dı&#x27;st3:rb/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打扰，扰乱；弄乱；使烦恼</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Small things disturb her</div>          <div class="mnem"><span class="lbl">记</span>不(dis否定前缀)十特步(turb 的谐音)→我不打算买特步，他总是在我面前推 销，“打扰”我，让我“烦恼”。</div>          <div class="root"><span class="lbl">根</span>dis(否定) + turb(搅动) → 把平静搅乱 → 打扰</div>          <div class="zt"><span class="lbl">真题</span>Women are more likely to experience disturbed sleep, anxiety and unusual fatigue before a heart attack. 女性在心脏病发作前更 容易经历睡眠紊乱、焦虑和异常的疲劳。(2021)</div>          <div class="fam"><span class="lbl">族</span>disturbance n. 打扰 / disturbed adj. 受扰的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">dimension</span>
+          <span class="ipa">/dai&#x27;men∫n, dı&#x27;men∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">维度，范围，规模，尺寸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she cannot judge the dimensions of her own words</div>          <div class="mnem"><span class="lbl">记</span>两个（di）门神（mension的谐 (213) 音)。要过春节了，家里的两扇门上都要贴“尺 寸，规模”一致的门神。</div>          <div class="root"><span class="lbl">根</span>di(二) + mens(量) + ion → 量出来的大小 → 尺寸</div>          <div class="zt"><span class="lbl">真题</span>You are not really going to be able to understand all of the dimensions of this plan. 你不 可能真正理解这个计划的所有方面。(2016)</div>          <div class="fam"><span class="lbl">族</span>dimensional adj. 维度的 / measure v. 测量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">column</span>
+          <span class="ipa">/&#x27;ka:ləm/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an iron column by the door</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“靠了门”(m想 成门)，门两边的柱子，通常都是“圆柱”的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：靠了门 → 门边立着的柱子</div>          <div class="zt"><span class="lbl">真题</span>She might close her Monday column. 她 可能会关闭她周一的专栏。</div>          <div class="fam"><span class="lbl">族</span>columnist n. 专栏作家 / pillar n. 柱子</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">draft</span>
+          <span class="ipa">/dræft/</span>
+          <span class="pos">n.</span>
+          <span class="cn">草稿；草案;草图；汇票 v.起草;草拟</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her first draft is never clean</div>          <div class="root"><span class="lbl">根</span>靠搭配记：first draft 初稿 / draft a plan 起草计划</div>          <div class="zt"><span class="lbl">真题</span>She worked on the draft of the American Constitution.她参与起草了《美国宪法》的草案。</div>          <div class="fam"><span class="lbl">族</span>drafting n. 起草 / draught n. 气流</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">drift</span>
+          <span class="ipa">/drift/</span>
+          <span class="pos">n.</span>
+          <span class="cn">流动v. 漂流</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>watches the smoke drift over the roofs</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“浮楼它”。有些 楼房建在河边，看着就像漂浮在水面上一样，所 以这个单词就是“漂浮”。drift：多指在外力作 用下随风或顺水飘荡，表示动态。float：可与 drift更换，但侧重指因有液体或气体所支持而 不下沉，可表动态或静态。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：drift away 漂走 / 随波逐流</div>          <div class="zt"><span class="lbl">真题</span>They float around in the oven. 它们漂浮 在烤箱里。(2021)</div>          <div class="fam"><span class="lbl">族</span>drifter n. 漂泊者 / driftwood n. 浮木</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 9 · Day 56</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

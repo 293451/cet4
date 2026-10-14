@@ -101,9 +101,17 @@ def check(day: str) -> list[str]:
     ws = d.get("words", [])
     text = d.get("tts_text", "")
 
-    # 词数（30 为主；个别天会多 1 个，仍算合格）
-    if not (30 <= len(ws) <= 31):
-        errs.append(f"words 数量 {len(ws)}，应为 30（或 31）")
+    # 词数：每天 30（个别天 31）。
+    # 最后一天（词表末尾）会不足 30 —— 那是正常的，不报错。
+    # 判据用 _task 里的词数做基准，而不是写死 30。
+    expect = 30
+    if tf.exists():
+        try:
+            expect = len(json.loads(tf.read_text(encoding="utf-8"))["words"])
+        except Exception:
+            pass
+    if len(ws) != expect:
+        errs.append(f"words 数量 {len(ws)}，应为 {expect}")
 
     # 注：不再检查「目标词互相包含」。
     #

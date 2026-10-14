@@ -130,13 +130,24 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
     if not toks:
         return []
 
-    # 音节流：非空条目按顺序拼接，同时记录每个字符的起止时间
+    # 音节流：非空条目按顺序拼接，同时记录每个字符的起止时间。
+    #
+    # ⚠️ 这里要**压掉连续重复的条目**。MiniMax 对数字会吐重复，次数还不固定：
+    #      "in 1960. He"     -> '1960' 重复 2 次
+    #      "from 1978. She"  -> '1978' 重复 16 次
+    #    如果在匹配阶段处理，得考虑"重复之间夹着标点""重复次数未知"等各种情况，
+    #    实测很难写对（Day 62 因此只还原出 248/279 词）。
+    #    在**构建阶段**压掉最干净 —— 下游所有逻辑都不需要知道这回事。
     stream_chars: list[str] = []
     stream_time: list[tuple[float, float]] = []
+    prev_token = None
     for s in syllables:
         t = s.get("word", "")
         if not t.strip():
             continue
+        if t == prev_token:
+            continue  # 和上一条完全相同 —— 是 MiniMax 的重复条目，丢掉
+        prev_token = t
         for ch in t:
             stream_chars.append(ch)
             stream_time.append((s["time_begin"], s["time_end"]))
@@ -191,38 +202,39 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
                     "end": stream_time[last][1],
                 }
             )
-            # 跳过紧邻的重复条目。
+            # 跳过紧邻的重复出现（可以连续多次）。
             #
-            # MiniMax 对**数字**会吐出重复条目：原文 "in 1960. He" 里
-            # 音节流是 [... 'in', ' ', '1960', '1960', ' ', 'He' ...]
-            # 匹配完第一个 1960 后指针停在第二个上，下一个词 He 就卡住了
-            # （实测 Day 20 只还原出 9/273 词）。
+            # 注意：这**不是**处理 MiniMax 的重复条目（那已在构建音节流时压掉了），
+            # 而是处理"同一个词在原文里连续出现了两次"的情况。
+            # 实测 "layout for forty years" 的音节流是 ...'for',' ','for','ty',' ','years'
+            # —— 匹配完第一个 'for' 后，指针落在第二个 'for' 上，下一个词 'forty'
+            # 就被 'for' 卡住了。
             #
             # ⚠️ 判据必须严格：吃掉的那段要**正好等于本词**，且后面紧跟词边界。
-            #    早期版本只看前缀就判重复，结果处理 "for forty years" 时
-            #    把 'for' 的重复误判成 'for'+'ty'，连 'ty' 一起吃掉，
-            #    导致 forty 整词丢失（实测 Day 11/12 因此各差 1 词）。
+            #    早期版本只看前缀就判重复，把 'for'+'ty' 误判成 'for' 的重复，
+            #    连 'ty' 一起吃掉，forty 整词丢失（Day 11/12 因此各差 1 词）。
             j = q
             dup = [c.lower() for c in want if _is_word_char(c)]
             if dup:
-                p = j
-                while p < len(stream) and not _is_word_char(stream[p]):
-                    p += 1
-                k2 = 0
-                while p < len(stream) and k2 < len(dup):
-                    c = stream[p]
-                    if not _is_word_char(c):
-                        # 词内不允许出现分隔符，否则不算同一词
-                        break
-                    if c.lower() == dup[k2]:
-                        k2 += 1
+                while True:
+                    p = j
+                    while p < len(stream) and not _is_word_char(stream[p]):
                         p += 1
+                    k2 = 0
+                    while p < len(stream) and k2 < len(dup):
+                        c = stream[p]
+                        if not _is_word_char(c):
+                            break  # 词内不允许分隔符
+                        if c.lower() == dup[k2]:
+                            k2 += 1
+                            p += 1
+                        else:
+                            break
+                    at_boundary = p >= len(stream) or not _is_word_char(stream[p])
+                    if k2 == len(dup) and at_boundary:
+                        j = p
                     else:
                         break
-                # 完整吃掉且到达词边界 —— 才算真的重复
-                at_boundary = p >= len(stream) or not _is_word_char(stream[p])
-                if k2 == len(dup) and at_boundary:
-                    j = p
         # 找不到就跳过这个词，指针不动 —— 让下一个词还有机会对齐
 
     return words

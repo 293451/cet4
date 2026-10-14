@@ -48,7 +48,12 @@ jobs:
 
       # 让仓库保持「活跃」，避免 GitHub 在 60 天无活动后自动禁用定时任务。
       # 用空提交，不产生文件，也就不和 .gitignore 打架。
+      #
+      # continue-on-error：保活只是辅助手段，它失败不该让整个任务显示红叉 ——
+      # 否则从 Actions 页面看不出「推送到底成没成功」（实测踩过：保活 403 报红，
+      # 但推送其实是成功的）。信号清晰比表面全绿重要。
       - name: 保活
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
