@@ -1,0 +1,699 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 20 · The Orchard Kitchen</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 20 · 11/1 · Unit 3 第 571-600 词</div>
+  <h1>The Orchard Kitchen<span class="cn">果园厨房</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-20.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2517"><p class="en"><span class="w" data-s="43" data-e="469">Nina&#x27;s</span> <span class="w" data-s="512" data-e="811">grandfather</span> <span class="w" data-s="853" data-e="1109">built</span> <span class="w" data-s="1152" data-e="1323">the</span> <span class="w" data-s="1365" data-e="1493">old</span> <span class="w target" data-s="1536" data-e="1835" title="木制的;呆板的">wooden</span> <span class="w" data-s="1877" data-e="2219">cottage</span> <span class="w" data-s="2261" data-e="2347">in</span> <span class="w" data-s="2389" data-e="2517">1960.</span></p><p class="zh">妮娜的祖父在 1960 年亲手盖了那间老木屋。</p></div>
+<div class="pair" data-s0="3285" data-s1="7936"><p class="en"><span class="w" data-s="3285" data-e="3541">He</span> <span class="w" data-s="3755" data-e="4181">used</span> <span class="w target" data-s="4224" data-e="4395" title="未经加工的，天然状态的；(引申为)不熟练 的，没有经验的">raw</span> <span class="w" data-s="4437" data-e="4907">boards</span> <span class="w" data-s="4949" data-e="5077">and</span> <span class="w target" data-s="5120" data-e="5376" title="简陋的；粗俗的；天然的">crude</span> <span class="w" data-s="5419" data-e="5589">tools,</span> <span class="w" data-s="5888" data-e="6101">and</span> <span class="w" data-s="6272" data-e="6656">every</span> <span class="w" data-s="6699" data-e="6912">summer</span> <span class="w" data-s="6955" data-e="7211">he</span> <span class="w target" data-s="7253" data-e="7595" title="取得(成果);收获；收割(庄稼)">reaped</span> <span class="w" data-s="7637" data-e="7680">the</span> <span class="w" data-s="7723" data-e="7936">fruit.</span></p><p class="zh">他用的是生木板和粗陋的工具，每年夏天他都会收获果实。</p></div>
+<div class="pair" data-s0="8107" data-s1="11307"><p class="en"><span class="w" data-s="8107" data-e="8875">By</span> <span class="w" data-s="8917" data-e="9301">August</span> <span class="w" data-s="9344" data-e="9472">the</span> <span class="w" data-s="9515" data-e="9771">apples</span> <span class="w" data-s="9813" data-e="9984">were</span> <span class="w target" data-s="10027" data-e="10325" title="熟的；时机成熟的">ripe</span> <span class="w" data-s="10368" data-e="10453">and</span> <span class="w" data-s="10496" data-e="10581">heavy</span> <span class="w" data-s="10624" data-e="10837">on</span> <span class="w" data-s="10880" data-e="10965">the</span> <span class="w" data-s="11008" data-e="11307">branches.</span></p><p class="zh">到了八月，苹果熟了，沉甸甸地挂在枝上。</p></div>
+<div class="pair" data-s0="11996" data-s1="15452"><p class="en"><span class="w" data-s="11996" data-e="12295">Nina</span> <span class="w" data-s="12338" data-e="12508">wanted</span> <span class="w" data-s="12551" data-e="12722">to</span> <span class="w target" data-s="12764" data-e="13191" title="使改变形态；使改观">transform</span> <span class="w" data-s="13234" data-e="13404">the</span> <span class="w" data-s="13447" data-e="13788">cottage</span> <span class="w" data-s="13831" data-e="14002">into</span> <span class="w" data-s="14044" data-e="14172">a</span> <span class="w" data-s="14215" data-e="14300">small</span> <span class="w" data-s="14343" data-e="14812">kitchen</span> <span class="w" data-s="14855" data-e="14983">for</span> <span class="w" data-s="15026" data-e="15452">travellers.</span></p><p class="zh">妮娜想把这间小屋改造成给旅人做饭的小餐馆。</p></div>
+<div class="pair" data-s0="15666" data-s1="18738"><p class="en"><span class="w" data-s="15666" data-e="16348">She</span> <span class="w" data-s="16391" data-e="16562">had</span> <span class="w" data-s="16604" data-e="16690">to</span> <span class="w target" data-s="16732" data-e="17116" title="">transplant</span> <span class="w" data-s="17159" data-e="17415">two</span> <span class="w" data-s="17458" data-e="17671">young</span> <span class="w" data-s="17714" data-e="17927">trees</span> <span class="w" data-s="17970" data-e="18524">nearer</span> <span class="w" data-s="18567" data-e="18610">the</span> <span class="w" data-s="18652" data-e="18738">wall.</span></p><p class="zh">她得把两棵小树移植到靠墙一些的地方。</p></div>
+<div class="pair" data-s0="19469" data-s1="24418"><p class="en"><span class="w" data-s="19469" data-e="19554">A</span> <span class="w" data-s="19597" data-e="19725">truck</span> <span class="w" data-s="19767" data-e="20194">would</span> <span class="w target" data-s="20365" data-e="20834" title="交通运输系统；运输工具；激动 v. 运输；传 输；流放">transport</span> <span class="w" data-s="20877" data-e="21047">the</span> <span class="w" data-s="21090" data-e="21175">old</span> <span class="w" data-s="21218" data-e="21645">furniture</span> <span class="w" data-s="21687" data-e="21815">to</span> <span class="w" data-s="21858" data-e="21901">the</span> <span class="w" data-s="21943" data-e="22071">city,</span> <span class="w" data-s="22285" data-e="22455">and</span> <span class="w" data-s="22541" data-e="22882">she</span> <span class="w" data-s="22925" data-e="23053">would</span> <span class="w target" data-s="23095" data-e="23394" title="转移；转学；让与；改编n. 搬迁，转会；换 乘;迁移">transfer</span> <span class="w" data-s="23437" data-e="23565">the</span> <span class="w" data-s="23607" data-e="23693">money</span> <span class="w" data-s="23735" data-e="23906">to</span> <span class="w" data-s="23949" data-e="24077">her</span> <span class="w" data-s="24119" data-e="24418">cousin.</span></p><p class="zh">一辆卡车会把旧家具运到城里，她则会把钱转给表姐。</p></div>
+<div class="pair" data-s0="24589" data-s1="26978"><p class="en"><span class="w" data-s="24589" data-e="25229">Every</span> <span class="w target" data-s="25271" data-e="25741" title="交易，业务；办理，处理">transaction</span> <span class="w" data-s="25783" data-e="26082">went</span> <span class="w" data-s="26125" data-e="26338">into</span> <span class="w" data-s="26381" data-e="26551">a</span> <span class="w" data-s="26594" data-e="26679">paper</span> <span class="w" data-s="26722" data-e="26978">book.</span></p><p class="zh">每一笔交易都记在一个纸本子上。</p></div>
+<div class="pair" data-s0="27191" data-s1="30306"><p class="en"><span class="w" data-s="27191" data-e="27746">She</span> <span class="w" data-s="27789" data-e="27959">could</span> <span class="w target" data-s="28002" data-e="28343" title="翻译；解释，说明">translate</span> <span class="w" data-s="28386" data-e="28514">the</span> <span class="w" data-s="28557" data-e="28770">menu</span> <span class="w" data-s="28813" data-e="28983">into</span> <span class="w" data-s="29026" data-e="29282">French</span> <span class="w" data-s="29325" data-e="29709">for</span> <span class="w" data-s="29837" data-e="30007">one</span> <span class="w" data-s="30050" data-e="30306">guest.</span></p><p class="zh">她能为一位客人把菜单翻译成法语。</p></div>
+<div class="pair" data-s0="31075" data-s1="33720"><p class="en"><span class="w" data-s="31075" data-e="31160">A</span> <span class="w" data-s="31203" data-e="31416">small</span> <span class="w" data-s="31459" data-e="31843">radio</span> <span class="w target" data-s="31885" data-e="32525" title="传输；传播；发射">transmitted</span> <span class="w" data-s="32568" data-e="32696">the</span> <span class="w" data-s="32739" data-e="32824">weather</span> <span class="w" data-s="32867" data-e="33123">report</span> <span class="w" data-s="33165" data-e="33464">every</span> <span class="w" data-s="33507" data-e="33720">morning.</span></p><p class="zh">一台小收音机每天早上播送天气预报。</p></div>
+<div class="pair" data-s0="33976" data-s1="37219"><p class="en"><span class="w" data-s="33976" data-e="34915">Trucks</span> <span class="w" data-s="34957" data-e="35085">in</span> <span class="w target" data-s="35128" data-e="35512" title="通过；转运；越过 n. 运输，运送">transit</span> <span class="w" data-s="35555" data-e="35725">through</span> <span class="w" data-s="35768" data-e="35853">the</span> <span class="w" data-s="35896" data-e="36152">village</span> <span class="w" data-s="36195" data-e="36408">often</span> <span class="w" data-s="36451" data-e="36749">stopped</span> <span class="w" data-s="36792" data-e="37005">for</span> <span class="w" data-s="37048" data-e="37219">coffee.</span></p><p class="zh">过境经过村子的卡车常常停下来喝咖啡。</p></div>
+<div class="pair" data-s0="37560" data-s1="42040"><p class="en"><span class="w" data-s="37560" data-e="38029">The</span> <span class="w" data-s="38285" data-e="38456">new</span> <span class="w" data-s="38499" data-e="38840">windows</span> <span class="w" data-s="38883" data-e="39053">were</span> <span class="w target" data-s="39096" data-e="39608" title="透明的，清澈的；易看穿的，易懂的">transparent,</span> <span class="w" data-s="39864" data-e="40077">but</span> <span class="w" data-s="40461" data-e="40632">the</span> <span class="w" data-s="40675" data-e="40803">old</span> <span class="w" data-s="40845" data-e="41059">door</span> <span class="w" data-s="41101" data-e="41315">was</span> <span class="w" data-s="41357" data-e="41571">still</span> <span class="w target" data-s="41613" data-e="42040" title="不透明的；不透光的；难理解的">opaque.</span></p><p class="zh">新窗户是透明的，但旧门还是不透明。</p></div>
+<div class="pair" data-s0="42645" data-s1="44523"><p class="en"><span class="w" data-s="42645" data-e="42773">Her</span> <span class="w" data-s="42816" data-e="42987">success</span> <span class="w" data-s="43029" data-e="43413">soon</span> <span class="w" data-s="43456" data-e="43755">became</span> <span class="w target" data-s="43797" data-e="44053" title="显然的;貌似的">apparent</span> <span class="w" data-s="44096" data-e="44309">to</span> <span class="w" data-s="44352" data-e="44523">everyone.</span></p><p class="zh">她的成功很快就对每个人都变得显而易见了。</p></div>
+<div class="pair" data-s0="44821" data-s1="49429"><p class="en"><span class="w" data-s="44821" data-e="45077">It</span> <span class="w" data-s="45589" data-e="45675">was</span> <span class="w target" data-s="45717" data-e="46016" title="明显的，显然的；平淡无奇的">obvious</span> <span class="w" data-s="46059" data-e="46229">that</span> <span class="w" data-s="46272" data-e="46357">the</span> <span class="w" data-s="46400" data-e="46613">kitchen</span> <span class="w" data-s="46656" data-e="46784">would</span> <span class="w" data-s="46827" data-e="46955">grow:</span> <span class="w" data-s="47253" data-e="47893">the</span> <span class="w target" data-s="47936" data-e="48107" title="证据；(法庭)证物，证词">evidence</span> <span class="w" data-s="48149" data-e="48405">was</span> <span class="w" data-s="48448" data-e="48576">the</span> <span class="w" data-s="48619" data-e="48747">long</span> <span class="w" data-s="48789" data-e="49045">line</span> <span class="w" data-s="49088" data-e="49216">of</span> <span class="w" data-s="49259" data-e="49429">cars.</span></p><p class="zh">小餐馆会扩张是明显的：证据就是门外排起的长长车队。</p></div>
+<div class="pair" data-s0="49771" data-s1="52331"><p class="en"><span class="w" data-s="49771" data-e="50411">The</span> <span class="w" data-s="50453" data-e="50581">change</span> <span class="w" data-s="50624" data-e="50837">was</span> <span class="w target" data-s="50880" data-e="51221" title="明显的；明白的">evident</span> <span class="w" data-s="51264" data-e="51477">even</span> <span class="w" data-s="51520" data-e="51733">to</span> <span class="w" data-s="51776" data-e="51904">her</span> <span class="w" data-s="51947" data-e="52331">grandfather.</span></p><p class="zh">这一变化连她祖父都看得出来。</p></div>
+<div class="pair" data-s0="53067" data-s1="55371"><p class="en"><span class="w" data-s="53067" data-e="53152">He</span> <span class="w" data-s="53195" data-e="53280">would</span> <span class="w target" data-s="53323" data-e="53579" title="断言，声称">assert</span> <span class="w" data-s="53621" data-e="53707">that</span> <span class="w" data-s="53749" data-e="53835">the</span> <span class="w" data-s="53877" data-e="54133">soil</span> <span class="w" data-s="54176" data-e="54304">here</span> <span class="w" data-s="54347" data-e="54517">was</span> <span class="w" data-s="54560" data-e="54688">the</span> <span class="w" data-s="54731" data-e="54859">best</span> <span class="w" data-s="54901" data-e="55072">in</span> <span class="w" data-s="55115" data-e="55200">the</span> <span class="w" data-s="55243" data-e="55371">country.</span></p><p class="zh">他总断言这里的土壤是全国最好的。</p></div>
+<div class="pair" data-s0="55669" data-s1="57675"><p class="en"><span class="w" data-s="55669" data-e="55840">The</span> <span class="w" data-s="56267" data-e="56395">land</span> <span class="w" data-s="56437" data-e="56693">became</span> <span class="w" data-s="56736" data-e="56949">a</span> <span class="w target" data-s="56992" data-e="57291" title="移植(器官、皮肤等);移栽，移种，移植(植物) η.(器官等的)移植">desert</span> <span class="w" data-s="57333" data-e="57419">in</span> <span class="w" data-s="57461" data-e="57675">July.</span></p><p class="zh">七月里这片地几乎成了沙漠。</p></div>
+<div class="pair" data-s0="57973" data-s1="61216"><p class="en"><span class="w" data-s="57973" data-e="58144">She</span> <span class="w" data-s="58485" data-e="58741">would</span> <span class="w target" data-s="58784" data-e="59040" title="插入;嵌进">insert</span> <span class="w" data-s="59083" data-e="59168">a</span> <span class="w" data-s="59211" data-e="59296">thin</span> <span class="w" data-s="59339" data-e="59552">stick</span> <span class="w" data-s="59595" data-e="59851">into</span> <span class="w" data-s="59893" data-e="59979">the</span> <span class="w" data-s="60021" data-e="60149">ground</span> <span class="w" data-s="60192" data-e="60491">to</span> <span class="w" data-s="60533" data-e="60661">test</span> <span class="w" data-s="60704" data-e="60917">the</span> <span class="w" data-s="60960" data-e="61216">soil.</span></p><p class="zh">她会往地里插一根细棍来试土。</p></div>
+<div class="pair" data-s0="61675" data-s1="65003"><p class="en"><span class="w" data-s="61675" data-e="61888">Some</span> <span class="w" data-s="61931" data-e="62272">roots</span> <span class="w" data-s="62315" data-e="62485">would</span> <span class="w target" data-s="62528" data-e="62955" title="使突出；伸出">exsert</span> <span class="w" data-s="62997" data-e="63125">from</span> <span class="w" data-s="63168" data-e="63296">the</span> <span class="w" data-s="63339" data-e="63424">dry</span> <span class="w" data-s="63467" data-e="63723">earth</span> <span class="w" data-s="63765" data-e="64149">like</span> <span class="w" data-s="64363" data-e="64576">small</span> <span class="w" data-s="64619" data-e="65003">fingers.</span></p><p class="zh">一些根会像小手指一样从干土里伸出来。</p></div>
+<div class="pair" data-s0="65259" data-s1="67733"><p class="en"><span class="w" data-s="65259" data-e="65899">For</span> <span class="w target" data-s="65941" data-e="66368" title="(饭后)甜点，甜食">dessert</span> <span class="w" data-s="66411" data-e="66581">she</span> <span class="w" data-s="66709" data-e="66880">served</span> <span class="w" data-s="66923" data-e="67307">apples</span> <span class="w" data-s="67349" data-e="67477">with</span> <span class="w" data-s="67520" data-e="67733">cream.</span></p><p class="zh">甜点她端上的是苹果配奶油。</p></div>
+<div class="pair" data-s0="67947" data-s1="70592"><p class="en"><span class="w" data-s="67947" data-e="68587">Her</span> <span class="w" data-s="68629" data-e="69013">grandfather</span> <span class="w" data-s="69056" data-e="69355">had</span> <span class="w target" data-s="69397" data-e="69739" title="移植(器官、皮肤等);移栽，移种，移植(植物) η.(器官等的)移植">deserted</span> <span class="w" data-s="69781" data-e="69867">the</span> <span class="w" data-s="69909" data-e="70080">city</span> <span class="w" data-s="70123" data-e="70336">long</span> <span class="w" data-s="70379" data-e="70592">ago.</span></p><p class="zh">她祖父很久以前就抛弃了城市。</p></div>
+<div class="pair" data-s0="71330" data-s1="74530"><p class="en"><span class="w" data-s="71330" data-e="71500">In</span> <span class="w" data-s="71543" data-e="71756">spring,</span> <span class="w" data-s="72012" data-e="72354">white</span> <span class="w" data-s="72482" data-e="72994">flowers</span> <span class="w" data-s="73036" data-e="73207">would</span> <span class="w target" data-s="73250" data-e="73506" title="开花">bloom</span> <span class="w" data-s="73548" data-e="73676">at</span> <span class="w" data-s="73719" data-e="73804">the</span> <span class="w" data-s="73847" data-e="73932">edge</span> <span class="w" data-s="73975" data-e="74103">of</span> <span class="w" data-s="74146" data-e="74188">the</span> <span class="w" data-s="74231" data-e="74530">orchard.</span></p><p class="zh">春天，果园边上会开满白花。</p></div>
+<div class="pair" data-s0="74700" data-s1="78156"><p class="en"><span class="w" data-s="74700" data-e="74914">That</span> <span class="w" data-s="75255" data-e="75426">year</span> <span class="w" data-s="75468" data-e="75724">a</span> <span class="w" data-s="75767" data-e="75895">quiet</span> <span class="w target" data-s="75938" data-e="76322" title="&amp;. η.(发出)隆隆声；激增，繁荣">boom</span> <span class="w" data-s="76364" data-e="76535">began:</span> <span class="w" data-s="76876" data-e="77346">three</span> <span class="w" data-s="77388" data-e="77644">new</span> <span class="w" data-s="77687" data-e="77986">shops</span> <span class="w" data-s="78028" data-e="78156">opened.</span></p><p class="zh">那一年，一股热潮悄悄兴起：三家新店开了张。</p></div>
+<div class="pair" data-s0="78412" data-s1="81612"><p class="en"><span class="w" data-s="78412" data-e="78796">In</span> <span class="w" data-s="78967" data-e="79308">autumn</span> <span class="w" data-s="79351" data-e="79436">the</span> <span class="w" data-s="79479" data-e="79820">kitchen&#x27;s</span> <span class="w" data-s="79863" data-e="79991">future</span> <span class="w" data-s="80034" data-e="80332">began</span> <span class="w" data-s="80375" data-e="80546">to</span> <span class="w target" data-s="80588" data-e="80802" title="隐约出现；逼近，临近 η.织布机；隐隐显示">loom</span> <span class="w" data-s="80844" data-e="81015">like</span> <span class="w" data-s="81058" data-e="81143">a</span> <span class="w" data-s="81186" data-e="81271">heavy</span> <span class="w" data-s="81314" data-e="81612">cloud.</span></p><p class="zh">到了秋天，小餐馆的前途开始像一片乌云一样逼近。</p></div>
+<div class="pair" data-s0="82308" data-s1="84356"><p class="en"><span class="w" data-s="82308" data-e="82394">The</span> <span class="w" data-s="82436" data-e="82564">long</span> <span class="w" data-s="82607" data-e="82863">winter</span> <span class="w" data-s="82906" data-e="83418">afternoons</span> <span class="w" data-s="83460" data-e="83716">were</span> <span class="w" data-s="83759" data-e="83887">full</span> <span class="w" data-s="83930" data-e="84058">of</span> <span class="w target" data-s="84100" data-e="84356" title="忧郁；愁闷；无望；幽暗；黑暗；昏暗">gloom.</span></p><p class="zh">漫长的冬日午后充满了忧郁。</p></div>
+<div class="pair" data-s0="84527" data-s1="87386"><p class="en"><span class="w" data-s="84527" data-e="85295">Her</span> <span class="w" data-s="85338" data-e="85935">grandfather&#x27;s</span> <span class="w" data-s="85978" data-e="86148">praise</span> <span class="w" data-s="86191" data-e="86447">did</span> <span class="w target" data-s="86490" data-e="86788" title="促进，推动；使兴旺 n.推动，促进；宣扬">boost</span> <span class="w" data-s="86831" data-e="86959">her</span> <span class="w" data-s="87002" data-e="87386">confidence.</span></p><p class="zh">祖父的夸奖确实增强了她的信心。</p></div>
+<div class="pair" data-s0="87599" data-s1="90586"><p class="en"><span class="w" data-s="87599" data-e="87898">He</span> <span class="w" data-s="88154" data-e="88410">would</span> <span class="w target" data-s="88452" data-e="88666" title="">boast</span> <span class="w" data-s="88708" data-e="88836">that</span> <span class="w" data-s="88879" data-e="89007">the</span> <span class="w" data-s="89050" data-e="89263">apple</span> <span class="w" data-s="89306" data-e="89434">pie</span> <span class="w" data-s="89476" data-e="89775">had</span> <span class="w" data-s="89818" data-e="89946">no</span> <span class="w" data-s="89988" data-e="90202">equal</span> <span class="w" data-s="90244" data-e="90586">anywhere.</span></p><p class="zh">他会吹嘘说，这苹果派别处哪儿也比不上。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">wooden</span>
+          <span class="ipa">/&#x27;wudn/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">木制的;呆板的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old wooden cottage</div>          <div class="root"><span class="lbl">根</span>wood(木头) + en(……的) → 木制的；像木头一样呆板</div>          <div class="zt"><span class="lbl">真题</span>Their aim was to provide quality, yet affordable wooden furniture.他们的目标是提 供高质量且价格合理的木制家具。(2018)</div>          <div class="fam"><span class="lbl">族</span>wood n. 木头 / woody adj. 木质的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">assert</span>
+          <span class="ipa">/ə&#x27;sə:rt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">断言，声称</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would assert that the soil here was the best</div>          <div class="mnem"><span class="lbl">记</span>de(否定)十sert(发音类似“塞 它”，就是加入，插入)→不再加入→离开；抛弃。 被上帝抛弃的地方就是“沙漠”。</div>          <div class="root"><span class="lbl">根</span>as(一再) + sert(插入、说) → 一口咬定</div>          <div class="zt"><span class="lbl">真题</span>They are deserted by their family. 他们 被家人抛弃了。(2015)</div>          <div class="fam"><span class="lbl">族</span>assertion n. 断言 / assertive adj. 自信的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">desert</span>
+          <span class="ipa">/&#x27;dezərt,dı&#x27;z3:rt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">移植(器官、皮肤等);移栽，移种，移植(植物) η.(器官等的)移植</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The land became a desert in July</div>          <div class="mnem"><span class="lbl">记</span>trans（从……到……）十 plant (植物，种植)，那该单词就解释为：从这里种到 那里，就是“移植”。</div>          <div class="root"><span class="lbl">根</span>de(否定) + sert(加入) → 不再加入 → 抛弃；被抛弃之地</div>          <div class="fam"><span class="lbl">族</span>deserted adj. 荒废的 / desertion n. 遗弃</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">dessert</span>
+          <span class="ipa">/dı&#x27;z3:rt/</span>
+          <span class="pos"></span>
+          <span class="cn">(饭后)甜点，甜食</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>For dessert she served apples with cream</div>          <div class="mnem"><span class="lbl">记</span>比 desert(沙漠)多了一个 s，一 个人不要去沙漠玩啊，有美女蛇(s想成美女蛇) 会把你当“甜点”吃掉的。</div>          <div class="root"><span class="lbl">根</span>比 desert(沙漠) 多一个 s → 甜点</div>          <div class="zt"><span class="lbl">真题</span>One study recruited 200 obese adults to take part in a 16-week-long diet, where half added dessert to their breakfast, and half didn&#x27;t.一项研究招募了 200名肥胖成年人参加 为期16周的饮食，其中一半人在早餐中加入甜 点，一半人没有。(2019)</div>          <div class="fam"><span class="lbl">族</span>dessert spoon 甜点匙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">exsert</span>
+          <span class="ipa">/ek&#x27;s3it/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使突出；伸出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Some roots would exsert from the dry earth</div>          <div class="mnem"><span class="lbl">记</span>ex(出)十sert(插入)→插出去 →突出。</div>          <div class="root"><span class="lbl">根</span>ex(出) + sert(插入) → 插出去 → 伸出</div>          <div class="zt"><span class="lbl">真题</span>Physical and biological factors exsert more influence on other organisms than on man. 物理和生物因素对其他生物体的影响大 于对人类的影响。</div>          <div class="fam"><span class="lbl">族</span>exsertion n. 伸出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">insert</span>
+          <span class="ipa">/ın&#x27;s3:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">插入;嵌进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She would insert a thin stick into the ground</div>          <div class="mnem"><span class="lbl">记</span>in(进入)十sert(加入)→加入 进来→插入。</div>          <div class="root"><span class="lbl">根</span>in(进入) + sert(插入) → 插进去</div>          <div class="zt"><span class="lbl">真题</span>People tried to insert rubber and steel between the building and its foundation to reduce the impact of ground vibrations. 人们试 图在建筑物和地基之间插入橡胶和钢，以减少 地面震动的影响。</div>          <div class="fam"><span class="lbl">族</span>insertion n. 插入；插入物</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">transplant</span>
+          <span class="ipa">/træns&#x27;plænt, &#x27;trænsplænt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She had to transplant two young trees</div>          <div class="root"><span class="lbl">根</span>trans(转移) + plant(种植) → 从这里种到那里</div>          <div class="fam"><span class="lbl">族</span>transplantation n. 移植</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">translate</span>
+          <span class="ipa">/trænz&#x27;leit/</span>
+          <span class="pos"></span>
+          <span class="cn">翻译；解释，说明</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She could translate the menu into French</div>          <div class="root"><span class="lbl">根</span>trans(转移) + late(想成 carry 搬) → 把意思搬过去</div>          <div class="zt"><span class="lbl">真题</span>It can be avoided if human values are translated into their language. 如果把人类的价 值观翻译成他们的语言，这是可以避免的。 (2016)</div>          <div class="fam"><span class="lbl">族</span>translation n. 翻译 / translator n. 译者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">transmit</span>
+          <span class="ipa">/trænz&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">传输；传播；发射</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A small radio transmitted the weather report</div>          <div class="mnem"><span class="lbl">记</span>trans 表示“从……到……”；m 想成妹妹；it它。妹妹和它中间来回地→传递。 从此处，我们也引申出来mit词根的意思是： send。所以该单词就是来回地送，即“传递”。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + mit(送) → 送过去 → 传播</div>          <div class="zt"><span class="lbl">真题</span>Her appearance on a talk show was broadcast three times, transmitting her message to over 40 million people. 她在一个脱口秀节目 中的亮相被播放了三次，向超过4000万人传递 了她的信息。</div>          <div class="fam"><span class="lbl">族</span>transmission n. 传输 / transmitter n. 发射机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">transform</span>
+          <span class="ipa">/træns&#x27;fo:m/</span>
+          <span class="pos"></span>
+          <span class="cn">使改变形态；使改观</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nina wanted to transform the cottage</div>          <div class="mnem"><span class="lbl">记</span>trans（从……到……）十 form (形式)，从这儿到那儿，形式变了→改变，变换。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + form(形式) → 换了形式 → 改变</div>          <div class="zt"><span class="lbl">真题</span>So teaching people about which foods are healthy and how to prepare them, she says, can actually transform a patient&#x27;s life. 因此,她 说，教人们哪些食物是健康的，以及如何准备这 些食物，实际上可以改变病人的生活。(2018)</div>          <div class="fam"><span class="lbl">族</span>transformation n. 转变</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">transport</span>
+          <span class="ipa">/&#x27;trænspə:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">交通运输系统；运输工具；激动 v. 运输；传 输；流放</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A truck would transport the old furniture</div>          <div class="mnem"><span class="lbl">记</span>trans（从……到……)十 port (港口)，从一个港口到另一个港口→运输。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + port(港口) → 从一个港口到另一个 → 运输</div>          <div class="zt"><span class="lbl">真题</span>Urban crowdedness would be greatly relieved if only the fares charged on public transport were more reasonable. 如果公共交通 收费更合理一些，城市的拥挤状况就会大大缓解。</div>          <div class="fam"><span class="lbl">族</span>transportation n. 运输</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">transaction</span>
+          <span class="ipa">/træn&#x27;zæk∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">交易，业务；办理，处理</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every transaction went into a paper book</div>          <div class="mnem"><span class="lbl">记</span>trans(从……到……)十 action (行动，活动)，我一个行动，你一个行动，我们在 干什么？→交易。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + action(行动) → 你一动我一动的交换</div>          <div class="zt"><span class="lbl">真题</span>But technology has reduced transaction costs, making sharing assets cheaper and easier than ever. 但技术降低了交易成本，使得 共享资产比以往任何时候都更便宜、更容易。</div>          <div class="fam"><span class="lbl">族</span>transact v. 办理；交易</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">transfer</span>
+          <span class="ipa">/træns&#x27;f3:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">转移；转学；让与；改编n. 搬迁，转会；换 乘;迁移</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she would transfer the money to her cousin</div>          <div class="mnem"><span class="lbl">记</span>trans（从……到……）+ fer (佛)，把佛经从西天迁移到大唐→搬运，转移。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + fer(拿、带) → 带过去</div>          <div class="zt"><span class="lbl">真题</span>But how many bacteria actually transfer in five seconds？ 但是有多少种细菌能在 5 秒钟 内转移呢？ 第三单元</div>          <div class="fam"><span class="lbl">族</span>transferable adj. 可转移的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">transparent</span>
+          <span class="ipa">/træns&#x27;pærənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">透明的，清澈的；易看穿的，易懂的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The new windows were transparent</div>          <div class="mnem"><span class="lbl">记</span>trans(从……到……)十parent (父母)，父母之间是什么样的？听过“夫妻脸” 吗？彼此很了解→透明的；易懂的。</div>          <div class="root"><span class="lbl">根</span>trans(穿过) + par(出现) + ent → 光能穿过 → 透明的</div>          <div class="zt"><span class="lbl">真题</span>Let the debates be transparent and vigorous，wherever they are held. 无论在何处 举行辩论，都应使辩论易懂而有力。(2022)</div>          <div class="fam"><span class="lbl">族</span>transparency n. 透明；透明度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">opaque</span>
+          <span class="ipa">/əu&#x27;peık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不透明的；不透光的；难理解的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old door was still opaque</div>          <div class="mnem"><span class="lbl">记</span>该单词发音非常像“欧佩克” (石油输出国组织)，那石油的价格是怎样的？ →不透明的。</div>          <div class="root"><span class="lbl">根</span>谐音「欧佩克」→ 石油价格不透明</div>          <div class="fam"><span class="lbl">族</span>opaquely adv. 含糊地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">transit</span>
+          <span class="ipa">/&#x27;trænzit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">通过；转运；越过 n. 运输，运送</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Trucks in transit through the village</div>          <div class="mnem"><span class="lbl">记</span>trans（从……到……)+ it (它)，把它(it)从这儿弄到那儿→运输，运送。</div>          <div class="root"><span class="lbl">根</span>trans(转移) + it(走) → 走过去 → 过境</div>          <div class="fam"><span class="lbl">族</span>transition n. 过渡</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">apparent</span>
+          <span class="ipa">/ə&#x27;pærənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">显然的;貌似的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her success soon became apparent to everyone</div>          <div class="mnem"><span class="lbl">记</span>一再地（ap）提到你的父母 (parents)，“显然”你很爱他们啊。“显然的”引 申为“表面上的，貌似(真实)的”。</div>          <div class="root"><span class="lbl">根</span>ap(一再) + par(出现) + ent → 一再出现 → 明显的</div>          <div class="zt"><span class="lbl">真题</span>These invisible duties become apparent only when you don&#x27;t do them. 只有当你不去做 的时候，这些看不见的责任才会变得明显。 (2021)</div>          <div class="fam"><span class="lbl">族</span>apparently adv. 显然地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">obvious</span>
+          <span class="ipa">/&#x27;a:bviəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明显的，显然的；平淡无奇的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was obvious that the kitchen would grow</div>          <div class="root"><span class="lbl">根</span>ob(在前面) + vi(路) + ous → 就摆在路上 → 明显的</div>          <div class="zt"><span class="lbl">真题</span>Once all the obvious answers were exhausted, participants gave more and more inventive answers to combat boredom. —旦所 有显而易见的答案都被用尽，参与者就会给出 越来越多有创意的答案来对抗无聊。(2020)</div>          <div class="fam"><span class="lbl">族</span>obviously adv. 显然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">evident</span>
+          <span class="ipa">/&#x27;evidənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明显的；明白的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The change was evident even to her grandfather</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“俺为等他”；你 为了去机场等你爱的那个人，一定把自己装扮 得很“明显”，比如戴着红色的帽子，打着粉色的 领结，这样他才能认出你啊。</div>          <div class="root"><span class="lbl">根</span>e(出) + vid(看) + ent → 一看就知道</div>          <div class="zt"><span class="lbl">真题</span>The fridge&#x27;s effect upon the environment has been evident. 冰箱对环境的影响已经很明 显了。</div>          <div class="fam"><span class="lbl">族</span>evidence n. 证据</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">evidence</span>
+          <span class="ipa">/&#x27;evidəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">证据；(法庭)证物，证词</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the evidence was the long line of cars</div>          <div class="mnem"><span class="lbl">记</span>evident 的名词形式，“证据”就 是很明显的东西啊。</div>          <div class="root"><span class="lbl">根</span>evident(明显的) + ce → 明摆着的东西 → 证据</div>          <div class="zt"><span class="lbl">真题</span>There was no evidence that errors occurred more when the misnamer was frustrated，tired or angry. 没有证据表明，当叫 错别人名字的人感到沮丧、厌烦或愤怒时，错误 会发生得更多。(2019)</div>          <div class="fam"><span class="lbl">族</span>evident adj. 明显的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">loom</span>
+          <span class="ipa">/lu:m/</span>
+          <span class="pos">v.</span>
+          <span class="cn">隐约出现；逼近，临近 η.织布机；隐隐显示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to loom like a heavy cloud</div>          <div class="mnem"><span class="lbl">记</span>想象成：100(loo)米(m)外的东 西，你能看清吗？→(模糊之物)隐约出现。</div>          <div class="root"><span class="lbl">根</span>联想：100(loo)米(m)外 → 只能隐约看见</div>          <div class="fam"><span class="lbl">族</span>looming adj. 逼近的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">boom</span>
+          <span class="ipa">/bu:m/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp;. η.(发出)隆隆声；激增，繁荣</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a quiet boom began</div>          <div class="mnem"><span class="lbl">记</span>600(boo)个妹妹（m），大家都 说女生是招商银行，男生是建设银行，如果你家 有600个妹妹，那就是600个招商银行啊！你 家肯定就会“繁荣，昌盛”。</div>          <div class="root"><span class="lbl">根</span>拟声：轰的一声 → 突然兴旺</div>          <div class="zt"><span class="lbl">真题</span>It still has a chance to give rise to a boom in the global economy.(中国)仍有机会为全球 经济带来繁荣。(2016)</div>          <div class="fam"><span class="lbl">族</span>booming adj. 繁荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">bloom</span>
+          <span class="ipa">/blu:m/</span>
+          <span class="pos">v.</span>
+          <span class="cn">开花</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>white flowers would bloom</div>          <div class="mnem"><span class="lbl">记</span>6100(bloo)个妹妹(m)，一家有 这么多妹妹，有点过于夸张啦，但是我们经常把 女人比喻成什么？→花。所以把这个单词想成 6100朵花在“开放，怒放”。</div>          <div class="root"><span class="lbl">根</span>联想：6100(bloo)朵花一齐开放</div>          <div class="zt"><span class="lbl">真题</span>With the development in science and technology man can make various flowers bloom before their time. 随着科学技术的发展， 人们可以使各种各样的花提前绽放。</div>          <div class="fam"><span class="lbl">族</span>blossom n. 花 v. 开花</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">gloom</span>
+          <span class="ipa">/glu:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">忧郁；愁闷；无望；幽暗；黑暗；昏暗</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The long winter afternoons were full of gloom</div>          <div class="mnem"><span class="lbl">记</span>哥哥(g)看100(loo)米(m)外的 东西看不清，一副“忧郁”的表情。</div>          <div class="root"><span class="lbl">根</span>联想：哥(g)看 100(loo)米外看不清 → 忧郁</div>          <div class="fam"><span class="lbl">族</span>gloomy adj. 阴郁的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">boost</span>
+          <span class="ipa">/bu:st/</span>
+          <span class="pos">v.</span>
+          <span class="cn">促进，推动；使兴旺 n.推动，促进；宣扬</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>did boost her confidence</div>          <div class="root"><span class="lbl">根</span>联想：boo(喊) + st → 喊一声给你打气</div>          <div class="zt"><span class="lbl">真题</span>Agreeable people boost your confidence and allow you to relax and feel comfortable. 随 和的人会增强你的自信，让你放松，感到舒适。</div>          <div class="fam"><span class="lbl">族</span>booster n. 助推器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">boast</span>
+          <span class="ipa">/bəust/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He would boast that the apple pie had no equal anywhere</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“宝石塔” (一种游戏)，你说你总能赢，“吹牛，吹嘘”吧！</div>          <div class="root"><span class="lbl">根</span>谐音「宝石塔」→ 到处吹自己总能赢</div>          <div class="zt"><span class="lbl">真题</span>They boast the longest battery life. 它们 拥有最长的电池寿命。(2023) (078)</div>          <div class="fam"><span class="lbl">族</span>boastful adj. 自夸的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">raw</span>
+          <span class="ipa">/re:/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">未经加工的，天然状态的；(引申为)不熟练 的，没有经验的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He used raw boards</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“肉”。肉开始 都是“生的，未加工的”。</div>          <div class="root"><span class="lbl">根</span>谐音「肉」→ 肉开始都是生的、未加工的</div>          <div class="zt"><span class="lbl">真题</span>Many governments have done more than the US government in providing the raw materials for innovation. 在提供原材料促进创新方面，许多 政府比美国政府做得更多。(2015)</div>          <div class="fam"><span class="lbl">族</span>rawly adv. 未加工地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">crude</span>
+          <span class="ipa">/kru:d/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">简陋的；粗俗的；天然的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>crude tools</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“可人的”。这 块钻石是“天然的”，可以人手。</div>          <div class="root"><span class="lbl">根</span>谐音「可人的」→ 天然钻石谁都想人手</div>          <div class="zt"><span class="lbl">真题</span>It wants to expand its storage of crude oil. 它希望扩大原油储存量。(2014)</div>          <div class="fam"><span class="lbl">族</span>crudely adv. 粗略地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">ripe</span>
+          <span class="ipa">/rap/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">熟的；时机成熟的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the apples were ripe and heavy</div>          <div class="mnem"><span class="lbl">记</span>日头(ri)，也就是太阳，扑(p)过 去的地方，就是太阳照着的植物，很容易“成 熟”。</div>          <div class="root"><span class="lbl">根</span>联想：日(ri)头照到 (p) 的地方，果实就熟了</div>          <div class="fam"><span class="lbl">族</span>ripen v. 使成熟 / ripeness n. 成熟</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">reap</span>
+          <span class="ipa">/ri:p/</span>
+          <span class="pos">v.</span>
+          <span class="cn">取得(成果);收获；收割(庄稼)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every summer he reaped the fruit</div>          <div class="mnem"><span class="lbl">记</span>我高中有个同学叫张瑞璞，她 家是农村的，每次农忙都要请假，回家“收割庄 (079) 第三单元 稼”。</div>          <div class="root"><span class="lbl">根</span>联想：同学张瑞璞农忙就要回家收割庄稼</div>          <div class="zt"><span class="lbl">真题</span>At middle age, he wrote, the sowing is behind; now is the time to reap. 他写道，人到中 年，播种已经晚了；现在是收获的时候了。(2017)</div>          <div class="fam"><span class="lbl">族</span>reaper n. 收割者 / harvest n. 收获</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 3 · Day 20</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,689 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 12 · The Sealed Tin in the Closet</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 12 · 10/24 · Unit 2 第 331-360 词</div>
+  <h1>The Sealed Tin in the Closet<span class="cn">壁橱里那个封好的铁盒</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-12.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3755"><p class="en"><span class="w" data-s="43" data-e="469">Grandpa&#x27;s</span> <span class="w" data-s="512" data-e="640">old</span> <span class="w" data-s="683" data-e="1067">fishing</span> <span class="w" data-s="1109" data-e="1237">boat</span> <span class="w" data-s="1280" data-e="1451">had</span> <span class="w" data-s="1493" data-e="1621">been</span> <span class="w" data-s="1664" data-e="1792">sitting</span> <span class="w" data-s="1835" data-e="2048">under</span> <span class="w" data-s="2091" data-e="2261">a</span> <span class="w" data-s="2304" data-e="2517">grey</span> <span class="w target" data-s="2560" data-e="2859" title="">blanket</span> <span class="w" data-s="2901" data-e="3029">in</span> <span class="w" data-s="3072" data-e="3115">the</span> <span class="w" data-s="3157" data-e="3243">yard</span> <span class="w" data-s="3285" data-e="3541">for</span> <span class="w" data-s="3584" data-e="3755">years.</span></p><p class="zh">爷爷那艘旧渔船盖着一块灰色毯子，在院子里放了好多年。</p></div>
+<div class="pair" data-s0="4053" data-s1="9557"><p class="en"><span class="w" data-s="4053" data-e="4821">The</span> <span class="w" data-s="4864" data-e="5205">cabin</span> <span class="w" data-s="5248" data-e="5333">was</span> <span class="w target" data-s="5376" data-e="5675" title="空缺的，未被占用的；茫然的">vacant,</span> <span class="w" data-s="5845" data-e="6059">and</span> <span class="w" data-s="6144" data-e="6485">the</span> <span class="w" data-s="6528" data-e="6613">floor</span> <span class="w" data-s="6656" data-e="6869">was</span> <span class="w" data-s="6912" data-e="7040">so</span> <span class="w" data-s="7083" data-e="7509">dusty</span> <span class="w" data-s="7552" data-e="7723">that</span> <span class="w" data-s="7765" data-e="7851">I</span> <span class="w" data-s="7893" data-e="8021">had</span> <span class="w" data-s="8064" data-e="8149">to</span> <span class="w target" data-s="8192" data-e="8533" title="真空 v. 用真空吸尘器清扫">vacuum</span> <span class="w" data-s="8576" data-e="8619">it</span> <span class="w" data-s="8661" data-e="8832">before</span> <span class="w" data-s="8875" data-e="9003">I</span> <span class="w" data-s="9045" data-e="9131">could</span> <span class="w" data-s="9173" data-e="9259">step</span> <span class="w" data-s="9301" data-e="9557">inside.</span></p><p class="zh">船舱是空的，地板上积满灰尘，我得先用吸尘器吸一遍才敢踏进去。</p></div>
+<div class="pair" data-s0="10336" data-s1="14987"><p class="en"><span class="w" data-s="10336" data-e="10422">There</span> <span class="w" data-s="10464" data-e="10550">was</span> <span class="w" data-s="10592" data-e="10635">a</span> <span class="w" data-s="10678" data-e="10763">lot</span> <span class="w" data-s="10806" data-e="10976">to</span> <span class="w target" data-s="11019" data-e="11318" title="丢弃，抛弃">discard:</span> <span class="w" data-s="11659" data-e="12171">bent</span> <span class="w target" data-s="12214" data-e="12555" title="">hooks,</span> <span class="w" data-s="12683" data-e="13110">torn</span> <span class="w" data-s="13152" data-e="13408">nets,</span> <span class="w" data-s="13579" data-e="13750">and</span> <span class="w" data-s="13963" data-e="14134">three</span> <span class="w" data-s="14176" data-e="14603">bags</span> <span class="w" data-s="14646" data-e="14688">of</span> <span class="w target" data-s="14731" data-e="14987" title="垃圾，废物 v.损坏">trash.</span></p><p class="zh">要丢掉的东西太多了：弯了的鱼钩、破渔网，还有三袋垃圾。</p></div>
+<div class="pair" data-s0="15243" data-s1="21515"><p class="en"><span class="w" data-s="15243" data-e="15926">The</span> <span class="w" data-s="15968" data-e="16182">hull</span> <span class="w" data-s="16224" data-e="16352">still</span> <span class="w" data-s="16395" data-e="16736">carried</span> <span class="w" data-s="16779" data-e="16907">a</span> <span class="w" data-s="16950" data-e="16992">long</span> <span class="w" data-s="17035" data-e="17419">crack</span> <span class="w" data-s="17462" data-e="17675">from</span> <span class="w" data-s="17718" data-e="17803">a</span> <span class="w target" data-s="17846" data-e="18144" title="碰撞；冲突">collision</span> <span class="w" data-s="18187" data-e="18272">with</span> <span class="w" data-s="18315" data-e="18443">the</span> <span class="w" data-s="18486" data-e="18614">dock,</span> <span class="w" data-s="18827" data-e="18998">and</span> <span class="w" data-s="19083" data-e="19467">a</span> <span class="w" data-s="19510" data-e="19638">second</span> <span class="w" data-s="19680" data-e="19894">one</span> <span class="w" data-s="19936" data-e="20064">from</span> <span class="w" data-s="20107" data-e="20235">a</span> <span class="w target" data-s="20278" data-e="20448" title="冲突；不协调；撞击声 v. 冲突；争论；(使) 撞击出巨大的响声">clash</span> <span class="w" data-s="20491" data-e="20747">with</span> <span class="w" data-s="20790" data-e="20875">a</span> <span class="w" data-s="20918" data-e="21088">steel</span> <span class="w" data-s="21131" data-e="21515">buoy.</span></p><p class="zh">船身上还留着一道长长的裂缝，是当年和码头撞出来的；另一道是和钢制浮标撞出来的。</p></div>
+<div class="pair" data-s0="22035" data-s1="24936"><p class="en"><span class="w" data-s="22035" data-e="22333">Grandpa</span> <span class="w" data-s="22376" data-e="22589">once</span> <span class="w" data-s="22632" data-e="22845">watched</span> <span class="w" data-s="22888" data-e="23187">a</span> <span class="w" data-s="23229" data-e="23315">small</span> <span class="w" data-s="23357" data-e="23613">boat</span> <span class="w target" data-s="23656" data-e="24083" title="撞车，坠毁 η. 撞车事故，失事">crash</span> <span class="w" data-s="24125" data-e="24339">into</span> <span class="w" data-s="24381" data-e="24467">the</span> <span class="w" data-s="24509" data-e="24765">harbour</span> <span class="w" data-s="24808" data-e="24936">wall.</span></p><p class="zh">爷爷曾经眼睁睁看着一条小船撞上港口的墙。</p></div>
+<div class="pair" data-s0="25192" data-s1="29971"><p class="en"><span class="w" data-s="25192" data-e="25704">The</span> <span class="w target" data-s="25832" data-e="26088" title="沉船；失事；交通事故；残骸 v. 破坏，毁坏">wreck</span> <span class="w" data-s="26131" data-e="26259">lay</span> <span class="w" data-s="26301" data-e="26472">on</span> <span class="w" data-s="26515" data-e="26557">the</span> <span class="w" data-s="26600" data-e="26813">beach</span> <span class="w" data-s="26856" data-e="26984">all</span> <span class="w" data-s="27027" data-e="27325">winter,</span> <span class="w" data-s="27496" data-e="27709">and</span> <span class="w" data-s="27837" data-e="28264">every</span> <span class="w" data-s="28307" data-e="28733">storm</span> <span class="w" data-s="28776" data-e="28904">would</span> <span class="w target" data-s="28947" data-e="29203" title="打碎，粉碎；猛击">smash</span> <span class="w" data-s="29245" data-e="29416">it</span> <span class="w" data-s="29459" data-e="29544">a</span> <span class="w" data-s="29587" data-e="29672">little</span> <span class="w" data-s="29715" data-e="29971">smaller.</span></p><p class="zh">那条船的残骸在沙滩上躺了一整个冬天，每场暴风雨都把它砸得更碎一点。</p></div>
+<div class="pair" data-s0="30643" data-s1="34525"><p class="en"><span class="w" data-s="30643" data-e="30771">When</span> <span class="w" data-s="30813" data-e="30899">he</span> <span class="w" data-s="30941" data-e="31069">told</span> <span class="w" data-s="31112" data-e="31283">that</span> <span class="w" data-s="31325" data-e="31539">story,</span> <span class="w" data-s="31795" data-e="32008">he</span> <span class="w" data-s="32136" data-e="32307">would</span> <span class="w" data-s="32349" data-e="32520">suddenly</span> <span class="w target" data-s="32563" data-e="32989" title="猛冲，突进；(使)冲撞 n. 猛冲，突进">dash</span> <span class="w" data-s="33032" data-e="33288">outside</span> <span class="w" data-s="33331" data-e="33629">to</span> <span class="w" data-s="33672" data-e="33800">check</span> <span class="w" data-s="33843" data-e="34013">his</span> <span class="w" data-s="34056" data-e="34141">own</span> <span class="w" data-s="34184" data-e="34525">ropes.</span></p><p class="zh">他讲这个故事的时候，总会突然冲出去检查自己的缆绳。</p></div>
+<div class="pair" data-s0="34739" data-s1="38877"><p class="en"><span class="w" data-s="34739" data-e="34909">I</span> <span class="w" data-s="35293" data-e="35379">had</span> <span class="w" data-s="35421" data-e="35549">no</span> <span class="w target" data-s="35592" data-e="35805" title="现金，金钱 v. 改进；改善">cash</span> <span class="w" data-s="35848" data-e="36019">to</span> <span class="w" data-s="36061" data-e="36275">repair</span> <span class="w" data-s="36317" data-e="36403">the</span> <span class="w" data-s="36445" data-e="36573">boat,</span> <span class="w" data-s="36829" data-e="36957">and</span> <span class="w" data-s="37043" data-e="37256">I</span> <span class="w" data-s="37299" data-e="37384">was</span> <span class="w target" data-s="37427" data-e="37768" title="羞愧的;惭愧的；羞耻的">ashamed</span> <span class="w" data-s="37811" data-e="37896">to</span> <span class="w" data-s="37939" data-e="38024">ask</span> <span class="w" data-s="38067" data-e="38195">my</span> <span class="w" data-s="38237" data-e="38408">family</span> <span class="w" data-s="38451" data-e="38707">for</span> <span class="w" data-s="38749" data-e="38877">money.</span></p><p class="zh">我没有现金修船，也不好意思向家里要钱。</p></div>
+<div class="pair" data-s0="39176" data-s1="43912"><p class="en"><span class="w" data-s="39176" data-e="39432">Still,</span> <span class="w" data-s="39645" data-e="39816">I</span> <span class="w" data-s="40072" data-e="40243">wanted</span> <span class="w" data-s="40285" data-e="40456">to</span> <span class="w target" data-s="40499" data-e="40755" title="进展，进步v.前进，向前移动；进步">advance</span> <span class="w" data-s="40797" data-e="40968">the</span> <span class="w" data-s="41011" data-e="41139">work,</span> <span class="w" data-s="41352" data-e="41608">so</span> <span class="w" data-s="41821" data-e="41992">I</span> <span class="w" data-s="42035" data-e="42163">asked</span> <span class="w" data-s="42205" data-e="42376">my</span> <span class="w" data-s="42419" data-e="42675">uncle</span> <span class="w" data-s="42717" data-e="42888">to</span> <span class="w target" data-s="42931" data-e="43229" title="批准；赞成，同意">approve</span> <span class="w" data-s="43272" data-e="43357">a</span> <span class="w" data-s="43400" data-e="43528">small</span> <span class="w" data-s="43571" data-e="43912">loan.</span></p><p class="zh">不过我还是想把活儿往前推进，就去请叔叔批准一小笔借款。</p></div>
+<div class="pair" data-s0="44860" data-s1="53052"><p class="en"><span class="w" data-s="44860" data-e="44946">He</span> <span class="w" data-s="44988" data-e="45159">wanted</span> <span class="w target" data-s="45202" data-e="45628" title="证据，证明 adj.能抵御；能防范；可防护">proof</span> <span class="w" data-s="45671" data-e="45799">that</span> <span class="w" data-s="45842" data-e="45884">she</span> <span class="w" data-s="45927" data-e="46098">could</span> <span class="w" data-s="46140" data-e="46268">still</span> <span class="w" data-s="46311" data-e="46695">sail,</span> <span class="w" data-s="46866" data-e="47036">and</span> <span class="w" data-s="47164" data-e="47591">said</span> <span class="w" data-s="47634" data-e="47762">a</span> <span class="w" data-s="47804" data-e="47847">good</span> <span class="w" data-s="47890" data-e="48146">coat</span> <span class="w" data-s="48188" data-e="48274">of</span> <span class="w" data-s="48316" data-e="48402">paint</span> <span class="w" data-s="48444" data-e="48700">would</span> <span class="w target" data-s="48743" data-e="48999" title="提高；增强;增进">enhance</span> <span class="w" data-s="49042" data-e="49212">her</span> <span class="w" data-s="49255" data-e="49426">value,</span> <span class="w target" data-s="49724" data-e="50535" title="扩大,扩充；放大;(~upon/on)详述">enlarge</span> <span class="w" data-s="50578" data-e="50791">her</span> <span class="w" data-s="50834" data-e="50962">market,</span> <span class="w" data-s="51218" data-e="51474">and</span> <span class="w target" data-s="51644" data-e="52156" title="充实；使丰富；使饱含(某物)">enrich</span> <span class="w" data-s="52199" data-e="52412">the</span> <span class="w" data-s="52455" data-e="52540">whole</span> <span class="w" data-s="52583" data-e="53052">harbour.</span></p><p class="zh">他要看到这条船还能航行的证据，还说好好刷一层漆能提高她的身价、扩大她的市场，也能让整个港口受益。</p></div>
+<div class="pair" data-s0="53180" data-s1="56380"><p class="en"><span class="w" data-s="53180" data-e="53863">So</span> <span class="w" data-s="53906" data-e="54076">I</span> <span class="w" data-s="54119" data-e="54204">learned</span> <span class="w" data-s="54247" data-e="54460">to</span> <span class="w target" data-s="54503" data-e="54802" title="扎牢，扣住，系牢">fasten</span> <span class="w" data-s="54844" data-e="55058">every</span> <span class="w" data-s="55100" data-e="55442">rope</span> <span class="w" data-s="55484" data-e="55655">and</span> <span class="w" data-s="55698" data-e="56039">pull</span> <span class="w" data-s="56082" data-e="56210">it</span> <span class="w target" data-s="56252" data-e="56380" title="牢固的，紧的；严密的；严格的；拮据的 adv.紧紧地;牢固地">tight.</span></p><p class="zh">于是我学着把每根缆绳都系牢、拉紧。</p></div>
+<div class="pair" data-s0="56807" data-s1="59751"><p class="en"><span class="w" data-s="56807" data-e="56978">I</span> <span class="w" data-s="57020" data-e="57148">made</span> <span class="w" data-s="57191" data-e="57319">the</span> <span class="w" data-s="57362" data-e="57532">deck</span> <span class="w target" data-s="57575" data-e="57959" title="不透水的；防水的；水密的；严密的；无懈可 击的 (046)">watertight</span> <span class="w" data-s="58002" data-e="58386">and</span> <span class="w" data-s="58556" data-e="58855">checked</span> <span class="w" data-s="58898" data-e="58940">that</span> <span class="w" data-s="58983" data-e="59154">nothing</span> <span class="w" data-s="59196" data-e="59410">was</span> <span class="w target" data-s="59452" data-e="59751" title="释放；放任；松开 adj. 未固定牢的；自由的">loose.</span></p><p class="zh">我把甲板做成防水的，还检查了有没有哪里松动。</p></div>
+<div class="pair" data-s0="60631" data-s1="62039"><p class="en"><span class="w" data-s="60631" data-e="60759">One</span> <span class="w" data-s="60801" data-e="61015">last</span> <span class="w" data-s="61057" data-e="61271">thing</span> <span class="w" data-s="61313" data-e="61484">had</span> <span class="w" data-s="61527" data-e="61655">to</span> <span class="w" data-s="61697" data-e="61740">be</span> <span class="w target" data-s="61783" data-e="62039" title="打开；解开；消除，取消">undone.</span></p><p class="zh">还有最后一件事需要解开。</p></div>
+<div class="pair" data-s0="62295" data-s1="67372"><p class="en"><span class="w" data-s="62295" data-e="62551">A</span> <span class="w" data-s="62721" data-e="63319">narrow</span> <span class="w target" data-s="63361" data-e="63660" title="贮藏室；壁橱">closet</span> <span class="w target" data-s="63703" data-e="63959" title="把……围起来；附入">enclosed</span> <span class="w" data-s="64001" data-e="64257">the</span> <span class="w" data-s="64300" data-e="64385">space</span> <span class="w" data-s="64428" data-e="64684">under</span> <span class="w" data-s="64727" data-e="64855">the</span> <span class="w" data-s="64897" data-e="65111">bench,</span> <span class="w" data-s="65281" data-e="65623">held</span> <span class="w" data-s="65665" data-e="65836">shut</span> <span class="w" data-s="65879" data-e="66092">by</span> <span class="w" data-s="66135" data-e="66263">a</span> <span class="w target" data-s="66305" data-e="66391" title="">hook</span> <span class="w" data-s="66433" data-e="66732">and</span> <span class="w" data-s="66817" data-e="66903">a</span> <span class="w" data-s="66945" data-e="67073">broken</span> <span class="w" data-s="67116" data-e="67372">lock.</span></p><p class="zh">长凳下面是窄窄一个壁橱，被一个钩子和一把坏锁扣着。</p></div>
+<div class="pair" data-s0="67585" data-s1="70103"><p class="en"><span class="w" data-s="67585" data-e="68225">At</span> <span class="w" data-s="68268" data-e="68396">first</span> <span class="w" data-s="68439" data-e="68737">I</span> <span class="w" data-s="68780" data-e="68908">did</span> <span class="w" data-s="68951" data-e="69036">not</span> <span class="w target" data-s="69079" data-e="69335" title="揭露；透露，泄露，使暴露">disclose</span> <span class="w" data-s="69377" data-e="69548">the</span> <span class="w" data-s="69591" data-e="69676">find</span> <span class="w" data-s="69719" data-e="69932">to</span> <span class="w" data-s="69975" data-e="70103">anyone.</span></p><p class="zh">起初我没有把发现告诉任何人。</p></div>
+<div class="pair" data-s0="70831" data-s1="77146"><p class="en"><span class="w" data-s="70831" data-e="71173">Inside,</span> <span class="w" data-s="71471" data-e="71642">in</span> <span class="w" data-s="71813" data-e="71941">a</span> <span class="w target" data-s="71983" data-e="72197" title="封上(信封)；密封，封锁 n. 印章；密封装置">sealed</span> <span class="w" data-s="72239" data-e="72453">tin,</span> <span class="w" data-s="72623" data-e="72794">lay</span> <span class="w" data-s="73093" data-e="73263">a</span> <span class="w" data-s="73306" data-e="73647">photograph</span> <span class="w" data-s="73690" data-e="74074">and</span> <span class="w" data-s="74287" data-e="74415">a</span> <span class="w" data-s="74458" data-e="74586">letter</span> <span class="w" data-s="74629" data-e="74842">my</span> <span class="w" data-s="74885" data-e="75354">grandfather</span> <span class="w" data-s="75397" data-e="75653">had</span> <span class="w" data-s="75695" data-e="75823">tried</span> <span class="w" data-s="75866" data-e="76037">to</span> <span class="w target" data-s="76079" data-e="76378" title="隐藏；隐瞒；掩盖">conceal</span> <span class="w" data-s="76421" data-e="76634">for</span> <span class="w" data-s="76677" data-e="76975">forty</span> <span class="w" data-s="77018" data-e="77146">years.</span></p><p class="zh">里面有个封好的铁盒，盒里是一张照片，还有一封爷爷藏了四十年的信。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">blanket</span>
+          <span class="ipa">/&#x27;blænkit/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sitting under a grey blanket in the yard</div>          <div class="mnem"><span class="lbl">记</span>一部美国电影叫《ET外星人》， 他的好朋友害怕别人看到 ET(blanket 的最后 两个字母)，就给这个外星人身上披了一个“毯 子”。</div>          <div class="root"><span class="lbl">根</span>blank(白) + et(小东西) → 一块白布 → 毯子</div>          <div class="zt"><span class="lbl">真题</span>The atmosphere again acts as our protective blanket on earth. 大气再次充当我们 在地球上的保护毯。</div>          <div class="fam"><span class="lbl">族</span>blank adj. 空白的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">vacant</span>
+          <span class="ipa">/&#x27;veikənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">空缺的，未被占用的；茫然的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The cabin was vacant</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“未(开）垦 的”。一片土地未开垦的→空缺的，未被占 用的。</div>          <div class="root"><span class="lbl">根</span>vac(空) + ant(形容词尾) → 空着的</div>          <div class="zt"><span class="lbl">真题</span>As the water is pumped out, the vacant space left is compacted by the weight of the earth above.当水被抽出来的时候，剩下的空间 被上面的土地的重量压紧。(2018)</div>          <div class="fam"><span class="lbl">族</span>vacancy n. 空缺 / vacation n. 假期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">vacuum</span>
+          <span class="ipa">/&#x27;vækju:m/</span>
+          <span class="pos">n.</span>
+          <span class="cn">真空 v. 用真空吸尘器清扫</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I had to vacuum it</div>          <div class="mnem"><span class="lbl">记</span>这个单词前半部分类似 vacant。vacant 是空缺的；m 想成妹妹，妹妹内 心是空缺的，那就是“真空”的。</div>          <div class="root"><span class="lbl">根</span>vac(空) + uum → 完全空 → 真空</div>          <div class="zt"><span class="lbl">真题</span>Study the effect of radiation and vacuum on its materials. 研究辐射和真空对其材料的 影响。</div>          <div class="fam"><span class="lbl">族</span>vacant adj. 空的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">discard</span>
+          <span class="ipa">/dı&#x27;ska:rd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">丢弃，抛弃</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was a lot to discard</div>          <div class="mnem"><span class="lbl">记</span>dis(消失)+card(纸牌)→纸牌 消失了→丢弃。</div>          <div class="root"><span class="lbl">根</span>dis(去掉) + card(牌) → 把牌扔掉</div>          <div class="zt"><span class="lbl">真题</span>Beverage companies should be responsible for collecting and reusing discarded plastic soda bottles. 饮料公司应该负责收集和重新使用丢 弃的塑料苏打瓶。</div>          <div class="fam"><span class="lbl">族</span>card n. 卡片</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">trash</span>
+          <span class="ipa">/træ∫/</span>
+          <span class="pos"></span>
+          <span class="cn">垃圾，废物 v.损坏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>three bags of trash</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“揣洗”。想象一 下，一双“垃圾”一样的、很臭的袜子，你还揣回 宿舍洗洗？</div>          <div class="root"><span class="lbl">根</span>谐音：揣洗 → 脏得还想揣回去洗 → 垃圾</div>          <div class="zt"><span class="lbl">真题</span>But as the saying goes, one person&#x27;s trash is another&#x27;s treasure. 但是俗话说得好，— 个人的垃圾是另一个的宝藏。(2018)</div>          <div class="fam"><span class="lbl">族</span>trashy adj. 劣质的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">collision</span>
+          <span class="ipa">/kə&#x27;lızn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">碰撞；冲突</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a long crack from a collision with the dock</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“可（很）累人”。 小时候冬天很冷，我们小孩就抱紧胳膊，彼此 “碰撞”，很累人，玩一会身上就发热了。</div>          <div class="root"><span class="lbl">根</span>col(共同) + lis(撞) + ion → 撞在一起</div>          <div class="zt"><span class="lbl">真题</span>But there are also thousands of asteroids whose orbits put them on a collision course with Earth. 但也有成千上万颗小行星，它们的 轨道使它们与地球发生碰撞。</div>          <div class="fam"><span class="lbl">族</span>collide v. 碰撞</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">clash</span>
+          <span class="ipa">/klæ∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">冲突；不协调；撞击声 v. 冲突；争论；(使) 撞击出巨大的响声</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a second one from a clash with a steel buoy</div>          <div class="mnem"><span class="lbl">记</span>用飞机坠毁来编故事：单词前 半部分的发音类似“可来”，电影中经常有飞机 出故障，撞击摩天大楼的事件发生，那飞机可来 “撞击”了大楼？</div>          <div class="root"><span class="lbl">根</span>拟声：金属相撞的“咔啦”声 → 冲突</div>          <div class="zt"><span class="lbl">真题</span>Multiculturalism can be a rewarding, enriching experience, but it can also lead to a clash of values. 多元文化主义可以是一种有益 的、丰富的体验，但它也可能导致价值观的 冲突。</div>          <div class="fam"><span class="lbl">族</span>clashing adj. 相互冲突的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">crash</span>
+          <span class="ipa">/kræ∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">撞车，坠毁 η. 撞车事故，失事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>watched a small boat crash into the harbour wall</div>          <div class="root"><span class="lbl">根</span>拟声：哗啦一声 → 撞毁</div>          <div class="zt"><span class="lbl">真题</span>People suffering from sleep loss are at an increased risk from obesity, psychological problems and car crashes. 睡眠不足的人患肥胖、心理问 题和遭遇车祸的风险更高。(2016)</div>          <div class="fam"><span class="lbl">族</span>crash n. 撞车事故</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">wreck</span>
+          <span class="ipa">/rek/</span>
+          <span class="pos">n.</span>
+          <span class="cn">沉船；失事；交通事故；残骸 v. 破坏，毁坏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The wreck lay on the beach all winter</div>          <div class="mnem"><span class="lbl">记</span>发音类似“歪个”。“交通事故” 把电线杆都撞歪了。</div>          <div class="root"><span class="lbl">根</span>谐音：歪个 → 撞得歪了 → 残骸</div>          <div class="zt"><span class="lbl">真题</span>Natural disasters can wreck a community&#x27;s infrastructure, disrupting systems for months or years. 自然灾害可以破坏一个社区的基础设 施，扰乱系统达数月或数年之久。</div>          <div class="fam"><span class="lbl">族</span>wreckage n. 残骸</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">smash</span>
+          <span class="ipa">/smæ∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打碎，粉碎；猛击</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every storm would smash it a little smaller</div>          <div class="mnem"><span class="lbl">记</span>sma 想象成 small(小)，smash 就是小灰(ash是“灰尘，灰烬”)，那就是摩天大 楼“粉碎”了，变成了ash(灰烬)。</div>          <div class="root"><span class="lbl">根</span>s + mash(捣碎) → 砸成碎块</div>          <div class="zt"><span class="lbl">真题</span>Located on the shore of Sullivan&#x27;s Island off, the award-winning beach house was built to replace one smashed to pieces by Hurricane (飓风) Hugo 10 years ago. 这座屡获殊荣的海 滨别墅位于沙利文岛的岸边，是为了取代10年 前被“雨果”飓风摧毁的房子建造的。</div>          <div class="fam"><span class="lbl">族</span>smashed adj. 破碎的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">cash</span>
+          <span class="ipa">/kæ∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">现金，金钱 v. 改进；改善</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I had no cash to repair the boat</div>          <div class="mnem"><span class="lbl">记</span>总统很伤心，感叹需要花费多 少开支(cash发音类似“开支”)才能恢复摩天大 楼的原貌啊，所以cash就是“现金”的意思。 (045) 第二单元</div>          <div class="root"><span class="lbl">根</span>谐音：开支 → 要花的现钱</div>          <div class="zt"><span class="lbl">真题</span>Cotton doesn&#x27;t have to go, since it is, after all, one of the most useful cash crops across the globe. 棉花并不一定要消失，毕竟它 是全球最有用的经济作物之一。(2023)</div>          <div class="fam"><span class="lbl">族</span>cashier n. 出纳员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">ashamed</span>
+          <span class="ipa">/ə&#x27;Sermd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">羞愧的;惭愧的；羞耻的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I was ashamed to ask my family for money</div>          <div class="mnem"><span class="lbl">记</span>ash(灰)+a(一)+ me(我)+d (的)，我的脸上有一点儿灰→羞愧的。</div>          <div class="root"><span class="lbl">根</span>a(在) + shame(羞耻) + ed → 感到羞耻的</div>          <div class="zt"><span class="lbl">真题</span>He was ashamed of having asked such a silly question. 他为问了这样一个愚蠢的问题而 感到羞愧。</div>          <div class="fam"><span class="lbl">族</span>shame n. 羞耻 / shameful adj. 可耻的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">dash</span>
+          <span class="ipa">/dæ∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">猛冲，突进；(使)冲撞 n. 猛冲，突进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he would suddenly dash outside to check his own ropes</div>          <div class="mnem"><span class="lbl">记</span>该单词读音类似“大事”。大事 不好了，赶紧冲出去看一下→猛冲。</div>          <div class="root"><span class="lbl">根</span>谐音：大事 → 有大事就冲出去</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s Ken Outlaw, a welder in rural North Carolina whose dream of going back to school at a local community college was dashed by Hurricane Florence. 他是北卡罗来纳州农村地 区的一名焊工肯·奥特劳，他重返当地社区大 学上学的梦想被飓风佛罗伦萨摧毁了。(2020) 例 As soon as the teacher opened the door, they dashed into the classroom. 老师一开门，他 们就冲进了教室。</div>          <div class="fam"><span class="lbl">族</span>dashing adj. 冲劲十足的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">advance</span>
+          <span class="ipa">/əd&#x27;væns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">进展，进步v.前进，向前移动；进步</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I wanted to advance the work</div>          <div class="mnem"><span class="lbl">记</span>ad 表示“一再地”，vance 可以 想成人名“万斯”。我们中文有句老话，叫“人往 高处走”，那该单词就是万斯一再地“进步，前 进”啊。</div>          <div class="root"><span class="lbl">根</span>ad(向前) + vance(先) → 走在前面 → 前进</div>          <div class="zt"><span class="lbl">真题</span>It contributes greatly to the advance of society as a whole. 它对整个社会的进步做出了 巨大贡献。(2016)</div>          <div class="fam"><span class="lbl">族</span>advanced adj. 先进的 / advancement n. 进步</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">approve</span>
+          <span class="ipa">/ə&#x27;pru:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">批准；赞成，同意</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>asked my uncle to approve a small loan</div>          <div class="mnem"><span class="lbl">记</span>ap 表示“一再地”，prove意为 “证明”，一再地证明你干一件事情是可行的，是 想要得到别人的“同意，赞成”。</div>          <div class="root"><span class="lbl">根</span>ap(加强) + prove(证明) → 一再证明才同意</div>          <div class="zt"><span class="lbl">真题</span>Public health groups applauded the approved tax as a step toward fixing certain lasting health issues. 公共卫生组织对批准的税 收表示欢迎，认为这是解决某些持久健康问题 的一步。(2019)</div>          <div class="fam"><span class="lbl">族</span>approval n. 批准 / approved adj. 经批准的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">proof</span>
+          <span class="ipa">/pru:f/</span>
+          <span class="pos">n.</span>
+          <span class="cn">证据，证明 adj.能抵御；能防范；可防护</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He wanted proof that she could still sail</div>          <div class="mnem"><span class="lbl">记</span>这个单词不容易记忆，但是联 想到prove是“证明”的意思，你就知道为什么 把proof翻译成“证据”了吧。</div>          <div class="root"><span class="lbl">根</span>与 prove(证明) 同源 → 证据</div>          <div class="zt"><span class="lbl">真题</span>So far there has been no scientific proof of the educational benefits of iPads. 到目前为 止，还没有科学证据证明iPad对教育有好处。</div>          <div class="fam"><span class="lbl">族</span>prove v. 证明</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">enhance</span>
+          <span class="ipa">/ın&#x27;hæns/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提高；增强;增进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>would enhance her value</div>          <div class="mnem"><span class="lbl">记</span>使(en)十汉斯(hance读音类似 “汉斯”，人名)，使汉斯这个人更厉害了，也就是 “提高，增强”了。</div>          <div class="root"><span class="lbl">根</span>en(使) + hance(高) → 使更高 → 提高</div>          <div class="zt"><span class="lbl">真题</span>Informing students about the brain as a learning machine is a good strategy to enhance their motivation for learning. 让学生了解作为 学习机器的大脑是增强他们学习动机的一个好 策略。(2016)</div>          <div class="fam"><span class="lbl">族</span>enhancement n. 提高</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">enlarge</span>
+          <span class="ipa">/ın&#x27;la:rd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">扩大,扩充；放大;(~upon/on)详述</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>enlarge her market</div>          <div class="mnem"><span class="lbl">记</span>使（en）十大（large），就是“扩 大，放大”。</div>          <div class="root"><span class="lbl">根</span>en(使) + large(大) → 使变大</div>          <div class="zt"><span class="lbl">真题</span>Can you enlarge upon what you have said a moment before？你能把你刚才所说的话再详 细说说吗？</div>          <div class="fam"><span class="lbl">族</span>large adj. 大的 / enlargement n. 扩大</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">enrich</span>
+          <span class="ipa">/ın&#x27;rıt∫/</span>
+          <span class="pos">v.</span>
+          <span class="cn">充实；使丰富；使饱含(某物)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>enrich the whole harbour</div>          <div class="mnem"><span class="lbl">记</span>使(en)富含(rich)，就是“使丰 富”。</div>          <div class="root"><span class="lbl">根</span>en(使) + rich(富) → 使丰富</div>          <div class="zt"><span class="lbl">真题</span>The liberal arts in higher education help enrich students&#x27;spiritual life. 高等教育中的文 科有助于丰富学生的精神生活。(2014)</div>          <div class="fam"><span class="lbl">族</span>rich adj. 富有的 / enrichment n. 丰富</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">fasten</span>
+          <span class="ipa">/&#x27;fa:sn/</span>
+          <span class="pos">v.</span>
+          <span class="cn">扎牢，扣住，系牢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I learned to fasten every rope</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以解释为“使(en) 快(fast)”。设想运动会刚开始，你把鞋带系紧 后，跑得更快了→扎牢，系牢。</div>          <div class="root"><span class="lbl">根</span>fast(牢) + en(使) → 使牢固 → 系紧</div>          <div class="zt"><span class="lbl">真题</span>If you do not fasten your safety belt, your chances of being hurt will be greater. 如果你不系好安全带，你受伤的概率就会更大。</div>          <div class="fam"><span class="lbl">族</span>fast adj. 牢固的 / fastener n. 扣件</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">tight</span>
+          <span class="ipa">/tait/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">牢固的，紧的；严密的；严格的；拮据的 adv.紧紧地;牢固地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>pull it tight</div>          <div class="root"><span class="lbl">根</span>联想：tie(系) 的形近词 → 系得紧 → 紧的</div>          <div class="zt"><span class="lbl">真题</span>Your heart is beating faster and harder, and the muscles of your arms and legs become tight.你的心跳越来越快，手臂和腿部的肌肉变 得紧绷。</div>          <div class="fam"><span class="lbl">族</span>tighten v. 收紧 / tightly adv. 紧紧地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">watertight</span>
+          <span class="ipa">/&#x27;wə:tərtait/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不透水的；防水的；水密的；严密的；无懈可 击的 (046)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I made the deck watertight</div>          <div class="mnem"><span class="lbl">记</span>水(water)+紧的(tight)，就是 水进不去的→防水的。</div>          <div class="root"><span class="lbl">根</span>water(水) + tight(紧) → 水进不去 → 防水的</div>          <div class="fam"><span class="lbl">族</span>tight adj. 紧的 / airtight adj. 不漏气的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">loose</span>
+          <span class="ipa">/lu:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">释放；放任；松开 adj. 未固定牢的；自由的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>checked that nothing was loose</div>          <div class="mnem"><span class="lbl">记</span>lose我们很熟悉，意思是“丢 失”，为什么会“丢失”？因为是“未固定牢的”， 或者是你“松开”了啊。</div>          <div class="root"><span class="lbl">根</span>与 lose(丢失) 形近 → 没系牢才会丢 → 松的</div>          <div class="zt"><span class="lbl">真题</span>A pilot from Virginia removed his son&#x27;s loose tooth using a helicopter. 维吉尼亚州的一 名飞行员用直升机拔下了他儿子松动的牙齿。 (2019)</div>          <div class="fam"><span class="lbl">族</span>loosen v. 放松 / loosely adv. 松散地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">undo</span>
+          <span class="ipa">/^n&#x27;du:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打开；解开；消除，取消</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One last thing had to be undone</div>          <div class="root"><span class="lbl">根</span>un(相反) + do(做) → 把做过的反过来 → 解开</div>          <div class="zt"><span class="lbl">真题</span>I have returned to college to finish the degree I left undone some four decades ago. 我 已经回到大学，完成了大约40年前我未完成的 学位。</div>          <div class="fam"><span class="lbl">族</span>undone adj. 未完成的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">enclose</span>
+          <span class="ipa">/ın&#x27;kləuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">把……围起来；附入</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>enclosed the space under the bench</div>          <div class="mnem"><span class="lbl">记</span>close的意思是“关闭，闭合”； en前缀加在动词之前加强意义，怎么样才能关 得住，关得牢？当然是“围起来”了。</div>          <div class="root"><span class="lbl">根</span>en(使) + close(关) → 关起来 → 围住</div>          <div class="fam"><span class="lbl">族</span>close v. 关闭 / enclosure n. 围墙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">closet</span>
+          <span class="ipa">/&#x27;kla:zıt/</span>
+          <span class="pos"></span>
+          <span class="cn">贮藏室；壁橱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A narrow closet enclosed the space under the bench</div>          <div class="mnem"><span class="lbl">记</span>close(关上)+t(想成它)，关上 它，关上什么？“壁橱”的门啊。 (047) 第二单元</div>          <div class="root"><span class="lbl">根</span>close(关) + t(它) → 关起来的小空间 → 壁橱</div>          <div class="zt"><span class="lbl">真题</span>The child, frightened by smoke and noise, hides under a bed or in a closet and is later found dead. 孩子被烟雾和噪声吓坏了，躲 在床下或壁橱里，后来被发现死亡。(2010)</div>          <div class="fam"><span class="lbl">族</span>close v. 关闭 / closed adj. 关闭的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">hook</span>
+          <span class="ipa">/huk/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>held shut by a hook and a broken lock</div>          <div class="root"><span class="lbl">根</span>联想：钩子弯弯的形状 → 钩</div>          <div class="zt"><span class="lbl">真题</span>Be careful in removing illegal or undersized fish from the hook. 从鱼钩上取下 非法或体形过小的鱼时要小心。</div>          <div class="fam"><span class="lbl">族</span>hooked adj. 钩状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">disclose</span>
+          <span class="ipa">/dıs&#x27;kləuz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">揭露；透露，泄露，使暴露</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>I did not disclose the find to anyone</div>          <div class="mnem"><span class="lbl">记</span>dis 表示否定，close 意思是关 闭，那该单词就是不关闭→使暴露，泄露。</div>          <div class="root"><span class="lbl">根</span>dis(不) + close(关) → 不关着 → 透露</div>          <div class="zt"><span class="lbl">真题</span>Questions are a powerful tool, especially when they encourage others to disclose information about themselves. 问题是一个强大的工具，尤其 是当他们鼓励别人透露自己的信息时。(2021)</div>          <div class="fam"><span class="lbl">族</span>disclosure n. 披露</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">seal</span>
+          <span class="ipa">/si:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">封上(信封)；密封，封锁 n. 印章；密封装置</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in a sealed tin</div>          <div class="mnem"><span class="lbl">记</span>sea大海，1想象成一个拉锁，把 大海的水用拉锁给“封上”了。</div>          <div class="root"><span class="lbl">根</span>联想：sea(海) + l(拉锁) → 用拉锁把海封上</div>          <div class="zt"><span class="lbl">真题</span>Tightly sealed to prevent air leaks, the house was equipped with small double-paned windows.为了防止空气泄漏，房子配备了小的 双层玻璃窗，被密封得严严实实。</div>          <div class="fam"><span class="lbl">族</span>sealed adj. 密封的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">conceal</span>
+          <span class="ipa">/kən&#x27;si:l/</span>
+          <span class="pos">v.</span>
+          <span class="cn">隐藏；隐瞒；掩盖</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a letter my grandfather had tried to conceal for forty years</div>          <div class="mnem"><span class="lbl">记</span>con 都，ceal 类似 seal(密封)， conceal 就是都封上了→隐藏；掩盖。</div>          <div class="root"><span class="lbl">根</span>con(全) + ceal(像 seal 密封) → 全封上 → 隐藏</div>          <div class="zt"><span class="lbl">真题</span>He wanted to conceal something from his parents. 他想对父母隐瞒一些事情。(2021)</div>          <div class="fam"><span class="lbl">族</span>concealment n. 隐藏</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 2 · Day 12</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

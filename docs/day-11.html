@@ -1,0 +1,691 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 11 · The Whisper and the Deadline</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 11 · 10/23 · Unit 2 第 301-330 词</div>
+  <h1>The Whisper and the Deadline<span class="cn">那句耳语与最后的截稿日</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-11.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="1664"><p class="en"><span class="w" data-s="43" data-e="256">Green</span> <span class="w" data-s="299" data-e="597">Harbor</span> <span class="w" data-s="640" data-e="811">was</span> <span class="w" data-s="853" data-e="981">once</span> <span class="w" data-s="1024" data-e="1152">a</span> <span class="w target" data-s="1195" data-e="1493" title="能结果的；肥沃的">fertile</span> <span class="w" data-s="1536" data-e="1664">town.</span></p><p class="zh">绿港曾经是个肥沃的小镇。</p></div>
+<div class="pair" data-s0="1920" data-s1="8192"><p class="en"><span class="w" data-s="1920" data-e="2176">From</span> <span class="w" data-s="2517" data-e="2645">the</span> <span class="w" data-s="2688" data-e="2901">ferry</span> <span class="w" data-s="2944" data-e="3115">you</span> <span class="w" data-s="3157" data-e="3285">could</span> <span class="w" data-s="3328" data-e="3413">see</span> <span class="w" data-s="3456" data-e="3627">its</span> <span class="w target" data-s="3669" data-e="4011" title="轮廓线；天际线">skyline</span> <span class="w" data-s="4053" data-e="4267">of</span> <span class="w" data-s="4309" data-e="4395">white</span> <span class="w" data-s="4437" data-e="4651">mill</span> <span class="w" data-s="4693" data-e="5077">towers,</span> <span class="w" data-s="5291" data-e="5461">and</span> <span class="w" data-s="5632" data-e="5931">every</span> <span class="w" data-s="5973" data-e="6187">shop</span> <span class="w" data-s="6229" data-e="6443">on</span> <span class="w" data-s="6485" data-e="6656">Main</span> <span class="w" data-s="6699" data-e="6912">Street</span> <span class="w" data-s="6955" data-e="7125">had</span> <span class="w" data-s="7168" data-e="7253">a</span> <span class="w" data-s="7296" data-e="7339">name</span> <span class="w" data-s="7381" data-e="7637">I</span> <span class="w" data-s="7680" data-e="7808">knew</span> <span class="w" data-s="7851" data-e="8021">by</span> <span class="w" data-s="8064" data-e="8192">heart.</span></p><p class="zh">从渡轮上就能看见它那一片白色磨坊塔楼的天际线，主街上每一家店的名字我都记得。</p></div>
+<div class="pair" data-s0="8839" data-s1="17841"><p class="en"><span class="w" data-s="8839" data-e="8924">I</span> <span class="w" data-s="8967" data-e="9095">worked</span> <span class="w" data-s="9137" data-e="9308">at</span> <span class="w" data-s="9351" data-e="9393">the</span> <span class="w" data-s="9436" data-e="9607">local</span> <span class="w" data-s="9649" data-e="9863">paper,</span> <span class="w" data-s="10119" data-e="10375">where</span> <span class="w" data-s="10503" data-e="10631">the</span> <span class="w" data-s="10673" data-e="10759">old</span> <span class="w" data-s="10801" data-e="11143">editor</span> <span class="w" data-s="11185" data-e="11356">would</span> <span class="w target" data-s="11399" data-e="11655" title="轮廓，外形 v. 概述；勾勒，描画……的轮廓">outline</span> <span class="w" data-s="11697" data-e="11868">the</span> <span class="w" data-s="11911" data-e="11996">next</span> <span class="w" data-s="12039" data-e="12423">morning&#x27;s</span> <span class="w" data-s="12465" data-e="12721">pages</span> <span class="w" data-s="12764" data-e="12935">on</span> <span class="w" data-s="12977" data-e="13063">a</span> <span class="w" data-s="13105" data-e="13191">board,</span> <span class="w target" data-s="13404" data-e="14087" title="画线；强调">underline</span> <span class="w" data-s="14129" data-e="14257">the</span> <span class="w" data-s="14300" data-e="14428">two</span> <span class="w" data-s="14471" data-e="14855">shops</span> <span class="w" data-s="14897" data-e="14983">that</span> <span class="w" data-s="15025" data-e="15153">still</span> <span class="w" data-s="15196" data-e="15409">bought</span> <span class="w" data-s="15452" data-e="15793">ads,</span> <span class="w" data-s="16007" data-e="16220">and</span> <span class="w" data-s="16263" data-e="16391">keep</span> <span class="w" data-s="16433" data-e="16604">the</span> <span class="w" data-s="16647" data-e="16732">same</span> <span class="w target" data-s="16775" data-e="17201" title="布局，布置；设计；安排 yp ae p t y changed over the past 90 years. 过去 90 年里， 典型的超市布局几乎没有改变。(2023)">layout</span> <span class="w" data-s="17244" data-e="17329">for</span> <span class="w" data-s="17372" data-e="17671">forty</span> <span class="w" data-s="17713" data-e="17841">years.</span></p><p class="zh">我在当地报社干活，老编辑会在板子上勾勒出第二天报纸的版面，给那两家还在买广告的店铺画上横线，而且四十年来版面布局一直没变。</p></div>
+<div class="pair" data-s0="18621" data-s1="19944"><p class="en"><span class="w" data-s="18621" data-e="18835">Most</span> <span class="w" data-s="18877" data-e="19176">readers</span> <span class="w target" data-s="19219" data-e="19475" title="更喜欢">prefer</span> <span class="w" data-s="19517" data-e="19688">it</span> <span class="w" data-s="19731" data-e="19773">that</span> <span class="w" data-s="19816" data-e="19944">way.</span></p><p class="zh">大多数读者更喜欢这样。</p></div>
+<div class="pair" data-s0="20157" data-s1="21779"><p class="en"><span class="w" data-s="20157" data-e="20328">But</span> <span class="w" data-s="20925" data-e="21053">the</span> <span class="w" data-s="21096" data-e="21139">town</span> <span class="w" data-s="21181" data-e="21352">was</span> <span class="w" data-s="21395" data-e="21480">going</span> <span class="w" data-s="21523" data-e="21779">bad.</span></p><p class="zh">可是小镇在变坏。</p></div>
+<div class="pair" data-s0="22035" data-s1="28093"><p class="en"><span class="w" data-s="22035" data-e="22760">Rain</span> <span class="w" data-s="22803" data-e="22973">had</span> <span class="w target" data-s="23016" data-e="23315" title="削弱；腐蚀；风化；逐渐毁坏(权利或信心)">eroded</span> <span class="w" data-s="23357" data-e="23400">the</span> <span class="w" data-s="23443" data-e="23571">river</span> <span class="w target" data-s="23613" data-e="23784" title="破产者adj. 破产的；完全丧失的">bank,</span> <span class="w" data-s="24040" data-e="24168">the</span> <span class="w" data-s="24467" data-e="24552">mill</span> <span class="w" data-s="24595" data-e="24979">walls</span> <span class="w" data-s="25021" data-e="25149">had</span> <span class="w" data-s="25192" data-e="25363">begun</span> <span class="w" data-s="25405" data-e="25533">to</span> <span class="w target" data-s="25576" data-e="25789" title="&amp;. v. 衰退，衰减；腐烂，腐朽">decay,</span> <span class="w" data-s="26045" data-e="26216">and</span> <span class="w" data-s="26301" data-e="26771">empty</span> <span class="w" data-s="26813" data-e="27155">houses</span> <span class="w" data-s="27197" data-e="27325">were</span> <span class="w" data-s="27368" data-e="27624">falling</span> <span class="w" data-s="27667" data-e="27752">to</span> <span class="w target" data-s="27795" data-e="28093" title="(使)毁坏；(使)毁灭 η. 毁灭；破坏">ruin.</span></p><p class="zh">雨水侵蚀了河岸，磨坊的墙开始腐朽，空房子正一点点变成废墟。</p></div>
+<div class="pair" data-s0="28627" data-s1="33704"><p class="en"><span class="w" data-s="28627" data-e="28883">Cheap</span> <span class="w" data-s="28925" data-e="29395">imported</span> <span class="w" data-s="29437" data-e="29736">cloth</span> <span class="w target" data-s="29779" data-e="30248" title="">spoiled</span> <span class="w" data-s="30291" data-e="30419">the</span> <span class="w" data-s="30461" data-e="30589">market,</span> <span class="w" data-s="30803" data-e="30973">and</span> <span class="w" data-s="31229" data-e="31400">the</span> <span class="w" data-s="31443" data-e="31741">harbour</span> <span class="w" data-s="31784" data-e="31869">road</span> <span class="w target" data-s="31912" data-e="32680" title="恶化；变坏；退化">deteriorated</span> <span class="w" data-s="32723" data-e="32979">year</span> <span class="w" data-s="33021" data-e="33405">after</span> <span class="w" data-s="33448" data-e="33704">year.</span></p><p class="zh">便宜的进口布料毁了市场，港口那条路一年比一年糟。</p></div>
+<div class="pair" data-s0="34045" data-s1="41000"><p class="en"><span class="w" data-s="34045" data-e="34173">Our</span> <span class="w" data-s="34216" data-e="34472">ideas</span> <span class="w" data-s="34515" data-e="34771">were</span> <span class="w target" data-s="34813" data-e="35112" title="不新鲜的；(空气)污浊的；陈腐的；没有新 意的；厌倦的">stale,</span> <span class="w" data-s="35325" data-e="35496">our</span> <span class="w" data-s="35752" data-e="36093">headlines</span> <span class="w target" data-s="36136" data-e="36605" title="过时的;陈旧的">outdated,</span> <span class="w" data-s="36861" data-e="36989">and</span> <span class="w" data-s="37245" data-e="37416">every</span> <span class="w" data-s="37459" data-e="37757">small</span> <span class="w" data-s="37800" data-e="38056">loss</span> <span class="w" data-s="38099" data-e="38483">seemed</span> <span class="w" data-s="38653" data-e="38867">to</span> <span class="w target" data-s="38909" data-e="39208" title="逐渐削弱(信心、权威等)，破坏">undermine</span> <span class="w" data-s="39251" data-e="39421">the</span> <span class="w" data-s="39464" data-e="39507">trust</span> <span class="w" data-s="39549" data-e="39848">that</span> <span class="w" data-s="39891" data-e="39976">should</span> <span class="w target" data-s="40019" data-e="40403" title="构成……的基础或起因">underlie</span> <span class="w" data-s="40445" data-e="40616">a</span> <span class="w" data-s="40659" data-e="40744">local</span> <span class="w" data-s="40787" data-e="41000">paper.</span></p><p class="zh">我们的想法陈旧了，标题也过时了，每一次小小的损失似乎都在削弱那份本该支撑一份地方报纸的信任。</p></div>
+<div class="pair" data-s0="41256" data-s1="43347"><p class="en"><span class="w" data-s="41256" data-e="41981">Then</span> <span class="w" data-s="42024" data-e="42195">a</span> <span class="w target" data-s="42237" data-e="42493" title="耳语；低语；私语；小声说n.耳语(声)；低 语(声);私语(声)">whisper</span> <span class="w" data-s="42536" data-e="42749">reached</span> <span class="w" data-s="42792" data-e="42963">my</span> <span class="w" data-s="43005" data-e="43347">desk.</span></p><p class="zh">后来一句耳语传到了我的办公桌前。</p></div>
+<div class="pair" data-s0="44121" data-s1="49156"><p class="en"><span class="w" data-s="44121" data-e="44249">The</span> <span class="w" data-s="44292" data-e="44377">mill</span> <span class="w" data-s="44420" data-e="44761">owner</span> <span class="w" data-s="44804" data-e="44889">had</span> <span class="w target" data-s="44932" data-e="45273" title="贿赂，向……行贿 η.贿赂">bribed</span> <span class="w" data-s="45316" data-e="45444">two</span> <span class="w" data-s="45487" data-e="45871">officials</span> <span class="w" data-s="45913" data-e="46169">and</span> <span class="w target" data-s="46212" data-e="46553" title="欺骗;作弊">cheated</span> <span class="w" data-s="46596" data-e="46724">the</span> <span class="w" data-s="46767" data-e="46895">town,</span> <span class="w" data-s="47193" data-e="47791">hiding</span> <span class="w" data-s="47833" data-e="47919">a</span> <span class="w target" data-s="47961" data-e="48303" title="赤字，逆差；亏损；不足额；缺款额；缺少">deficit</span> <span class="w" data-s="48345" data-e="48516">he</span> <span class="w" data-s="48559" data-e="48729">never</span> <span class="w" data-s="48772" data-e="49156">admitted.</span></p><p class="zh">磨坊主贿赂了两名官员，欺骗了全镇，还藏着一笔他从不肯承认的赤字。</p></div>
+<div class="pair" data-s0="49327" data-s1="51204"><p class="en"><span class="w" data-s="49327" data-e="49924">He</span> <span class="w" data-s="49967" data-e="50180">had</span> <span class="w" data-s="50223" data-e="50351">tried</span> <span class="w" data-s="50393" data-e="50564">to</span> <span class="w target" data-s="50607" data-e="50863" title="欺骗，蒙骗，谁骗">deceive</span> <span class="w" data-s="50905" data-e="51033">us</span> <span class="w" data-s="51076" data-e="51204">all.</span></p><p class="zh">他试图蒙骗我们所有人。</p></div>
+<div class="pair" data-s0="51417" data-s1="54361"><p class="en"><span class="w" data-s="51417" data-e="51972">I</span> <span class="w" data-s="52015" data-e="52228">spent</span> <span class="w" data-s="52271" data-e="52399">a</span> <span class="w" data-s="52441" data-e="52527">week</span> <span class="w" data-s="52569" data-e="52783">trying</span> <span class="w" data-s="52825" data-e="52996">to</span> <span class="w target" data-s="53039" data-e="53380" title="查明；决定，决心；支配；影响">determine</span> <span class="w" data-s="53423" data-e="53551">who</span> <span class="w" data-s="53593" data-e="53679">had</span> <span class="w" data-s="53721" data-e="53935">signed</span> <span class="w" data-s="53977" data-e="54063">the</span> <span class="w" data-s="54105" data-e="54361">papers.</span></p><p class="zh">我花了一个星期想查明那些文件到底是谁签的。</p></div>
+<div class="pair" data-s0="55015" data-s1="59196"><p class="en"><span class="w" data-s="55015" data-e="55143">That</span> <span class="w" data-s="55185" data-e="55441">spring</span> <span class="w" data-s="55484" data-e="55825">the</span> <span class="w" data-s="55868" data-e="55953">mill</span> <span class="w" data-s="55996" data-e="56209">went</span> <span class="w target" data-s="56252" data-e="56636" title="破产者adj. 破产的；完全丧失的">bankrupt,</span> <span class="w" data-s="56849" data-e="57105">and</span> <span class="w" data-s="57148" data-e="57276">the</span> <span class="w" data-s="57319" data-e="57361">men</span> <span class="w" data-s="57404" data-e="57575">who</span> <span class="w" data-s="57617" data-e="57745">took</span> <span class="w" data-s="57788" data-e="57916">the</span> <span class="w" data-s="57959" data-e="58044">money</span> <span class="w" data-s="58087" data-e="58385">turned</span> <span class="w" data-s="58428" data-e="58599">out</span> <span class="w" data-s="58641" data-e="58769">to</span> <span class="w" data-s="58812" data-e="58855">be</span> <span class="w target" data-s="58897" data-e="59196" title="使腐化，使堕落；破坏，损坏 adj.贪污的， 受贿的，腐败的；营私舞弊的">corrupt.</span></p><p class="zh">那年春天磨坊破产了，收钱的那些人后来被查出是腐败的。</p></div>
+<div class="pair" data-s0="59409" data-s1="65681"><p class="en"><span class="w" data-s="59409" data-e="60007">When</span> <span class="w" data-s="60049" data-e="60135">I</span> <span class="w" data-s="60177" data-e="60476">published</span> <span class="w" data-s="60519" data-e="60647">the</span> <span class="w" data-s="60689" data-e="60860">story,</span> <span class="w" data-s="61116" data-e="61329">a</span> <span class="w" data-s="61415" data-e="61927">protest</span> <span class="w target" data-s="61969" data-e="62439" title="爆发，喷出">erupted</span> <span class="w" data-s="62481" data-e="62652">outside</span> <span class="w" data-s="62695" data-e="62951">our</span> <span class="w" data-s="62993" data-e="63207">office,</span> <span class="w" data-s="63420" data-e="63676">and</span> <span class="w" data-s="63719" data-e="64060">the</span> <span class="w" data-s="64103" data-e="64401">mayor&#x27;s</span> <span class="w" data-s="64444" data-e="64657">speech</span> <span class="w" data-s="64700" data-e="64871">was</span> <span class="w target" data-s="64913" data-e="65340" title="打断；打扰；使暂停">interrupted</span> <span class="w" data-s="65383" data-e="65681">twice.</span></p><p class="zh">报道登出来后，一场抗议在我们报社门口爆发，市长的讲话被打断了两次。</p></div>
+<div class="pair" data-s0="66411" data-s1="68587"><p class="en"><span class="w" data-s="66411" data-e="66539">The</span> <span class="w" data-s="66582" data-e="66923">scandal</span> <span class="w target" data-s="66966" data-e="67435" title="扰乱；分裂，瓦解；中断；彻底改变结构">disrupted</span> <span class="w" data-s="67478" data-e="67563">the</span> <span class="w" data-s="67606" data-e="67734">whole</span> <span class="w" data-s="67777" data-e="67990">town</span> <span class="w" data-s="68033" data-e="68374">for</span> <span class="w" data-s="68417" data-e="68587">months.</span></p><p class="zh">这桩丑闻扰乱了整个小镇好几个月。</p></div>
+<div class="pair" data-s0="68886" data-s1="74049"><p class="en"><span class="w" data-s="68886" data-e="69654">My</span> <span class="w" data-s="69697" data-e="70081">editor</span> <span class="w" data-s="70123" data-e="70294">asked</span> <span class="w" data-s="70337" data-e="70507">me</span> <span class="w" data-s="70550" data-e="70678">what</span> <span class="w" data-s="70721" data-e="70849">I</span> <span class="w" data-s="70891" data-e="70934">had</span> <span class="w target" data-s="70977" data-e="71403" title="察觉；注意到;意识到">perceived</span> <span class="w" data-s="71446" data-e="71702">and</span> <span class="w" data-s="71745" data-e="72043">what</span> <span class="w" data-s="72086" data-e="72214">plan</span> <span class="w" data-s="72257" data-e="72513">I</span> <span class="w" data-s="72555" data-e="72641">could</span> <span class="w target" data-s="72683" data-e="73067" title="构想，设想；怀孕">conceive</span> <span class="w" data-s="73110" data-e="73366">for</span> <span class="w" data-s="73409" data-e="73451">the</span> <span class="w" data-s="73494" data-e="73835">paper&#x27;s</span> <span class="w" data-s="73878" data-e="74049">future.</span></p><p class="zh">编辑问我察觉到了什么，又能为报社的将来构想出什么办法。</p></div>
+<div class="pair" data-s0="74262" data-s1="77419"><p class="en"><span class="w" data-s="74262" data-e="74561">I</span> <span class="w" data-s="74987" data-e="75243">had</span> <span class="w" data-s="75286" data-e="75457">no</span> <span class="w" data-s="75499" data-e="75670">answer;</span> <span class="w" data-s="76011" data-e="76481">my</span> <span class="w" data-s="76523" data-e="76694">mind</span> <span class="w" data-s="76737" data-e="76993">went</span> <span class="w target" data-s="77035" data-e="77419" title="空白的；空着的；茫然的，没有表情的 n. 空白处，空格">blank.</span></p><p class="zh">我答不上来，脑子一片空白。</p></div>
+<div class="pair" data-s0="77718" data-s1="80235"><p class="en"><span class="w" data-s="77718" data-e="77846">But</span> <span class="w" data-s="77889" data-e="77974">the</span> <span class="w target" data-s="78017" data-e="78273" title="截止日期，最终期限">deadline</span> <span class="w" data-s="78315" data-e="78443">was</span> <span class="w" data-s="78486" data-e="78870">Friday,</span> <span class="w" data-s="78998" data-e="79169">and</span> <span class="w" data-s="79510" data-e="79595">I</span> <span class="w" data-s="79638" data-e="79723">had</span> <span class="w" data-s="79766" data-e="79851">to</span> <span class="w" data-s="79894" data-e="79979">write</span> <span class="w" data-s="80022" data-e="80235">something.</span></p><p class="zh">可截稿日是星期五，我总得写点什么。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">fertile</span>
+          <span class="ipa">/&#x27;f3:rtl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">能结果的；肥沃的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Green Harbor was once a fertile town</div>          <div class="mnem"><span class="lbl">记</span>《西游记》里有一段是偷吃人参 果的场景，树上结了很多的人参果，类似佛头 (fertile的发音)，所以那棵树是“能结果的；肥 沃的”。</div>          <div class="root"><span class="lbl">根</span>fer(带来) + tile → 能带来果实 → 肥沃的</div>          <div class="zt"><span class="lbl">真题</span>In our always-connected world, boredom may be a hard-to-define state, but it is a fertile one. Watch paint dry or water boil, or at least put away your smartphone for a while, and you might unlock your next big idea. 在我们这 个始终互联的世界里，无聊可能是一种很难定 义的状态，但它是一种有产出的状态。看着油 漆变干或水沸腾，或者至少把你的智能手机收 起来一段时间，你可能会解锁你的下一个大 创意。</div>          <div class="fam"><span class="lbl">族</span>fertility n. 肥沃 / fertilizer n. 肥料</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">prefer</span>
+          <span class="ipa">/pri&#x27;f3:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">更喜欢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Most readers prefer it that way</div>          <div class="root"><span class="lbl">根</span>pre(在前) + fer(拿) → 先拿到 → 更喜欢</div>          <div class="zt"><span class="lbl">真题</span>Hundreds of studies show that infants prefer novelty. 数百项研究表明，婴儿喜欢新奇 事物。(2021)</div>          <div class="fam"><span class="lbl">族</span>preference n. 偏爱 / preferable adj. 更可取的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">skyline</span>
+          <span class="ipa">/&#x27;skailaın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">轮廓线；天际线</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>you could see its skyline of white mill towers</div>          <div class="mnem"><span class="lbl">记</span>在天空（sky）中画的一条线 (line)→天际线。</div>          <div class="root"><span class="lbl">根</span>sky(天空) + line(线) → 天上那条线</div>          <div class="fam"><span class="lbl">族</span>sky n. 天空 / line n. 线</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">outline</span>
+          <span class="ipa">/&#x27;autlain/</span>
+          <span class="pos">n.</span>
+          <span class="cn">轮廓，外形 v. 概述；勾勒，描画……的轮廓</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old editor would outline the next morning&#x27;s pages</div>          <div class="mnem"><span class="lbl">记</span>out外面的；line线，画画时最 外面的那条线，就是先勾勒出一个“外形，轮 廓”。</div>          <div class="root"><span class="lbl">根</span>out(外) + line(线) → 最外面那条线</div>          <div class="zt"><span class="lbl">真题</span>Nevertheless, many people live lives that are boringly predictable, or live a life where everything is outlined or planned. 然而，许多人 过着乏味的可预测的生活，或者过着一切都被 勾画或计划好的生活。(2021)</div>          <div class="fam"><span class="lbl">族</span>outline v. 概述 / underline v. 在下面画线</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">underlie</span>
+          <span class="ipa">/andə&#x27;lai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">构成……的基础或起因</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the trust that should underlie a local paper</div>          <div class="mnem"><span class="lbl">记</span>under“在……下面”，lie“位 于”，underlie“位于……的下面”，引申为“构成 ……的基础或起因”。</div>          <div class="root"><span class="lbl">根</span>under(下) + lie(躺) → 躺在下面 → 构成基础</div>          <div class="zt"><span class="lbl">真题</span>It underlies all human behaviors. 它是人 类所有行为的基础。</div>          <div class="fam"><span class="lbl">族</span>underlying adj. 根本的 / lie v. 躺</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">underline</span>
+          <span class="ipa">/andə&#x27;lain/</span>
+          <span class="pos">v.</span>
+          <span class="cn">画线；强调</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>underline the two shops that still bought ads</div>          <div class="mnem"><span class="lbl">记</span>under“在……下面”，line“线”， underline“在……下面画线”，引申为“强调”。</div>          <div class="root"><span class="lbl">根</span>under(下) + line(线) → 在下面画线 → 强调</div>          <div class="zt"><span class="lbl">真题</span>The accord underlined Italy&#x27;s global reputation as a good steward of art and culture. 该协议凸显了意大利作为艺术和文化的优秀管 理者在全球的声誉。 (040)</div>          <div class="fam"><span class="lbl">族</span>line n. 线 / underline v. 强调</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">deadline</span>
+          <span class="ipa">/&#x27;dedlain/</span>
+          <span class="pos"></span>
+          <span class="cn">截止日期，最终期限</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the deadline was Friday</div>          <div class="mnem"><span class="lbl">记</span>死(dead)线(line)，最后的那条 线→截止日期。</div>          <div class="root"><span class="lbl">根</span>dead(死) + line(线) → 不能越过的线</div>          <div class="zt"><span class="lbl">真题</span>He cannot finish his assignment before the deadline.他不能在最后期限前完成他的 任务。</div>          <div class="fam"><span class="lbl">族</span>dead adj. 死的 / line n. 线</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">layout</span>
+          <span class="ipa">/&#x27;leiaut/</span>
+          <span class="pos">n.</span>
+          <span class="cn">布局，布置；设计；安排 yp ae p t y changed over the past 90 years. 过去 90 年里， 典型的超市布局几乎没有改变。(2023)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>keep the same layout for forty years</div>          <div class="mnem"><span class="lbl">记</span>lay(放置)十out(出去)，去你家 玩，摆在我们面前的东西就是你家的“布局；设计”。</div>          <div class="root"><span class="lbl">根</span>lay(放) + out(出来) → 摆出来的样子</div>          <div class="fam"><span class="lbl">族</span>lay v. 放置 / layout n. 版面</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">outdated</span>
+          <span class="ipa">/iaut&#x27;dertıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">过时的;陈旧的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>our headlines outdated</div>          <div class="mnem"><span class="lbl">记</span>out(外面)十date(日期)，在日 期的外面，那就是“过时的”。</div>          <div class="root"><span class="lbl">根</span>out(出) + date(日期) → 出了日期 → 过时的</div>          <div class="zt"><span class="lbl">真题</span>In the midst of a record economic expansion, those familiar images are outdated and hurtful. 在创纪录的经济扩张中，那些熟悉 的画面已经过时了，而且很伤人。</div>          <div class="fam"><span class="lbl">族</span>update v. 更新 / date n. 日期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">stale</span>
+          <span class="ipa">/sterl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不新鲜的；(空气)污浊的；陈腐的；没有新 意的；厌倦的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Our ideas were stale</div>          <div class="mnem"><span class="lbl">记</span>s(美女蛇)+tale(故事)，美女 蛇的故事，太多这样的故事了，再讲就是“没有 新意的”了。 第二单元</div>          <div class="root"><span class="lbl">根</span>联想：s(蛇) + tale(故事) → 老掉牙的故事 → 陈腐的</div>          <div class="zt"><span class="lbl">真题</span>You need to do some self-assessment to determine where you have become stale in your thinking. 你需要做一些自我评估，以确定你的 思维在哪里变得陈旧。</div>          <div class="fam"><span class="lbl">族</span>staleness n. 陈腐</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">undermine</span>
+          <span class="ipa">/Andər&#x27;main/</span>
+          <span class="pos">v.</span>
+          <span class="cn">逐渐削弱(信心、权威等)，破坏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>seemed to undermine the trust</div>          <div class="mnem"><span class="lbl">记</span>你在煤矿（mine）的下面 (under)干嘛？→破坏。</div>          <div class="root"><span class="lbl">根</span>under(下) + mine(挖矿) → 在下面挖 → 削弱</div>          <div class="zt"><span class="lbl">真题</span>The passing cruise ships will undermine the foundations of the ancient buildings in Venice. 过往的游轮将会破坏威尼斯古建筑的 地基。</div>          <div class="fam"><span class="lbl">族</span>miner n. 矿工 / mining n. 采矿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">determine</span>
+          <span class="ipa">/dı&#x27;t3:rmın/</span>
+          <span class="pos">v.</span>
+          <span class="cn">查明；决定，决心；支配；影响</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>trying to determine who had signed the papers</div>          <div class="mnem"><span class="lbl">记</span>弟弟（de）特意（ter）在煤矿 (mine)里，终于“查明”并确定了是谁在暗中 破坏。</div>          <div class="root"><span class="lbl">根</span>de(加强) + termin(界限) + e → 划出界限 → 决定</div>          <div class="zt"><span class="lbl">真题</span>There are a few things you can do to determine whether or not a company is a good fit for you. 你可以做一些事情来确定一家公司 是否适合你。(2022)</div>          <div class="fam"><span class="lbl">族</span>determination n. 决心 / determined adj. 坚定的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">deteriorate</span>
+          <span class="ipa">/dı&#x27;tıriəreit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">恶化；变坏；退化</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the harbour road deteriorated year after year</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)最难忘的特别的日子 (teri 拼音读成特日)是在煤矿挖煤(o想成挖煤 的井口)。每天不见天日，是不是心情很糟糕， 身体也越来越糟糕？→恶化；变坏。</div>          <div class="root"><span class="lbl">根</span>deterior(更坏) + ate(动词尾) → 变得更坏</div>          <div class="zt"><span class="lbl">真题</span>Our interaction skills deteriorate. 我们的 互动技能退化。(2018)</div>          <div class="fam"><span class="lbl">族</span>deterioration n. 恶化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">erode</span>
+          <span class="ipa">/ī&#x27;rəud/</span>
+          <span class="pos">v.</span>
+          <span class="cn">削弱；腐蚀；风化；逐渐毁坏(权利或信心)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rain had eroded the river bank</div>          <div class="mnem"><span class="lbl">记</span>该单词可以拆分为：姨(e)+肉 的(rode)，阿姨住在重庆，每个冬天都要做腊 肉，然后把腊肉挂到外面，“风化”这些肉。</div>          <div class="root"><span class="lbl">根</span>e(出) + rod(啃) → 一点点啃掉 → 侵蚀</div>          <div class="zt"><span class="lbl">真题</span>The very presence of humans has eroded the diversity of chimp behavior. 正是人类的存 在削弱了黑猩猩行为的多样性。</div>          <div class="fam"><span class="lbl">族</span>erosion n. 侵蚀</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">spoil</span>
+          <span class="ipa">/spəil/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Cheap imported cloth spoiled the market</div>          <div class="mnem"><span class="lbl">记</span>蛇(s)扑到(p)你家油(oil)里去 了，一桶油就这样被“破坏”了。</div>          <div class="root"><span class="lbl">根</span>联想：蛇(s)扑(p)进油(oil)里 → 弄坏一桶油</div>          <div class="zt"><span class="lbl">真题</span>The police routinely seize spoils. 警察照 例扣押赃物。</div>          <div class="fam"><span class="lbl">族</span>spoiled adj. 被宠坏的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">ruin</span>
+          <span class="ipa">/&#x27;ruin/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(使)毁坏；(使)毁灭 η. 毁灭；破坏</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>empty houses were falling to ruin</div>          <div class="mnem"><span class="lbl">记</span>ru发音类似“辱”，in表示“里 面”。在里面侮辱一个人，经常辱骂一个人，就 是“毁坏”了他啊。</div>          <div class="root"><span class="lbl">根</span>联想：ru(辱) + in(里面) → 在里面辱骂 → 毁掉</div>          <div class="zt"><span class="lbl">真题</span>Anyway, there is a little more to tell, but I don&#x27;t want to ruin the story for you. 不管 怎样，还有一点要讲的，但我不想破坏你要听的 这个故事。(2013)</div>          <div class="fam"><span class="lbl">族</span>ruined adj. 毁掉的 / ruinous adj. 破坏性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">decay</span>
+          <span class="ipa">/dı&#x27;kei/</span>
+          <span class="pos">n.</span>
+          <span class="cn">&amp;. v. 衰退，衰减；腐烂，腐朽</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mill walls had begun to decay</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“低开”。经济在 “衰退”，股市每天低开→衰退，衰减。</div>          <div class="root"><span class="lbl">根</span>de(向下) + cay(落下) → 往下掉 → 衰败、腐烂</div>          <div class="fam"><span class="lbl">族</span>decayed adj. 腐烂的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">corrupt</span>
+          <span class="ipa">/kə&#x27;rapt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使腐化，使堕落；破坏，损坏 adj.贪污的， 受贿的，腐败的；营私舞弊的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the men who took the money turned out to be corrupt</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“可抓捕他”。 联想记忆：可抓捕“腐败的”人。</div>          <div class="root"><span class="lbl">根</span>cor(完全) + rupt(断裂) → 完全断掉 → 腐化</div>          <div class="zt"><span class="lbl">真题</span>The local governments are corrupted. 地 方政府已经腐败了。</div>          <div class="fam"><span class="lbl">族</span>corruption n. 腐败</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">bribe</span>
+          <span class="ipa">/braib/</span>
+          <span class="pos">v.</span>
+          <span class="cn">贿赂，向……行贿 η.贿赂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>had bribed two officials</div>          <div class="mnem"><span class="lbl">记</span>这个单词很像bride(新娘)，不 (b)骑马(ride)的人就是新娘，骑马的是新郎。 你给新娘“贿赂”一匹马吧，这样新娘也可以骑 马了。</div>          <div class="root"><span class="lbl">根</span>联想：b + ride(骑马) → 送新娘一匹马 → 行贿</div>          <div class="zt"><span class="lbl">真题</span>Bribing the boss is punishable. 贿赂老板 是应受到惩罚的。</div>          <div class="fam"><span class="lbl">族</span>bribery n. 行贿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">bankrupt</span>
+          <span class="ipa">/&#x27;bænkrapt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">破产者adj. 破产的；完全丧失的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mill went bankrupt</div>          <div class="mnem"><span class="lbl">记</span>bank是“银行”的意思，词根 rupt表示“断裂”，银行“断裂了”，即银行“破 产”了。</div>          <div class="root"><span class="lbl">根</span>bank(银行) + rupt(断裂) → 银行断了 → 破产</div>          <div class="zt"><span class="lbl">真题</span>Her business went bankrupt while she was in prison. 她在监狱期间，她的生意破产了。 (2015)</div>          <div class="fam"><span class="lbl">族</span>bankruptcy n. 破产</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">deficit</span>
+          <span class="ipa">/&#x27;defisit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">赤字，逆差；亏损；不足额；缺款额；缺少</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>hiding a deficit he never admitted</div>          <div class="mnem"><span class="lbl">记</span>弟弟开了一家公司，让铁锤做 CEO负责运营，结果公司出现亏损、赤字，那不 就是弟弟非得撕他吗(de 弟弟 fi 非得 ci 撕 t 他)？</div>          <div class="root"><span class="lbl">根</span>de(去掉) + fic(做) + it → 该做的没做够 → 赤字</div>          <div class="zt"><span class="lbl">真题</span>It will help many African countries reduce trade deficits. 它将帮助许多非洲国家减 少贸易赤字。(2023)</div>          <div class="fam"><span class="lbl">族</span>deficient adj. 缺乏的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">whisper</span>
+          <span class="ipa">/&#x27;wispər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">耳语；低语；私语；小声说n.耳语(声)；低 语(声);私语(声)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a whisper reached my desk</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“我们(whi发 音类似 we)撕破(sper)”。联想成我们的关系破 裂了，这种小道消息都要“小声说”。</div>          <div class="root"><span class="lbl">根</span>联想：我们(whi)撕破(sper) → 关系破了只能小声说</div>          <div class="zt"><span class="lbl">真题</span>Pay attention to the whispers so you (042) won&#x27;t have to hear the screams. 注意低声耳 语，这样你就不会听到尖叫。(2017)</div>          <div class="fam"><span class="lbl">族</span>whispering n. 低语</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">disrupt</span>
+          <span class="ipa">/dis&#x27;rapt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">扰乱；分裂，瓦解；中断；彻底改变结构</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The scandal disrupted the whole town for months</div>          <div class="mnem"><span class="lbl">记</span>dis(分开)+ rupt(分开，断裂) →分裂。</div>          <div class="root"><span class="lbl">根</span>dis(分开) + rupt(断裂) → 断开 → 扰乱</div>          <div class="zt"><span class="lbl">真题</span>The global economy continues to be disrupted by technology and other massive change. 全球经济持续被技术和其他巨大的变 化所扰乱。</div>          <div class="fam"><span class="lbl">族</span>disruption n. 中断 / disruptive adj. 破坏性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">erupt</span>
+          <span class="ipa">/1&#x27;rapt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">爆发，喷出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a protest erupted outside our office</div>          <div class="mnem"><span class="lbl">记</span>e(出)+ rupt(断裂)→断裂而 喷出→爆发，喷出。</div>          <div class="root"><span class="lbl">根</span>e(出) + rupt(断裂) → 断裂后喷出 → 爆发</div>          <div class="fam"><span class="lbl">族</span>eruption n. 爆发</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">interrupt</span>
+          <span class="ipa">/ntə&#x27;rapt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">打断；打扰；使暂停</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the mayor&#x27;s speech was interrupted twice</div>          <div class="mnem"><span class="lbl">记</span>inter(在……中间)十 rupt(分 开，断裂)→在讲话中间断裂→打断；使暂停。</div>          <div class="root"><span class="lbl">根</span>inter(中间) + rupt(断裂) → 中间断开 → 打断</div>          <div class="zt"><span class="lbl">真题</span>Please do not interrupt the speaker, you can ask your questions afterwards. 请不要打断 讲话者，你可以随后提出你的问题。</div>          <div class="fam"><span class="lbl">族</span>interruption n. 打断</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">cheat</span>
+          <span class="ipa">/t∫i:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">欺骗;作弊</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cheated the town</div>          <div class="mnem"><span class="lbl">记</span>读音类似“欺他”。欺他就是 “欺骗”了他。</div>          <div class="root"><span class="lbl">根</span>谐音：欺他 → 欺骗</div>          <div class="fam"><span class="lbl">族</span>cheater n. 骗子</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">deceive</span>
+          <span class="ipa">/dı&#x27;si:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">欺骗，蒙骗，谁骗</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had tried to deceive us all</div>          <div class="root"><span class="lbl">根</span>de(向下) + ceive(拿) → 背后拿走 → 欺骗</div>          <div class="zt"><span class="lbl">真题</span>My advice is that you not pay attention to the number of steps and ingredients, because they can be deceiving. 我的建议是，不要注意步 骤和配料的数量，因为它们可能具有欺骗性。 (2020)</div>          <div class="fam"><span class="lbl">族</span>deception n. 欺骗 / deceptive adj. 骗人的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">perceive</span>
+          <span class="ipa">/pər&#x27;si:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">察觉；注意到;意识到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>what I had perceived</div>          <div class="root"><span class="lbl">根</span>per(完全) + ceive(拿) → 完全抓住 → 察觉</div>          <div class="zt"><span class="lbl">真题</span>Studies show they&#x27;re also perceived as more competent than women in STEM(Science, Technology, Engineering, and Mathematics) fields. 研究表明，在 STEM(科学、技术、工程和 数学)领域，他们也被认为比女性更有能力。 (2017)</div>          <div class="fam"><span class="lbl">族</span>perception n. 知觉 / perceptive adj. 敏锐的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">conceive</span>
+          <span class="ipa">/kən&#x27;si:v/</span>
+          <span class="pos">v.</span>
+          <span class="cn">构想，设想；怀孕</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>what plan I could conceive for the paper&#x27;s future</div>          <div class="root"><span class="lbl">根</span>con(共同) + ceive(拿) → 在心里孕育 → 构想</div>          <div class="zt"><span class="lbl">真题</span>Park Yeon Soo conceived this city of the future back in 1986. 朴妍秀早在 1986 年就构想 了这座未来的城市。</div>          <div class="fam"><span class="lbl">族</span>concept n. 概念 / conception n. 构想</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">blank</span>
+          <span class="ipa">/blænk/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">空白的；空着的；茫然的，没有表情的 n. 空白处，空格</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>my mind went blank</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“不来客”。我 开了一家小面馆，从来没有来过客人，不来客， 我的小面馆就是“空白的；空着的”。</div>          <div class="root"><span class="lbl">根</span>谐音：不来客 → 店里空空的 → 空白的</div>          <div class="fam"><span class="lbl">族</span>blankly adv. 茫然地</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 2 · Day 11</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
