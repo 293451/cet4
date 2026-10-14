@@ -4,20 +4,12 @@
 *.token
 *token*
 *secret*
-*key*
 
 # ═══ 书的 OCR 数据（体积大 + 含原书全文，不入库）═══
 book/
 
-# ═══ 源内容与脚本（本地保留，不上 Pages）═══
-content/
-build/
+# ═══ 本地临时产物 ═══
 logs/
-progress.json
-*.bat
-*.md
-
-# ═══ 临时产物 ═══
 __pycache__/
 *.pyc
 node_modules/
@@ -25,3 +17,14 @@ package-lock.json
 package.json
 _preview*.png
 _cards.png
+build/_*.py
+build/_*.js
+
+# ═══ 任务分发文件（子 Agent 用，不必入库）═══
+_task/
+
+# ═══ 生成的保活标记 ═══
+.last_push
+
+# 注意：content/ 和 build/ 必须入库 ——
+# GitHub Actions 推送时要读 content/day-XX/words.json

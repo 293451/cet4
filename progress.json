@@ -1,0 +1,44 @@
+{
+  "start_date": "2026-10-13",
+  "words_per_day": 30,
+  "days": {
+    "01": {
+      "date": "2026-10-13",
+      "unit": "Unit 1",
+      "range": "1-30",
+      "words": [
+        "coast",
+        "universe",
+        "unify",
+        "unite",
+        "union",
+        "diverse",
+        "convert",
+        "versatile",
+        "reverse",
+        "anniversary",
+        "evolve",
+        "revolve",
+        "involve",
+        "revolt",
+        "controversy",
+        "contrary",
+        "contrast",
+        "nasty",
+        "formal",
+        "uniform",
+        "formation",
+        "reform",
+        "format",
+        "conform",
+        "formulate",
+        "perform",
+        "inform",
+        "notify",
+        "noticeable",
+        "toast"
+      ]
+    }
+  },
+  "review_log": []
+}

@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 09 · A Baker&#x27;s Glory in Maple Hollow</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 09 · 10/21 · Unit 2 第 241-270 词</div>
+  <h1>A Baker&#x27;s Glory in Maple Hollow<span class="cn">枫谷面包房的荣耀</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-09.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="5461"><p class="en"><span class="w" data-s="43" data-e="128">In</span> <span class="w" data-s="171" data-e="469">Maple</span> <span class="w" data-s="512" data-e="768">Hollow,</span> <span class="w" data-s="896" data-e="1109">the</span> <span class="w" data-s="1451" data-e="1835">fields</span> <span class="w" data-s="1877" data-e="1963">were</span> <span class="w" data-s="2005" data-e="2133">full</span> <span class="w" data-s="2176" data-e="2304">of</span> <span class="w target" data-s="2347" data-e="2560" title="谷物；颗粒">grain</span> <span class="w" data-s="2603" data-e="2816">by</span> <span class="w" data-s="2859" data-e="2987">late</span> <span class="w" data-s="3029" data-e="3371">June,</span> <span class="w" data-s="3584" data-e="3755">and</span> <span class="w" data-s="3925" data-e="4224">the</span> <span class="w target" data-s="4267" data-e="4437" title="小麦">wheat</span> <span class="w" data-s="4480" data-e="4651">stood</span> <span class="w" data-s="4693" data-e="4992">tall</span> <span class="w" data-s="5035" data-e="5291">and</span> <span class="w" data-s="5333" data-e="5461">gold.</span></p><p class="zh">在枫谷，六月底田野里满是谷物，小麦高高地立着，一片金黄。</p></div>
+<div class="pair" data-s0="5760" data-s1="10411"><p class="en"><span class="w" data-s="5760" data-e="6272">At</span> <span class="w" data-s="6315" data-e="6869">sunrise</span> <span class="w" data-s="6912" data-e="7211">the</span> <span class="w" data-s="7253" data-e="7339">whole</span> <span class="w" data-s="7381" data-e="7637">field</span> <span class="w" data-s="7680" data-e="7979">would</span> <span class="w target" data-s="8021" data-e="8363" title="闪光，耀眼v. 闪光，闪烁">glitter,</span> <span class="w" data-s="8491" data-e="8704">and</span> <span class="w" data-s="8747" data-e="9131">the</span> <span class="w" data-s="9173" data-e="9344">tops</span> <span class="w" data-s="9387" data-e="9515">of</span> <span class="w" data-s="9557" data-e="9643">the</span> <span class="w" data-s="9685" data-e="9899">grass</span> <span class="w" data-s="9941" data-e="10112">would</span> <span class="w target" data-s="10155" data-e="10411" title="发光,发热 n.亮光；脸红">glow.</span></p><p class="zh">日出时整片田野都在闪光，草尖上泛着光。</p></div>
+<div class="pair" data-s0="11021" data-s1="15587"><p class="en"><span class="w" data-s="11021" data-e="11149">Every</span> <span class="w" data-s="11192" data-e="11448">drop</span> <span class="w" data-s="11491" data-e="11704">of</span> <span class="w" data-s="11747" data-e="11960">dew</span> <span class="w" data-s="12003" data-e="12131">would</span> <span class="w target" data-s="12173" data-e="12600" title="火花；闪耀v. 发光；闪烁">sparkle,</span> <span class="w" data-s="12771" data-e="12941">and</span> <span class="w" data-s="13197" data-e="13411">above</span> <span class="w" data-s="13453" data-e="13709">them</span> <span class="w" data-s="13752" data-e="13965">the</span> <span class="w" data-s="14008" data-e="14136">last</span> <span class="w" data-s="14179" data-e="14477">stars</span> <span class="w" data-s="14520" data-e="14861">would</span> <span class="w" data-s="14904" data-e="15117">still</span> <span class="w target" data-s="15160" data-e="15587" title="闪烁，闪耀n. 闪烁，闪亮">twinkle.</span></p><p class="zh">每一滴露水都在闪耀，它们上方还有最后几颗星星在眨眼。</p></div>
+<div class="pair" data-s0="15757" data-s1="18147"><p class="en"><span class="w" data-s="15757" data-e="16483">Mara</span> <span class="w" data-s="16525" data-e="16739">ran</span> <span class="w" data-s="16781" data-e="16952">the</span> <span class="w" data-s="16995" data-e="17080">only</span> <span class="w" data-s="17123" data-e="17549">bakery</span> <span class="w" data-s="17592" data-e="17763">in</span> <span class="w" data-s="17805" data-e="17848">the</span> <span class="w" data-s="17891" data-e="18147">village.</span></p><p class="zh">玛拉在村里开着唯一一家面包房。</p></div>
+<div class="pair" data-s0="18360" data-s1="21859"><p class="en"><span class="w" data-s="18360" data-e="18872">She</span> <span class="w" data-s="18915" data-e="19256">baked</span> <span class="w" data-s="19299" data-e="19384">her</span> <span class="w" data-s="19427" data-e="19597">bread</span> <span class="w" data-s="19640" data-e="19811">with</span> <span class="w" data-s="19853" data-e="20067">local</span> <span class="w target" data-s="20109" data-e="20451" title="小麦">wheat</span> <span class="w" data-s="20493" data-e="20749">flour</span> <span class="w" data-s="20792" data-e="21048">and</span> <span class="w" data-s="21219" data-e="21347">a</span> <span class="w" data-s="21389" data-e="21475">little</span> <span class="w" data-s="21517" data-e="21859">honey.</span></p><p class="zh">她用本地小麦磨的面粉和一点蜂蜜烤面包。</p></div>
+<div class="pair" data-s0="22029" data-s1="26424"><p class="en"><span class="w" data-s="22029" data-e="22243">People</span> <span class="w" data-s="22285" data-e="22456">said</span> <span class="w" data-s="22499" data-e="22627">her</span> <span class="w" data-s="22669" data-e="22840">bread</span> <span class="w" data-s="22883" data-e="23011">had</span> <span class="w" data-s="23053" data-e="23139">a</span> <span class="w target" data-s="23181" data-e="23480" title="味(道)；特色；概述 v.给……调味；加味于">flavour</span> <span class="w" data-s="23523" data-e="23651">no</span> <span class="w" data-s="23693" data-e="23864">city</span> <span class="w" data-s="23907" data-e="24077">shop</span> <span class="w" data-s="24120" data-e="24376">could</span> <span class="w" data-s="24419" data-e="24803">copy,</span> <span class="w" data-s="24931" data-e="25059">and</span> <span class="w" data-s="25357" data-e="25485">it</span> <span class="w" data-s="25528" data-e="25613">was</span> <span class="w target" data-s="25656" data-e="25997" title="愉悦的；讨人喜欢的；宜人的，适合的">agreeable</span> <span class="w" data-s="26040" data-e="26168">to</span> <span class="w" data-s="26211" data-e="26424">everyone.</span></p><p class="zh">人们说她的面包有一种城里店铺学不来的味道，而且人人都觉得它可口。</p></div>
+<div class="pair" data-s0="27403" data-s1="29067"><p class="en"><span class="w" data-s="27403" data-e="27531">Her</span> <span class="w" data-s="27573" data-e="27701">mother</span> <span class="w" data-s="27744" data-e="28000">had</span> <span class="w" data-s="28043" data-e="28213">taught</span> <span class="w" data-s="28256" data-e="28341">her</span> <span class="w" data-s="28384" data-e="28469">to</span> <span class="w" data-s="28512" data-e="28555">work</span> <span class="w" data-s="28597" data-e="28768">with</span> <span class="w target" data-s="28811" data-e="29067" title="优美，优雅；恩宠v. 使荣耀；装饰">grace.</span></p><p class="zh">母亲教过她，干活要带着优雅。</p></div>
+<div class="pair" data-s0="29749" data-s1="32309"><p class="en"><span class="w" data-s="29749" data-e="30091">&quot;Never</span> <span class="w" data-s="30133" data-e="30261">bring</span> <span class="w target" data-s="30304" data-e="30731" title="耻辱；丢脸的人或事v. 使蒙羞，使失宠；使 失去动力">disgrace</span> <span class="w" data-s="30773" data-e="30944">to</span> <span class="w" data-s="30987" data-e="31072">this</span> <span class="w" data-s="31115" data-e="31243">shop,&quot;</span> <span class="w" data-s="31669" data-e="31840">she</span> <span class="w" data-s="31883" data-e="32011">used</span> <span class="w" data-s="32053" data-e="32181">to</span> <span class="w" data-s="32224" data-e="32309">say.</span></p><p class="zh">“永远别给这家店丢脸，”她过去常这样说。</p></div>
+<div class="pair" data-s0="32565" data-s1="36107"><p class="en"><span class="w" data-s="32565" data-e="33419">Mara&#x27;s</span> <span class="w" data-s="33461" data-e="33504">hands</span> <span class="w" data-s="33547" data-e="33760">were</span> <span class="w target" data-s="33803" data-e="34187" title="优雅的；优美的；文雅的；简练的，简洁的">elegant,</span> <span class="w" data-s="34315" data-e="34528">and</span> <span class="w" data-s="34656" data-e="34784">her</span> <span class="w" data-s="34827" data-e="34955">quiet</span> <span class="w target" data-s="34997" data-e="35424" title="魅力；吸引力v.吸引;迷住">charm</span> <span class="w" data-s="35467" data-e="35680">won</span> <span class="w" data-s="35723" data-e="35808">the</span> <span class="w" data-s="35851" data-e="36107">village.</span></p><p class="zh">玛拉的手灵巧优雅，她那份安静的魅力赢得了全村人。</p></div>
+<div class="pair" data-s0="36756" data-s1="41961"><p class="en"><span class="w" data-s="36756" data-e="36841">To</span> <span class="w" data-s="36884" data-e="37012">her,</span> <span class="w" data-s="37225" data-e="37908">baking</span> <span class="w" data-s="37950" data-e="38078">was</span> <span class="w" data-s="38121" data-e="38249">a</span> <span class="w" data-s="38292" data-e="38377">matter</span> <span class="w" data-s="38420" data-e="38676">of</span> <span class="w target" data-s="38718" data-e="38889" title="荣誉；荣幸v.尊敬，给……荣誉">honor,</span> <span class="w" data-s="39060" data-e="39230">and</span> <span class="w" data-s="39614" data-e="39742">the</span> <span class="w" data-s="39785" data-e="39998">smell</span> <span class="w" data-s="40041" data-e="40126">of</span> <span class="w" data-s="40169" data-e="40254">it</span> <span class="w" data-s="40297" data-e="40340">in</span> <span class="w" data-s="40382" data-e="40425">the</span> <span class="w" data-s="40468" data-e="40596">street</span> <span class="w" data-s="40638" data-e="40937">was</span> <span class="w" data-s="40980" data-e="41321">a</span> <span class="w" data-s="41364" data-e="41406">kind</span> <span class="w" data-s="41449" data-e="41662">of</span> <span class="w target" data-s="41705" data-e="41961" title="荣誉；光荣；赞美；辉煌">glory.</span></p><p class="zh">对她来说，烤面包关乎荣誉，街上飘着的那股香味就是一种荣耀。</p></div>
+<div class="pair" data-s0="42174" data-s1="44990"><p class="en"><span class="w" data-s="42174" data-e="42857">That</span> <span class="w" data-s="42900" data-e="43369">autumn,</span> <span class="w" data-s="43454" data-e="43625">the</span> <span class="w" data-s="43753" data-e="44094">county</span> <span class="w" data-s="44137" data-e="44265">held</span> <span class="w" data-s="44308" data-e="44478">a</span> <span class="w" data-s="44521" data-e="44734">baking</span> <span class="w" data-s="44777" data-e="44990">fair.</span></p><p class="zh">那年秋天，县里办了一场烘焙评比。</p></div>
+<div class="pair" data-s0="45679" data-s1="49861"><p class="en"><span class="w" data-s="45679" data-e="45765">The</span> <span class="w" data-s="45807" data-e="46021">judges</span> <span class="w" data-s="46063" data-e="46234">were</span> <span class="w target" data-s="46277" data-e="46661" title="突出的，卓越的，重要的">prominent</span> <span class="w" data-s="46703" data-e="47045">figures:</span> <span class="w" data-s="47301" data-e="47855">an</span> <span class="w target" data-s="47898" data-e="48154" title="明显的；杰出的，有名的">eminent</span> <span class="w" data-s="48197" data-e="48367">cook</span> <span class="w" data-s="48410" data-e="48794">and</span> <span class="w" data-s="48922" data-e="49007">a</span> <span class="w" data-s="49050" data-e="49306">famous</span> <span class="w" data-s="49349" data-e="49477">food</span> <span class="w" data-s="49519" data-e="49861">writer.</span></p><p class="zh">评委都是响当当的人物：一位有名的厨师，还有一位知名的美食作家。</p></div>
+<div class="pair" data-s0="49989" data-s1="53914"><p class="en"><span class="w" data-s="49989" data-e="50629">One</span> <span class="w" data-s="50671" data-e="50757">of</span> <span class="w" data-s="50799" data-e="50885">them</span> <span class="w" data-s="50927" data-e="51055">said</span> <span class="w" data-s="51098" data-e="51269">her</span> <span class="w" data-s="51311" data-e="51439">work</span> <span class="w" data-s="51482" data-e="51653">was</span> <span class="w target" data-s="51695" data-e="52250" title="非凡的；不平常的">extraordinary,</span> <span class="w" data-s="52506" data-e="52634">and</span> <span class="w" data-s="52805" data-e="52975">her</span> <span class="w" data-s="53018" data-e="53274">crust</span> <span class="w" data-s="53317" data-e="53487">was</span> <span class="w target" data-s="53530" data-e="53914" title="优秀的，杰出的，出色的，突出的">outstanding.</span></p><p class="zh">其中一位说她的手艺非凡，面包皮更是出色。</p></div>
+<div class="pair" data-s0="54547" data-s1="60349"><p class="en"><span class="w" data-s="54547" data-e="54632">A</span> <span class="w" data-s="54675" data-e="54803">young</span> <span class="w target" data-s="54845" data-e="55400" title="(电台、电视台或报刊的)评论员；(尤指电视 台或电台的)现场解说员，实况播音员">commentator</span> <span class="w" data-s="55443" data-e="55741">wrote</span> <span class="w" data-s="55784" data-e="55912">a</span> <span class="w" data-s="55955" data-e="56083">long</span> <span class="w target" data-s="56125" data-e="56467" title="谈论；言论；评述.说起；谈论；评论">remark</span> <span class="w" data-s="56509" data-e="56723">about</span> <span class="w" data-s="56765" data-e="56936">her</span> <span class="w" data-s="56979" data-e="57149">quiet</span> <span class="w" data-s="57192" data-e="57661">manner,</span> <span class="w" data-s="57832" data-e="57960">and</span> <span class="w" data-s="58216" data-e="58344">his</span> <span class="w target" data-s="58387" data-e="58557" title="议论；评论;解释. 表达意见">comment</span> <span class="w" data-s="58600" data-e="58984">appeared</span> <span class="w" data-s="59027" data-e="59325">in</span> <span class="w" data-s="59368" data-e="59453">the</span> <span class="w" data-s="59496" data-e="59624">paper</span> <span class="w" data-s="59667" data-e="59923">the</span> <span class="w" data-s="59965" data-e="60093">next</span> <span class="w" data-s="60136" data-e="60349">day.</span></p><p class="zh">一位年轻的评论员写了一大段关于她安静气质的评语，他的评论第二天就登了报。</p></div>
+<div class="pair" data-s0="60691" data-s1="64701"><p class="en"><span class="w" data-s="60691" data-e="60776">He</span> <span class="w" data-s="60819" data-e="60947">put</span> <span class="w" data-s="60989" data-e="61075">a</span> <span class="w target" data-s="61117" data-e="61203" title="成绩，分数；等级v.做记号，做标记；标明 方位；标示">mark</span> <span class="w" data-s="61245" data-e="61416">in</span> <span class="w" data-s="61459" data-e="61501">his</span> <span class="w" data-s="61544" data-e="61885">notebook:</span> <span class="w" data-s="62184" data-e="63037">&quot;ordinary</span> <span class="w" data-s="63080" data-e="63421">bread,</span> <span class="w target" data-s="63635" data-e="64445" title="非凡的；不平常的">extraordinary</span> <span class="w" data-s="64488" data-e="64701">hands.&quot;</span></p><p class="zh">他在笔记本上做了一个标记：“普通的面包，非凡的双手。”</p></div>
+<div class="pair" data-s0="65256" data-s1="67176"><p class="en"><span class="w" data-s="65256" data-e="65981">Everyone</span> <span class="w" data-s="66024" data-e="66109">in</span> <span class="w" data-s="66152" data-e="66195">the</span> <span class="w" data-s="66237" data-e="66451">village</span> <span class="w" data-s="66493" data-e="66621">could</span> <span class="w" data-s="66664" data-e="66792">see</span> <span class="w" data-s="66835" data-e="66920">her</span> <span class="w target" data-s="66963" data-e="67176" title="进步；进展v.进步，改进；前进，行进">progress.</span></p><p class="zh">村里每个人都能看到她的进步。</p></div>
+<div class="pair" data-s0="68335" data-s1="73711"><p class="en"><span class="w" data-s="68335" data-e="68633">Mara</span> <span class="w" data-s="68676" data-e="68804">was</span> <span class="w" data-s="68847" data-e="69188">chosen</span> <span class="w" data-s="69231" data-e="69359">as</span> <span class="w" data-s="69401" data-e="69572">the</span> <span class="w target" data-s="69615" data-e="69913" title="代表 v. 授(权)">delegate</span> <span class="w" data-s="69956" data-e="70084">to</span> <span class="w" data-s="70127" data-e="70169">the</span> <span class="w" data-s="70212" data-e="70340">small</span> <span class="w target" data-s="70383" data-e="70809" title="国会，代表大会">congress</span> <span class="w" data-s="70852" data-e="70937">of</span> <span class="w" data-s="70980" data-e="71279">bakers,</span> <span class="w" data-s="71449" data-e="71876">which</span> <span class="w" data-s="71919" data-e="72089">met</span> <span class="w" data-s="72132" data-e="72260">in</span> <span class="w" data-s="72303" data-e="72345">the</span> <span class="w" data-s="72388" data-e="72473">old</span> <span class="w target" data-s="72516" data-e="72900" title="议会；国会">parliament</span> <span class="w" data-s="72943" data-e="73071">hall</span> <span class="w" data-s="73113" data-e="73455">twice</span> <span class="w" data-s="73497" data-e="73583">a</span> <span class="w" data-s="73625" data-e="73711">year.</span></p><p class="zh">玛拉被选为面包师小型代表大会的代表，这个大会每年在老议会大厅开两次。</p></div>
+<div class="pair" data-s0="74009" data-s1="77295"><p class="en"><span class="w" data-s="74009" data-e="74564">At</span> <span class="w" data-s="74607" data-e="74735">the</span> <span class="w" data-s="74777" data-e="74863">meeting</span> <span class="w" data-s="74905" data-e="75161">one</span> <span class="w" data-s="75204" data-e="75545">baker</span> <span class="w" data-s="75588" data-e="75716">became</span> <span class="w target" data-s="75759" data-e="76271" title="好斗的；挑衅的；侵略的；富于攻击性的；有 上进心的">aggressive</span> <span class="w" data-s="76313" data-e="76527">and</span> <span class="w" data-s="76569" data-e="76996">insulted</span> <span class="w" data-s="77039" data-e="77124">the</span> <span class="w" data-s="77167" data-e="77295">others.</span></p><p class="zh">会上有一位面包师变得很凶，辱骂了别人。</p></div>
+<div class="pair" data-s0="77593" data-s1="80111"><p class="en"><span class="w" data-s="77593" data-e="77679">He</span> <span class="w" data-s="77721" data-e="77849">kept</span> <span class="w target" data-s="77892" data-e="78404" title="离题；岔路">digressing</span> <span class="w" data-s="78447" data-e="78745">until</span> <span class="w" data-s="79087" data-e="79300">the</span> <span class="w" data-s="79343" data-e="79641">chairman</span> <span class="w" data-s="79684" data-e="79812">stopped</span> <span class="w" data-s="79855" data-e="80111">him.</span></p><p class="zh">他一直跑题，直到主席制止了他。</p></div>
+<div class="pair" data-s0="80971" data-s1="84000"><p class="en"><span class="w" data-s="80971" data-e="81099">In</span> <span class="w" data-s="81141" data-e="81227">the</span> <span class="w" data-s="81269" data-e="81397">end</span> <span class="w" data-s="81440" data-e="81611">the</span> <span class="w target" data-s="81653" data-e="82080" title="一致的意见，共识">consensus</span> <span class="w" data-s="82123" data-e="82251">was</span> <span class="w" data-s="82293" data-e="82464">clear,</span> <span class="w" data-s="82720" data-e="82891">and</span> <span class="w" data-s="83019" data-e="83147">she</span> <span class="w" data-s="83189" data-e="83317">took</span> <span class="w" data-s="83360" data-e="83488">the</span> <span class="w" data-s="83531" data-e="83616">top</span> <span class="w" data-s="83659" data-e="84000">prize.</span></p><p class="zh">最后共识很清楚：她拿下了头奖。</p></div>
+<div class="pair" data-s0="84256" data-s1="86261"><p class="en"><span class="w" data-s="84256" data-e="84725">She</span> <span class="w" data-s="84768" data-e="85067">received</span> <span class="w" data-s="85109" data-e="85323">the</span> <span class="w target" data-s="85365" data-e="85621" title="喜爱；恩惠；偏爱；支持v.偏袒，偏爱；支 持，更喜欢">favour</span> <span class="w" data-s="85664" data-e="85792">of</span> <span class="w" data-s="85835" data-e="85877">the</span> <span class="w" data-s="85920" data-e="86005">whole</span> <span class="w" data-s="86048" data-e="86261">town.</span></p><p class="zh">她得到了全镇人的喜爱。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">grain</span>
+          <span class="ipa">/grein/</span>
+          <span class="pos">n.</span>
+          <span class="cn">谷物；颗粒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the fields were full of grain by late June</div>          <div class="mnem"><span class="lbl">记</span>雨中（rain）的哥哥（g）忙着收 “谷粒”啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a grain of rice 一粒米 → 谷物、颗粒</div>          <div class="zt"><span class="lbl">真题</span>Corn and soya beans are more important as feed grains. 玉米和大豆作为饲料谷物更为 重要。</div>          <div class="fam"><span class="lbl">族</span>grainy adj. 颗粒状的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">wheat</span>
+          <span class="ipa">/wi:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">小麦</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the wheat stood tall and gold</div>          <div class="root"><span class="lbl">根</span>靠搭配记：wheat field 麦田 → 小麦</div>          <div class="fam"><span class="lbl">族</span>wheaten adj. 小麦做的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">glitter</span>
+          <span class="ipa">/&#x27;glitə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">闪光，耀眼v. 闪光，闪烁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the whole field would glitter</div>          <div class="mnem"><span class="lbl">记</span>litter意为“垃圾”；g发音似 “改”，改变。那一件件垃圾，经过改造，变成一 件件工艺品，放在一起“闪闪发光”，十分“耀 眼”。</div>          <div class="root"><span class="lbl">根</span>gl- 常表「光」(glow / glare) + itter → 一直闪</div>          <div class="fam"><span class="lbl">族</span>glittering adj. 闪闪发光的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">glow</span>
+          <span class="ipa">/gləu/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发光,发热 n.亮光；脸红</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the tops of the grass would glow</div>          <div class="root"><span class="lbl">根</span>gl- 表「光」→ 发亮、发热</div>          <div class="zt"><span class="lbl">真题</span>They fill these tubes with gases that glow when electrified. 他们把这些管子装满通</div>          <div class="fam"><span class="lbl">族</span>glowing adj. 发光的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">sparkle</span>
+          <span class="ipa">/&#x27;spa:kl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">火花；闪耀v. 发光；闪烁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every drop of dew would sparkle</div>          <div class="mnem"><span class="lbl">记</span>这个单词我们很熟悉，星火的 英文就是 spark。s(嘶嘶的响声)+ park(公 园），过节时公园里嘶嘶的声音就是人们在放烟 火(点燃烟火时发出的嘶嘶的声音)→火花。</div>          <div class="root"><span class="lbl">根</span>spark(火花) + le(反复) → 不停冒火花</div>          <div class="fam"><span class="lbl">族</span>spark n. 火花</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">twinkle</span>
+          <span class="ipa">/&#x27;twigkl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">闪烁，闪耀n. 闪烁，闪亮</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the last stars would still twinkle</div>          <div class="mnem"><span class="lbl">记</span>儿 时的一首歌：Twinkle twinkle little star, how I wonder what you are. 一闪一闪亮晶晶，满天都是小星星。</div>          <div class="root"><span class="lbl">根</span>联想儿歌 Twinkle twinkle little star → 一闪一闪</div>          <div class="fam"><span class="lbl">族</span>twinkling adj. 闪烁的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">grace</span>
+          <span class="ipa">/greis/</span>
+          <span class="pos">n.</span>
+          <span class="cn">优美，优雅；恩宠v. 使荣耀；装饰</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>taught her to work with grace</div>          <div class="mnem"><span class="lbl">记</span>比赛(race)中哥哥(g)的动作真 “优雅”。是不是那些运动员的动作都很“优雅”？</div>          <div class="root"><span class="lbl">根</span>源自拉丁 gratia(感谢、喜爱) → 令人喜爱 → 优雅</div>          <div class="zt"><span class="lbl">真题</span>Here comes Chauncy, just trying to get food for him and his Mom off the grace of other people. 昌西来了，他只是想通过别人的 恩惠为他和他的妈妈获取食物。(2017)</div>          <div class="fam"><span class="lbl">族</span>graceful adj. 优雅的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">disgrace</span>
+          <span class="ipa">/dıs&#x27;greis/</span>
+          <span class="pos"></span>
+          <span class="cn">耻辱；丢脸的人或事v. 使蒙羞，使失宠；使 失去动力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Never bring disgrace to this shop</div>          <div class="root"><span class="lbl">根</span>dis(不) + grace(体面) → 不体面</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s no disgrace to be colored. 被涂上颜 色并不丢人。</div>          <div class="fam"><span class="lbl">族</span>disgraceful adj. 可耻的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">elegant</span>
+          <span class="ipa">/&#x27;eligənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">优雅的；优美的；文雅的；简练的，简洁的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Mara&#x27;s hands were elegant</div>          <div class="mnem"><span class="lbl">记</span>出来（e）+大腿（leg）+蚂蚁 (ant)→蚂蚁露出了她的大腿，是不是很瘦，很 直？→优雅的。</div>          <div class="root"><span class="lbl">根</span>e(出) + leg(挑选) + ant → 被挑出来的 → 优雅的</div>          <div class="zt"><span class="lbl">真题</span>I have seen this place—it is elegant, inside and out. 我看过这个地方——它里里外 外都很雅致。(2016) 033 第二单元</div>          <div class="fam"><span class="lbl">族</span>elegance n. 优雅</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">charm</span>
+          <span class="ipa">/t∫a:rm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">魅力；吸引力v.吸引;迷住</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her quiet charm won the village</div>          <div class="root"><span class="lbl">根</span>源自拉丁 carmen(咒语、歌) → 迷人之处</div>          <div class="zt"><span class="lbl">真题</span>“This is Aesop，the fabulist(寓言家)， the man of these charming little tales, often told in terms of animals and animal relationships,”he says. 他说，“这就是寓言家 伊索，讲述这些迷人的小故事的人，这些故事通 常以动物和动物关系的方式讲述。”(2016)</div>          <div class="fam"><span class="lbl">族</span>charming adj. 迷人的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">honor</span>
+          <span class="ipa">/&#x27;a:nər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">荣誉；荣幸v.尊敬，给……荣誉</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>baking was a matter of honor</div>          <div class="mnem"><span class="lbl">记</span>初中时我们学过这个对话吧： Thank you!回答是:It is my honor.(帮助你是 我的荣幸)。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：It&#x27;s my honor. 这是我的荣幸</div>          <div class="zt"><span class="lbl">真题</span>His behavior brought dishonour on his country.他的行为给他的国家带来了耻辱。</div>          <div class="fam"><span class="lbl">族</span>honorable adj. 光荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">glory</span>
+          <span class="ipa">/&#x27;glə:ri/</span>
+          <span class="pos"></span>
+          <span class="cn">荣誉；光荣；赞美；辉煌</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>was a kind of glory</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：哥（g）捞日 (lory)，是不是光耀九族的事情？→荣誉。</div>          <div class="root"><span class="lbl">根</span>与 glorious 同源，拉丁 gloria 光荣</div>          <div class="zt"><span class="lbl">真题</span>What was a significant contributor to the past glory of public schools?公立学校过去辉 煌的主要因素是什么？</div>          <div class="fam"><span class="lbl">族</span>glorious adj. 光荣的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">favour</span>
+          <span class="ipa">/&#x27;feivər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">喜爱；恩惠；偏爱；支持v.偏袒，偏爱；支 持，更喜欢</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She received the favour of the whole town.</div>          <div class="mnem"><span class="lbl">记</span>这个单词不容易记住意思。但 是它的名词favourite我们比较熟悉。比如：Ice cream is my favourite. 冰激凌是我的最爱。</div>          <div class="root"><span class="lbl">根</span>与 favourite(最爱) 同源 → 喜爱、偏爱</div>          <div class="zt"><span class="lbl">真题</span>In primitive times, human beings did not travel for pleasure but to find a more favourable climate. 在原始时代，人类旅行并不 是为了享乐，而是为了找到一个更适宜的气候。</div>          <div class="fam"><span class="lbl">族</span>favourite adj. 最喜爱的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">flavour</span>
+          <span class="ipa">/&#x27;fleivər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">味(道)；特色；概述 v.给……调味；加味于</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her bread had a flavour no city shop could copy</div>          <div class="mnem"><span class="lbl">记</span>这个单词和favor(喜爱)很像， 喜爱的是什么？味道(啊)。</div>          <div class="root"><span class="lbl">根</span>favour(喜爱) 换个字母：让人喜爱的是味道</div>          <div class="zt"><span class="lbl">真题</span>Moutai has mild flavour and a special fragrance. 茅台味道温和，香味独特。</div>          <div class="fam"><span class="lbl">族</span>flavourful adj. 味道浓郁的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">agreeable</span>
+          <span class="ipa">/ə&#x27;gri:əbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">愉悦的；讨人喜欢的；宜人的，适合的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it was agreeable to everyone</div>          <div class="root"><span class="lbl">根</span>agree(同意) + able(能) → 能让人点头的 → 宜人的</div>          <div class="zt"><span class="lbl">真题</span>Agreeable people boost your confidence and allow you to relax and feel comfortable. 随 和的人会增强你的自信，并且让你放松，感到 舒适。</div>          <div class="fam"><span class="lbl">族</span>agree v. 同意 / agreement n. 协议</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">consensus</span>
+          <span class="ipa">/kən&#x27;sensəs/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一致的意见，共识</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the consensus was clear</div>          <div class="mnem"><span class="lbl">记</span>所有人（con)神一样的（sen拼 音类似“神”)熟识(sus拼音类似“熟识”)，那就 是一群人在一起，相互都很默契，熟识。如此和 谐，说明他们的观点一致，达成了“共识”。</div>          <div class="root"><span class="lbl">根</span>con(共同) + sens(感觉) + us → 感觉一致 → 共识</div>          <div class="zt"><span class="lbl">真题</span>It seems there&#x27;s been a general consensus on how to get ahead in America: get a college education, find a reliable job, and buy your own home. 对于如何在美国出人头地，人们似 乎达成了一个普遍的共识：接受大学教育，找到 一份可靠的工作，然后购买属于自己的房子。 (2017)</div>          <div class="fam"><span class="lbl">族</span>consent v./n. 同意</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">extraordinary</span>
+          <span class="ipa">/1k&#x27;strə:dnrı/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">非凡的；不平常的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her work was extraordinary</div>          <div class="mnem"><span class="lbl">记</span>超出(extra)一般的(ordinary)， 那就是“非凡的，不平常的”。</div>          <div class="root"><span class="lbl">根</span>extra(超出) + ordinary(普通的) → 超出一般</div>          <div class="zt"><span class="lbl">真题</span>A couple of recent papers have finally opened a window on these people&#x27;s extraordinary minds. 最近的几篇论文终于打开了一扇窗户， 让我们了解这些人非凡的思维。(2017)</div>          <div class="fam"><span class="lbl">族</span>extraordinarily adv. 非常地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">eminent</span>
+          <span class="ipa">/&#x27;eminənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明显的；杰出的，有名的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an eminent cook</div>          <div class="mnem"><span class="lbl">记</span>e出去，min敏（拼音类似 “敏”),ent 进来(想象为enter)，那就是一个叫 敏的孩子，进城去打工，一年后再回到我们这个 小村庄，穿着和谈吐都有了城里人的感觉，在我 们村里很明显与众不同啊→明显的。</div>          <div class="root"><span class="lbl">根</span>e(向外) + min(突出) + ent → 突出来的 → 杰出的</div>          <div class="fam"><span class="lbl">族</span>eminence n. 卓越</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">prominent</span>
+          <span class="ipa">/&#x27;prpminənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">突出的，卓越的，重要的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The judges were prominent figures</div>          <div class="mnem"><span class="lbl">记</span>提前(pro)都很优秀(把 minent 想成 eminent)了→卓越的。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + min(突出) + ent → 向前突出来的</div>          <div class="zt"><span class="lbl">真题</span>The scientist&#x27;s invention is a prominence to human development. 这位科学家的发明对 人类发展起到了突出的作用。</div>          <div class="fam"><span class="lbl">族</span>prominence n. 突出；重要性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">outstanding</span>
+          <span class="ipa">/aut&#x27;stændı/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">优秀的，杰出的，出色的，突出的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her crust was outstanding</div>          <div class="mnem"><span class="lbl">记</span>正站在（standing）外面（out）， 别人都坐在教室里听课，你站在外面，很与众不 同啊→突出的。</div>          <div class="root"><span class="lbl">根</span>out(出) + standing(站) → 站出来 → 出众</div>          <div class="zt"><span class="lbl">真题</span>They feel proud of being an outstanding 034 problem solver. 他们为自己是出色的问题解决 者感到自豪。(2021)</div>          <div class="fam"><span class="lbl">族</span>outstandingly adv. 出众地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">mark</span>
+          <span class="ipa">/ma:rk/</span>
+          <span class="pos"></span>
+          <span class="cn">成绩，分数；等级v.做记号，做标记；标明 方位；标示</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He put a mark in his notebook</div>          <div class="mnem"><span class="lbl">记</span>mark这个单词的名词是 marker，我们很熟悉，marker笔啊，就是“做标 记”的笔。</div>          <div class="root"><span class="lbl">根</span>本义「边界记号」→ 标记、分数</div>          <div class="zt"><span class="lbl">真题</span>A student who earns good marks is generally a good student. 一个成绩好的学生通 常是个好学生。</div>          <div class="fam"><span class="lbl">族</span>marker n. 记号笔</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">remark</span>
+          <span class="ipa">/&#x27;ma:rk/</span>
+          <span class="pos"></span>
+          <span class="cn">谈论；言论；评述.说起；谈论；评论</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>wrote a long remark about her quiet manner</div>          <div class="mnem"><span class="lbl">记</span>mark标记，标志；阿姨(英文字 母re的谐音)对标记的地方，要发表“评论”啊。</div>          <div class="root"><span class="lbl">根</span>re(再) + mark(标记) → 再指出来 → 评论</div>          <div class="zt"><span class="lbl">真题</span>How did people feel when they learned of Gerald Ratner&#x27;s remarks？当人们得知杰拉尔 德·拉特纳的言论时，他们感觉如何？</div>          <div class="fam"><span class="lbl">族</span>remarkable adj. 显著的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">comment</span>
+          <span class="ipa">/&#x27;ka:ment/</span>
+          <span class="pos">n.</span>
+          <span class="cn">议论；评论;解释. 表达意见</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his comment appeared in the paper</div>          <div class="mnem"><span class="lbl">记</span>所有的（com）人（men）都评价 他(t)→评论;表达意见。</div>          <div class="root"><span class="lbl">根</span>com(共同) + ment(想) → 一起说出想法 → 评论</div>          <div class="zt"><span class="lbl">真题</span>Such comments often seem quite reasonable. 这样的评论往往似乎相当合理。</div>          <div class="fam"><span class="lbl">族</span>commentator n. 评论员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">commentator</span>
+          <span class="ipa">/&#x27;ka:mənteitər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(电台、电视台或报刊的)评论员；(尤指电视 台或电台的)现场解说员，实况播音员</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A young commentator wrote a long remark</div>          <div class="root"><span class="lbl">根</span>comment(评论) + ator(人) → 评论的人</div>          <div class="fam"><span class="lbl">族</span>comment n./v. 评论</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">progress</span>
+          <span class="ipa">/&#x27;pra:gres, prə&#x27;gres/</span>
+          <span class="pos">n.</span>
+          <span class="cn">进步；进展v.进步，改进；前进，行进</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Everyone in the village could see her progress.</div>          <div class="mnem"><span class="lbl">记</span>向前(pro)十走(gress),那这个 单词就是：往前走→进步。</div>          <div class="root"><span class="lbl">根</span>pro(向前) + gress(走) → 往前走</div>          <div class="zt"><span class="lbl">真题</span>But innovation, broadly defined, is the crucial ingredient in all economic progress. 但 广义上的创新是所有经济发展的关键因素。 (2015)</div>          <div class="fam"><span class="lbl">族</span>progressive adj. 进步的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">congress</span>
+          <span class="ipa">/&#x27;kpngres/</span>
+          <span class="pos"></span>
+          <span class="cn">国会，代表大会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the small congress of bakers</div>          <div class="mnem"><span class="lbl">记</span>一起(con)往里走(gress)，所有 中国人都往里走→国会，代表大会。</div>          <div class="root"><span class="lbl">根</span>con(一起) + gress(走) → 一起走进来开会</div>          <div class="zt"><span class="lbl">真题</span>Barack Obama and the Democrats in Congress resist the temptation to interfere too much.巴拉克·奥巴马和国会中的民主党人抵 制住了过度干预的诱惑。</div>          <div class="fam"><span class="lbl">族</span>congressman n. 国会议员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">digress</span>
+          <span class="ipa">/dar&#x27;gres/</span>
+          <span class="pos">v.</span>
+          <span class="cn">离题；岔路</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He kept digressing</div>          <div class="mnem"><span class="lbl">记</span>di表示“两个”，gress表示 “走”，两个人走，你跟我走得不一致→离题， 岔路。</div>          <div class="root"><span class="lbl">根</span>di(分开) + gress(走) → 走岔了 → 离题</div>          <div class="fam"><span class="lbl">族</span>digression n. 离题</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">aggressive</span>
+          <span class="ipa">/ə&#x27;gresiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">好斗的；挑衅的；侵略的；富于攻击性的；有 上进心的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>one baker became aggressive</div>          <div class="mnem"><span class="lbl">记</span>ag表示“加强”，gress表示 “走”，ive是形容词后缀。想象一群狼一再地围 着你走，它们在干什么？→侵略的，好斗的，引 申为“有上进心的”。</div>          <div class="root"><span class="lbl">根</span>ag(加强) + gress(走) + ive → 一再逼近 → 好斗的</div>          <div class="zt"><span class="lbl">真题</span>Melanomas(黑色素瘤) are the most aggressive 035 skin cancers. 黑色素瘤是最具侵袭性的皮肤癌。</div>          <div class="fam"><span class="lbl">族</span>aggression n. 侵略</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">parliament</span>
+          <span class="ipa">/&#x27;pa:rləmənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">议会；国会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>met in the old parliament hall</div>          <div class="mnem"><span class="lbl">记</span>发音类似“怕了们”。他（怕了 他们)→有什么事情还要跟“议会”一起协商，真 是怕了他们→议会；国会。</div>          <div class="root"><span class="lbl">根</span>parli(说，法语 parler) + ment → 说话的地方 → 议会</div>          <div class="zt"><span class="lbl">真题</span>Later Parliament increased the speed limit to 14 miles per hour. 后来议会将限速提 高到每小时14英里。</div>          <div class="fam"><span class="lbl">族</span>parliamentary adj. 议会的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">delegate</span>
+          <span class="ipa">/&#x27;deligət, &#x27;deligeit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">代表 v. 授(权)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>chosen as the delegate</div>          <div class="mnem"><span class="lbl">记</span>dele(te)删除符号，gate 门。国 外议员在开会讨论时经常争吵，甚至大打出手。 议员在某次开会的时候，一方为了冲破反对派 的封锁，用铁锤砸门，拆掉门以后才进入国会会 场。因此，拆门的人→代表。</div>          <div class="root"><span class="lbl">根</span>de(离开) + leg(委派) + ate → 被派出去的人 → 代表</div>          <div class="zt"><span class="lbl">真题</span>Leaders have to be able to delegate and manage resources wisely—including staff expertise. 领导者必须能够明智地分配和管理资源——包 括员工的专业知识。(2017)</div>          <div class="fam"><span class="lbl">族</span>delegation n. 代表团</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 2 · Day 09</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

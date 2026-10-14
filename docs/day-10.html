@@ -1,0 +1,696 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 10 · The Shop at the Edge of Town</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 10 · 10/22 · Unit 2 第 271-300 词</div>
+  <h1>The Shop at the Edge of Town<span class="cn">镇边的小店</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-10.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="1877"><p class="en"><span class="w" data-s="43" data-e="341">Rosa</span> <span class="w" data-s="384" data-e="512">kept</span> <span class="w" data-s="555" data-e="683">a</span> <span class="w" data-s="725" data-e="853">small</span> <span class="w" data-s="896" data-e="1109">shop</span> <span class="w" data-s="1152" data-e="1365">at</span> <span class="w" data-s="1408" data-e="1451">the</span> <span class="w" data-s="1493" data-e="1579">edge</span> <span class="w" data-s="1621" data-e="1707">of</span> <span class="w" data-s="1749" data-e="1877">town.</span></p><p class="zh">罗莎在镇子边上开着一家小店。</p></div>
+<div class="pair" data-s0="2133" data-s1="4693"><p class="en"><span class="w" data-s="2133" data-e="2773">Behind</span> <span class="w" data-s="2816" data-e="2987">it</span> <span class="w" data-s="3029" data-e="3115">was</span> <span class="w" data-s="3157" data-e="3243">a</span> <span class="w" data-s="3285" data-e="3499">narrow</span> <span class="w target" data-s="3541" data-e="3797" title="草坪">lawn</span> <span class="w" data-s="3840" data-e="3968">and</span> <span class="w" data-s="4011" data-e="4096">two</span> <span class="w" data-s="4139" data-e="4309">rose</span> <span class="w target" data-s="4352" data-e="4693" title="灌木；灌木丛；矮树">bushes.</span></p><p class="zh">店后有一小片草坪和两丛玫瑰。</p></div>
+<div class="pair" data-s0="4907" data-s1="10837"><p class="en"><span class="w" data-s="4907" data-e="5589">Beyond</span> <span class="w" data-s="5632" data-e="5760">the</span> <span class="w" data-s="5803" data-e="5931">fence</span> <span class="w" data-s="5973" data-e="6357">the</span> <span class="w target" data-s="6400" data-e="6656" title="杂草，野草">weeds</span> <span class="w" data-s="6699" data-e="6784">had</span> <span class="w" data-s="6827" data-e="7040">grown</span> <span class="w" data-s="7083" data-e="7253">into</span> <span class="w" data-s="7296" data-e="7424">a</span> <span class="w target" data-s="7467" data-e="7723" title="丛林，密林，杂草丛生的地方">jungle,</span> <span class="w" data-s="7893" data-e="8107">and</span> <span class="w" data-s="8149" data-e="8405">every</span> <span class="w" data-s="8448" data-e="8917">Saturday</span> <span class="w" data-s="8960" data-e="9131">she</span> <span class="w" data-s="9173" data-e="9301">would</span> <span class="w" data-s="9344" data-e="9429">take</span> <span class="w" data-s="9472" data-e="9557">her</span> <span class="w target" data-s="9600" data-e="9728" title="刷子，毛刷；画笔">brush</span> <span class="w" data-s="9771" data-e="10069">and</span> <span class="w" data-s="10112" data-e="10325">work</span> <span class="w" data-s="10368" data-e="10624">until</span> <span class="w" data-s="10667" data-e="10837">dark.</span></p><p class="zh">篱笆外面，野草已经长成了一片丛林，每个星期六她都会拿上刷子干到天黑。</p></div>
+<div class="pair" data-s0="11532" data-s1="15031"><p class="en"><span class="w" data-s="11532" data-e="11703">Past</span> <span class="w" data-s="11745" data-e="11916">the</span> <span class="w" data-s="11959" data-e="12129">last</span> <span class="w target" data-s="12172" data-e="12556" title="灌木；灌木丛；矮树">bush</span> <span class="w" data-s="12599" data-e="12812">lay</span> <span class="w" data-s="12897" data-e="13068">an</span> <span class="w" data-s="13111" data-e="13196">open</span> <span class="w target" data-s="13239" data-e="13452" title="田；地；场地；领域 adj. 实地的；野外的">field</span> <span class="w" data-s="13495" data-e="13793">where</span> <span class="w" data-s="13836" data-e="14135">village</span> <span class="w" data-s="14177" data-e="14305">boys</span> <span class="w" data-s="14348" data-e="14604">played</span> <span class="w" data-s="14647" data-e="15031">football.</span></p><p class="zh">最后一丛灌木过去，就是一片空地，村里的男孩们在踢球。</p></div>
+<div class="pair" data-s0="15244" data-s1="17676"><p class="en"><span class="w" data-s="15244" data-e="15756">Her</span> <span class="w" data-s="15841" data-e="16268">nephew</span> <span class="w" data-s="16311" data-e="16439">Tom</span> <span class="w" data-s="16481" data-e="16737">was</span> <span class="w" data-s="16780" data-e="16865">an</span> <span class="w target" data-s="16908" data-e="17249" title="会计，会计师">accountant</span> <span class="w" data-s="17292" data-e="17420">in</span> <span class="w" data-s="17463" data-e="17505">the</span> <span class="w" data-s="17548" data-e="17676">city.</span></p><p class="zh">她的侄子汤姆是城里的会计。</p></div>
+<div class="pair" data-s0="17889" data-s1="20151"><p class="en"><span class="w" data-s="17889" data-e="18487">One</span> <span class="w" data-s="18529" data-e="18785">summer</span> <span class="w" data-s="18828" data-e="19084">he</span> <span class="w" data-s="19127" data-e="19212">came</span> <span class="w" data-s="19255" data-e="19383">to</span> <span class="w" data-s="19425" data-e="19553">check</span> <span class="w" data-s="19596" data-e="19724">her</span> <span class="w target" data-s="19767" data-e="20151" title="">accounts.</span></p><p class="zh">有一年夏天，他回来查她的账。</p></div>
+<div class="pair" data-s0="20321" data-s1="22540"><p class="en"><span class="w" data-s="20321" data-e="20705">He</span> <span class="w" data-s="20748" data-e="21047">sat</span> <span class="w" data-s="21089" data-e="21260">at</span> <span class="w" data-s="21303" data-e="21345">the</span> <span class="w target" data-s="21388" data-e="21473" title="柜台；对立面；计算器，计数器v. 反驳 adv.相反地">counter</span> <span class="w" data-s="21516" data-e="21815">and</span> <span class="w" data-s="21857" data-e="22113">began</span> <span class="w" data-s="22156" data-e="22369">to</span> <span class="w target" data-s="22412" data-e="22540" title="数数；计数；重要.点数；数量；罪状；伯爵">count.</span></p><p class="zh">他坐在柜台边，开始数。</p></div>
+<div class="pair" data-s0="23184" data-s1="26768"><p class="en"><span class="w" data-s="23184" data-e="23355">Some</span> <span class="w" data-s="23397" data-e="23525">of</span> <span class="w" data-s="23568" data-e="23653">the</span> <span class="w target" data-s="23696" data-e="23909" title="账单；议案">bills</span> <span class="w" data-s="23952" data-e="24123">could</span> <span class="w" data-s="24165" data-e="24293">not</span> <span class="w" data-s="24336" data-e="24507">be</span> <span class="w" data-s="24549" data-e="24677">added</span> <span class="w" data-s="24720" data-e="24891">up;</span> <span class="w" data-s="25104" data-e="25232">the</span> <span class="w" data-s="25488" data-e="25829">costs</span> <span class="w" data-s="25872" data-e="25915">were</span> <span class="w" data-s="25957" data-e="26128">almost</span> <span class="w target" data-s="26171" data-e="26768" title="不可数的，很多的">uncountable.</span></p><p class="zh">有些账单根本加不起来，那些开销几乎数不清。</p></div>
+<div class="pair" data-s0="26981" data-s1="29072"><p class="en"><span class="w" data-s="26981" data-e="27195">He</span> <span class="w" data-s="27365" data-e="27536">asked</span> <span class="w" data-s="27579" data-e="27749">her</span> <span class="w" data-s="27792" data-e="27877">to</span> <span class="w target" data-s="27920" data-e="28219" title="删除">delete</span> <span class="w" data-s="28261" data-e="28475">three</span> <span class="w" data-s="28517" data-e="28688">old</span> <span class="w" data-s="28731" data-e="29072">records.</span></p><p class="zh">他让她删掉三条旧记录。</p></div>
+<div class="pair" data-s0="29671" data-s1="32871"><p class="en"><span class="w" data-s="29671" data-e="29799">Then</span> <span class="w" data-s="29841" data-e="29969">he</span> <span class="w" data-s="30012" data-e="30097">found</span> <span class="w" data-s="30140" data-e="30268">a</span> <span class="w target" data-s="30311" data-e="30609" title="折扣 v. 打折扣">discount</span> <span class="w" data-s="30652" data-e="30823">she</span> <span class="w" data-s="30865" data-e="30993">had</span> <span class="w" data-s="31036" data-e="31121">given</span> <span class="w" data-s="31164" data-e="31292">to</span> <span class="w" data-s="31335" data-e="31420">a</span> <span class="w" data-s="31463" data-e="31804">customer</span> <span class="w" data-s="31847" data-e="31975">and</span> <span class="w" data-s="32017" data-e="32401">never</span> <span class="w" data-s="32444" data-e="32657">written</span> <span class="w" data-s="32700" data-e="32871">down.</span></p><p class="zh">接着他发现了一笔她给过顾客、却从没记下来的折扣。</p></div>
+<div class="pair" data-s0="33724" data-s1="37095"><p class="en"><span class="w" data-s="33724" data-e="33767">&quot;You</span> <span class="w" data-s="33809" data-e="33937">took</span> <span class="w" data-s="33980" data-e="34065">a</span> <span class="w target" data-s="34108" data-e="34279" title="(借出的)贷款">loan</span> <span class="w" data-s="34321" data-e="34407">from</span> <span class="w" data-s="34449" data-e="34492">the</span> <span class="w" data-s="34535" data-e="34663">bank,&quot;</span> <span class="w" data-s="35089" data-e="35132">he</span> <span class="w" data-s="35175" data-e="35260">said,</span> <span class="w" data-s="35559" data-e="35601">&quot;and</span> <span class="w" data-s="35857" data-e="36156">the</span> <span class="w target" data-s="36199" data-e="36327" title="债，债务，欠款">debt</span> <span class="w" data-s="36369" data-e="36455">is</span> <span class="w" data-s="36497" data-e="36625">still</span> <span class="w" data-s="36668" data-e="36839">on</span> <span class="w" data-s="36881" data-e="36967">the</span> <span class="w" data-s="37009" data-e="37095">paper.&quot;</span></p><p class="zh">“你从银行贷了款，”他说，“这笔债还挂在纸上。”</p></div>
+<div class="pair" data-s0="37820" data-s1="39100"><p class="en"><span class="w" data-s="37820" data-e="37863">&quot;You</span> <span class="w" data-s="37905" data-e="38033">must</span> <span class="w target" data-s="38076" data-e="38417" title="归还，偿还，清偿">repay</span> <span class="w" data-s="38460" data-e="38631">it</span> <span class="w" data-s="38673" data-e="38801">before</span> <span class="w" data-s="38844" data-e="39100">winter.&quot;</span></p><p class="zh">“冬天之前你必须还清。”</p></div>
+<div class="pair" data-s0="39612" data-s1="41703"><p class="en"><span class="w" data-s="39612" data-e="40124">Rosa</span> <span class="w" data-s="40167" data-e="40295">looked</span> <span class="w" data-s="40337" data-e="40465">at</span> <span class="w" data-s="40508" data-e="40593">the</span> <span class="w target" data-s="40636" data-e="40679" title="账单；议案">bill</span> <span class="w" data-s="40721" data-e="40892">on</span> <span class="w" data-s="40935" data-e="40977">the</span> <span class="w" data-s="41020" data-e="41105">wall</span> <span class="w" data-s="41148" data-e="41361">and</span> <span class="w" data-s="41404" data-e="41489">said</span> <span class="w" data-s="41532" data-e="41703">nothing.</span></p><p class="zh">罗莎看着墙上的那张账单，什么也没说。</p></div>
+<div class="pair" data-s0="41959" data-s1="44476"><p class="en"><span class="w" data-s="41959" data-e="42513">That</span> <span class="w" data-s="42556" data-e="42769">year</span> <span class="w" data-s="42812" data-e="43025">the</span> <span class="w" data-s="43068" data-e="43153">shop</span> <span class="w" data-s="43196" data-e="43452">had</span> <span class="w" data-s="43495" data-e="43580">to</span> <span class="w target" data-s="43623" data-e="43921" title="经历，经受(变化、不快的事等)">undergo</span> <span class="w" data-s="43964" data-e="44220">big</span> <span class="w" data-s="44263" data-e="44476">changes.</span></p><p class="zh">那一年，小店不得不经历大变化。</p></div>
+<div class="pair" data-s0="45595" data-s1="47430"><p class="en"><span class="w" data-s="45595" data-e="45894">Rosa</span> <span class="w" data-s="45936" data-e="46064">had</span> <span class="w" data-s="46107" data-e="46192">to</span> <span class="w target" data-s="46235" data-e="46448" title="">endure</span> <span class="w" data-s="46491" data-e="46704">many</span> <span class="w" data-s="46747" data-e="47003">long</span> <span class="w" data-s="47046" data-e="47430">nights.</span></p><p class="zh">罗莎不得不熬过许多个长夜。</p></div>
+<div class="pair" data-s0="47558" data-s1="51355"><p class="en"><span class="w" data-s="47558" data-e="48070">She</span> <span class="w" data-s="48112" data-e="48283">bought</span> <span class="w target" data-s="48326" data-e="48710" title="持久的，耐用的">durable</span> <span class="w" data-s="48752" data-e="49136">shelves</span> <span class="w" data-s="49179" data-e="49392">and</span> <span class="w" data-s="49606" data-e="49734">kept</span> <span class="w" data-s="49776" data-e="49904">the</span> <span class="w" data-s="49947" data-e="50075">store</span> <span class="w" data-s="50118" data-e="50331">open</span> <span class="w" data-s="50374" data-e="50544">for</span> <span class="w" data-s="50587" data-e="50715">a</span> <span class="w" data-s="50758" data-e="50886">longer</span> <span class="w target" data-s="50928" data-e="51355" title="持续时间；期间">duration.</span></p><p class="zh">她买了耐用的货架，让店每天开得更久。</p></div>
+<div class="pair" data-s0="51611" data-s1="53958"><p class="en"><span class="w" data-s="51611" data-e="51952">Her</span> <span class="w" data-s="52123" data-e="52251">back</span> <span class="w target" data-s="52294" data-e="52720" title="">suffered,</span> <span class="w" data-s="52848" data-e="53062">but</span> <span class="w" data-s="53232" data-e="53360">she</span> <span class="w" data-s="53403" data-e="53531">never</span> <span class="w" data-s="53574" data-e="53744">gave</span> <span class="w" data-s="53787" data-e="53958">up.</span></p><p class="zh">她的背很受罪，但她从没放弃。</p></div>
+<div class="pair" data-s0="54439" data-s1="59047"><p class="en"><span class="w" data-s="54439" data-e="54609">From</span> <span class="w" data-s="54652" data-e="54695">the</span> <span class="w" data-s="54737" data-e="54865">numbers</span> <span class="w" data-s="54908" data-e="55164">in</span> <span class="w" data-s="55207" data-e="55292">front</span> <span class="w" data-s="55335" data-e="55463">of</span> <span class="w" data-s="55505" data-e="55591">him,</span> <span class="w" data-s="55761" data-e="55975">Tom</span> <span class="w" data-s="56188" data-e="56487">could</span> <span class="w target" data-s="56529" data-e="56785" title="">infer</span> <span class="w" data-s="56828" data-e="56999">one</span> <span class="w" data-s="57041" data-e="57297">thing:</span> <span class="w" data-s="57596" data-e="57724">the</span> <span class="w" data-s="57980" data-e="58108">shop</span> <span class="w" data-s="58151" data-e="58407">was</span> <span class="w" data-s="58449" data-e="58620">not</span> <span class="w" data-s="58663" data-e="59047">dying.</span></p><p class="zh">从眼前的这些数字里，汤姆能推断出一件事：这家店没有死。</p></div>
+<div class="pair" data-s0="59217" data-s1="61991"><p class="en"><span class="w" data-s="59217" data-e="59473">He</span> <span class="w target" data-s="59644" data-e="60199" title="提到；涉及">referred</span> <span class="w" data-s="60241" data-e="60327">to</span> <span class="w" data-s="60369" data-e="60497">the</span> <span class="w" data-s="60540" data-e="60839">neighbours</span> <span class="w" data-s="60881" data-e="60967">who</span> <span class="w" data-s="61009" data-e="61137">came</span> <span class="w" data-s="61180" data-e="61393">every</span> <span class="w" data-s="61436" data-e="61692">single</span> <span class="w" data-s="61735" data-e="61991">day.</span></p><p class="zh">他提到了那些每天都来的老邻居。</p></div>
+<div class="pair" data-s0="62677" data-s1="69376"><p class="en"><span class="w" data-s="62677" data-e="62848">On</span> <span class="w" data-s="62891" data-e="63275">Sunday</span> <span class="w" data-s="63317" data-e="63531">he</span> <span class="w" data-s="63573" data-e="63659">met</span> <span class="w" data-s="63701" data-e="63787">an</span> <span class="w" data-s="63829" data-e="63915">old</span> <span class="w target" data-s="63957" data-e="64469" title="相似的人或物">counterpart</span> <span class="w" data-s="64512" data-e="64683">of</span> <span class="w" data-s="64725" data-e="64768">his</span> <span class="w" data-s="64811" data-e="65024">aunt,</span> <span class="w" data-s="65195" data-e="65493">a</span> <span class="w" data-s="65536" data-e="66091">shopkeeper</span> <span class="w" data-s="66133" data-e="66219">from</span> <span class="w" data-s="66261" data-e="66389">the</span> <span class="w" data-s="66432" data-e="66475">next</span> <span class="w" data-s="66517" data-e="66731">street,</span> <span class="w" data-s="66944" data-e="67243">and</span> <span class="w" data-s="67285" data-e="67925">Rosa</span> <span class="w target" data-s="67968" data-e="68395" title="&amp; n. 遭遇；遇见 v.认为；把……视为；解">encountered</span> <span class="w" data-s="68437" data-e="68565">an</span> <span class="w" data-s="68608" data-e="68693">old</span> <span class="w" data-s="68736" data-e="68949">friend</span> <span class="w" data-s="68992" data-e="69205">at</span> <span class="w" data-s="69248" data-e="69376">last.</span></p><p class="zh">星期天，汤姆遇到了姑姑的一位老同行——隔壁街的另一位店主，而罗莎也终于遇见了一位老朋友。</p></div>
+<div class="pair" data-s0="69717" data-s1="72619"><p class="en"><span class="w" data-s="69717" data-e="70315">That</span> <span class="w" data-s="70357" data-e="70699">afternoon</span> <span class="w" data-s="70741" data-e="71040">a</span> <span class="w target" data-s="71083" data-e="71424" title="(某些体育比赛的)裁判，裁判员；推荐人；调 解人">referee</span> <span class="w" data-s="71467" data-e="71765">blew</span> <span class="w" data-s="71808" data-e="71893">his</span> <span class="w" data-s="71936" data-e="72235">whistle</span> <span class="w" data-s="72277" data-e="72363">on</span> <span class="w" data-s="72405" data-e="72448">the</span> <span class="w target" data-s="72491" data-e="72619" title="田；地；场地；领域 adj. 实地的；野外的">field.</span></p><p class="zh">那天下午，一位裁判在球场上吹响了哨子。</p></div>
+<div class="pair" data-s0="73354" data-s1="78090"><p class="en"><span class="w" data-s="73354" data-e="73525">A</span> <span class="w target" data-s="73567" data-e="73866" title="参议员">senator</span> <span class="w" data-s="73909" data-e="74122">and</span> <span class="w" data-s="74165" data-e="74293">two</span> <span class="w" data-s="74335" data-e="74506">members</span> <span class="w" data-s="74549" data-e="74762">of</span> <span class="w" data-s="74805" data-e="74847">the</span> <span class="w" data-s="74890" data-e="74975">town</span> <span class="w target" data-s="75018" data-e="75445" title="理事会，委员会，地方议会">council</span> <span class="w" data-s="75487" data-e="75743">came</span> <span class="w" data-s="75786" data-e="75957">to</span> <span class="w target" data-s="75999" data-e="76213" title="授予；开会，协商">confer</span> <span class="w" data-s="76255" data-e="76383">a</span> <span class="w" data-s="76426" data-e="76554">small</span> <span class="w" data-s="76597" data-e="76938">award</span> <span class="w" data-s="76981" data-e="77237">on</span> <span class="w" data-s="77279" data-e="77322">the</span> <span class="w" data-s="77365" data-e="77621">oldest</span> <span class="w" data-s="77663" data-e="77749">shop</span> <span class="w" data-s="77791" data-e="77962">in</span> <span class="w" data-s="78005" data-e="78090">town.</span></p><p class="zh">一位参议员和两名镇议会的成员来了，为镇上最老的店铺颁发一个小奖项。</p></div>
+<div class="pair" data-s0="78431" data-s1="80479"><p class="en"><span class="w" data-s="78431" data-e="79157">Rosa</span> <span class="w" data-s="79199" data-e="79370">stood</span> <span class="w" data-s="79413" data-e="79541">at</span> <span class="w" data-s="79583" data-e="79626">her</span> <span class="w target" data-s="79669" data-e="79797" title="柜台；对立面；计算器，计数器v. 反驳 adv.相反地">counter</span> <span class="w" data-s="79839" data-e="80138">and</span> <span class="w" data-s="80181" data-e="80479">smiled.</span></p><p class="zh">罗莎站在柜台后面，笑了。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">delete</span>
+          <span class="ipa">/dı&#x27;li:t/</span>
+          <span class="pos">v.</span>
+          <span class="cn">删除</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He asked her to delete three old records.</div>          <div class="root"><span class="lbl">根</span>联想：电脑键盘上的 Delete 键 → 删除</div>          <div class="zt"><span class="lbl">真题</span>They deleted all information about gender. 他们删除了所有关于性别的信息。(2017)</div>          <div class="fam"><span class="lbl">族</span>deletion n. 删除</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">senator</span>
+          <span class="ipa">/&#x27;senətər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">参议员</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A senator and two members of the town council came</div>          <div class="mnem"><span class="lbl">记</span>词根 sen 类似 send(送)，ator 类似actor(演员)，送来了一个演员。西方国家 的国会，三权分立很虚伪，是资产阶级意志的体 现，“参议员”就是一群演员在表演。</div>          <div class="root"><span class="lbl">根</span>sen(老) + ator(人) → 元老 → 参议员</div>          <div class="zt"><span class="lbl">真题</span>Senator Charles Schumer called on Facebook to change its privacy policy. 参议员查尔斯·舒 默呼吁 Facebook 更改其隐私政策。</div>          <div class="fam"><span class="lbl">族</span>senate n. 参议院</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">council</span>
+          <span class="ipa">/&#x27;kaunsl/</span>
+          <span class="pos"></span>
+          <span class="cn">理事会，委员会，地方议会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>two members of the town council came</div>          <div class="mnem"><span class="lbl">记</span>这些“理事会”成员不干活，每 次开会都是数(coun 想成 count)铅笔(cil 想成 pencil)。</div>          <div class="root"><span class="lbl">根</span>与 consult(商议) 同源 → 一起商议的团体 → 理事会</div>          <div class="zt"><span class="lbl">真题</span>“Exercise by itself is a very tough way to lose weight,&quot; says York Onnen, program director of the President&#x27;s Council on Physical Fitness and Sports. “运动本身是一种非常艰难 的减肥方式，”约克·昂南说，他是总统体能和 运动委员会的项目主任。</div>          <div class="fam"><span class="lbl">族</span>councillor n. 议员，委员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">count</span>
+          <span class="ipa">/kaunt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">数数；计数；重要.点数；数量；罪状；伯爵</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>began to count</div>          <div class="mnem"><span class="lbl">记</span>往下(down)数(count)，就是倒 数啊。</div>          <div class="root"><span class="lbl">根</span>本义「一起算」(com + putare) → 数数、算</div>          <div class="zt"><span class="lbl">真题</span>It counts less than generally thought. 它 没有人们普遍认为的那么重要。(2019)</div>          <div class="fam"><span class="lbl">族</span>countless adj. 无数的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">uncountable</span>
+          <span class="ipa">/Λn&#x27;kauntəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不可数的，很多的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the costs were almost uncountable</div>          <div class="root"><span class="lbl">根</span>un(不) + count(数) + able(能) → 数不清的</div>          <div class="fam"><span class="lbl">族</span>count v. 数 / countable adj. 可数的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">counter</span>
+          <span class="ipa">/&#x27;kauntə(r)/</span>
+          <span class="pos">n.</span>
+          <span class="cn">柜台；对立面；计算器，计数器v. 反驳 adv.相反地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He sat at the counter and began to count.</div>          <div class="mnem"><span class="lbl">记</span>count 表示“数数”，counter 表 (036) 示“数数的物品或人”，就是计算器或计算者，引 申为柜台(柜台前的营业员都要拿着计算器算 清楚多少钱)，并且顾客和营业员隔着柜台站 着，他们不就是“相反地”站着吗？那动词的意 思就很明显了，采取“相反的”立场，那就是“反 驳”。</div>          <div class="root"><span class="lbl">根</span>count(数) + er(物) → 算账的地方 → 柜台</div>          <div class="zt"><span class="lbl">真题</span>And it doesn&#x27;t run counter to the goals of public education. 而且它并不违背公共教育的 目标。(2015)</div>          <div class="fam"><span class="lbl">族</span>count v. 数</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">account</span>
+          <span class="ipa">/ə&#x27;kaunt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he came to check her accounts</div>          <div class="root"><span class="lbl">根</span>ac(加强) + count(算) → 算清楚 → 账目、说明</div>          <div class="zt"><span class="lbl">真题</span>Taking into account economic need beyond that absolute measure, the Institute for Policy Studies found that 140 million people are poor or low-income. 考虑到那个绝对指标 之外的经济需求，政策研究所发现，1.4亿人处 于贫困或低收入状态。(2020)</div>          <div class="fam"><span class="lbl">族</span>accountant n. 会计</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">accountant</span>
+          <span class="ipa">/ə&#x27;kauntənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">会计，会计师</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her nephew Tom was an accountant in the city.</div>          <div class="mnem"><span class="lbl">记</span>一再地（ac）数（count）蚂蚁 (ant)，谁的工作是上班就从罐子中倒出一堆蚂 蚁，在那里数有多少只？和数字打交道的人是 谁？→会计。</div>          <div class="root"><span class="lbl">根</span>account(账) + ant(人) → 管账的人</div>          <div class="zt"><span class="lbl">真题</span>Because financial matters are so important, some accountants become top executives. 因为 财务问题非常重要，一些会计师成了高管。</div>          <div class="fam"><span class="lbl">族</span>account n. 账目</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">counterpart</span>
+          <span class="ipa">/&#x27;kauntəpa:t/</span>
+          <span class="pos">n.</span>
+          <span class="cn">相似的人或物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he met an old counterpart of his aunt</div>          <div class="mnem"><span class="lbl">记</span>相反的（counter）部分（part）， 通常有两个东西，也就是一对同时出现时，总是 “相似的人或物”。比如人的两只手，鸟的两只 翅膀。 第二单元</div>          <div class="root"><span class="lbl">根</span>counter(对应) + part(部分) → 对应的一方</div>          <div class="zt"><span class="lbl">真题</span>They are better educated than their mothers and grandmothers had been—or than their young male counterparts are now. 他们比 自己的母亲和祖母受过更好的教育——或者比 她们现在的年轻男性同龄人所受的教育更好。</div>          <div class="fam"><span class="lbl">族</span>counter- 前缀：相对应的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">encounter</span>
+          <span class="ipa">/ın&#x27;kauntə(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">&amp; n. 遭遇；遇见 v.认为；把……视为；解</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa encountered an old friend at last</div>          <div class="mnem"><span class="lbl">记</span>使……进入（en）+相对 (counter),那不就是俩人“遇见”了吗？→遇见； 遭遇。</div>          <div class="root"><span class="lbl">根</span>en(使进入) + counter(相对) → 迎面碰上</div>          <div class="zt"><span class="lbl">真题</span>Why do some students give up when they encounter difficulty, whereas others who are no more skilled continue to strive and learn? 为什么有些学生遇到困难就放弃，而另一些没 有更多技能的人继续努力学习？(2016)</div>          <div class="fam"><span class="lbl">族</span>counter v. 反驳</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">discount</span>
+          <span class="ipa">/&#x27;diskaunt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">折扣 v. 打折扣</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>he found a discount she had given to a customer</div>          <div class="mnem"><span class="lbl">记</span>往下(dis)数(count)→打折。</div>          <div class="root"><span class="lbl">根</span>dis(去掉) + count(算) → 从总数里减掉 → 打折</div>          <div class="zt"><span class="lbl">真题</span>Traffic was boosted in America, the home of fast food, with discounts and promotions. 在快餐之乡美国，折扣和促销活动增加了客 流量。</div>          <div class="fam"><span class="lbl">族</span>count v. 计数</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">repay</span>
+          <span class="ipa">/rı&#x27;pei/</span>
+          <span class="pos">v.</span>
+          <span class="cn">归还，偿还，清偿</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>You must repay it before winter.</div>          <div class="mnem"><span class="lbl">记</span>pay 是付钱，那 re 表示回来，就 是“归还，偿还”。</div>          <div class="root"><span class="lbl">根</span>re(回) + pay(付) → 付回去 → 偿还</div>          <div class="zt"><span class="lbl">真题</span>He can choose to turn to the bank for a loan to pay his way through university, which he can repay after graduation. 他可以选择向银 行贷款以支付大学学费，然后在毕业后偿还。</div>          <div class="fam"><span class="lbl">族</span>repayment n. 偿还</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">bill</span>
+          <span class="ipa">/brl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">账单；议案</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Some of the bills could not be added up</div>          <div class="root"><span class="lbl">根</span>本义「小圆印章」→ 盖印的单据 → 账单；议案</div>          <div class="zt"><span class="lbl">真题</span>If a home generates more power than it uses，the bill is zero. 如果一个家庭产生的电力 比它使用的多，那么账单是零。</div>          <div class="fam"><span class="lbl">族</span>billing n. 开账单</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">loan</span>
+          <span class="ipa">/ləun/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(借出的)贷款</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>You took a loan from the bank</div>          <div class="mnem"><span class="lbl">记</span>loan可以把 n想象成门，在银 行门口装(load)钱→贷款。</div>          <div class="root"><span class="lbl">根</span>与 lend 同源，l- 表「给出」→ 贷出去的钱</div>          <div class="zt"><span class="lbl">真题</span>Often there&#x27;ll be a car loan and perhaps a mortgage. 通常会有汽车贷款，也许还有抵押贷 款。(2020) (037)</div>          <div class="fam"><span class="lbl">族</span>lend v. 借出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">debt</span>
+          <span class="ipa">/det/</span>
+          <span class="pos"></span>
+          <span class="cn">债，债务，欠款</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the debt is still on the paper</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“贷它”。贷就是 借钱，你借了银行的钱，就是“欠款”了啊。</div>          <div class="root"><span class="lbl">根</span>源自拉丁 debitum(该还的东西) → 欠款</div>          <div class="fam"><span class="lbl">族</span>debtor n. 债务人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">lawn</span>
+          <span class="ipa">/lə:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">草坪</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Behind it was a narrow lawn and two rose bushes.</div>          <div class="mnem"><span class="lbl">记</span>law 法律;lawyer 律师；n 想象 成“门”的样子。那就是律师家门口有一大片 “草坪”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：mow the lawn 修剪草坪 → 草坪</div>          <div class="zt"><span class="lbl">真题</span>Residents were cutting their lawns, washing their cars and otherwise idling away a pleasant，sunny day. 居民们正在修剪草坪、洗 车，或者用其他方式打发这阳光明媚的日子。</div>          <div class="fam"><span class="lbl">族</span>lawnmower n. 割草机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">bush</span>
+          <span class="ipa">/bu∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">灌木；灌木丛；矮树</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Past the last bush lay an open field</div>          <div class="mnem"><span class="lbl">记</span>bush想成布什，布什家里很富 有，人家只有草坪，他家有个森林，里面都是“灌 木丛”。</div>          <div class="root"><span class="lbl">根</span>本义「一丛」→ 灌木、灌木丛</div>          <div class="zt"><span class="lbl">真题</span>So when you look for nests and eggs in branches of the trees and bushes remember that some nests may be right your feet. 所以, 当你们在树枝和灌木丛中寻找巢穴和蛋时，请 记住，有些巢穴可能就在你们的脚下。</div>          <div class="fam"><span class="lbl">族</span>bushy adj. 茂密的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">brush</span>
+          <span class="ipa">/bra∫/</span>
+          <span class="pos">n.</span>
+          <span class="cn">刷子，毛刷；画笔</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she would take her brush and work until dark</div>          <div class="mnem"><span class="lbl">记</span>布什(bush)拿花(r想成花）做 “画笔”，画了一幅画送给你。</div>          <div class="root"><span class="lbl">根</span>联想：bush(灌木) 中间加 r → 灌木做的刷子</div>          <div class="zt"><span class="lbl">真题</span>An American artist was giving a speech on the art of Japanese brush painting to an audience that included visitors from Japan. — 位美国艺术家正在给观众做关于日本水墨画艺 术的演讲，听众中有来自日本的游客。(2011)</div>          <div class="fam"><span class="lbl">族</span>brushwork n. 笔法</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">jungle</span>
+          <span class="ipa">/&#x27;d3^ngl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">丛林，密林，杂草丛生的地方</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the weeds had grown into a jungle</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“夹勾”。如果你 在“杂草丛生的地方”行进，很容易被夹住脚，勾 住衣服。</div>          <div class="root"><span class="lbl">根</span>源自梵语 jangala(荒地) → 丛林</div>          <div class="zt"><span class="lbl">真题</span>During the past decade, researchers have discovered hundreds of large earth works deep in the jungle. 过去的十年里，研究人员在丛林 深处发现了数百个大型的土方工程。</div>          <div class="fam"><span class="lbl">族</span>jungle-like adj. 丛林般的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">weed</span>
+          <span class="ipa">/wi:d/</span>
+          <span class="pos">n.</span>
+          <span class="cn">杂草，野草</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Beyond the fence the weeds had grown</div>          <div class="mnem"><span class="lbl">记</span>我们(wee发音同 we)的(d)花 园里长满了“野草”。</div>          <div class="root"><span class="lbl">根</span>联想：seed(种子) 换个首字母 → 自己冒出来的野草</div>          <div class="zt"><span class="lbl">真题</span>Six 4-H Club girls worked to clean a 72- foot curbside that was covered with weeds, rocks and trash. 4-H 俱乐部的 6 个女孩清理了 一段72英尺长的路边，这个路边被杂草、石头 和垃圾覆盖。</div>          <div class="fam"><span class="lbl">族</span>weedy adj. 杂草丛生的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">field</span>
+          <span class="ipa">/fi:ld/</span>
+          <span class="pos">n.</span>
+          <span class="cn">田；地；场地；领域 adj. 实地的；野外的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>lay an open field where village boys played football</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“肥沃的”，什么 肥沃？→田；地。</div>          <div class="root"><span class="lbl">根</span>本义「开阔的平地」→ 田地、领域</div>          <div class="zt"><span class="lbl">真题</span>Great innovators are good at connecting concepts from various academic fields. 伟大的 创新者善于将不同学术领域的概念联系起来。 (2015)</div>          <div class="fam"><span class="lbl">族</span>fieldwork n. 实地调查</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">undergo</span>
+          <span class="ipa">/iΛndər&#x27;gəu/</span>
+          <span class="pos">v.</span>
+          <span class="cn">经历，经受(变化、不快的事等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the shop had to undergo big changes</div>          <div class="mnem"><span class="lbl">记</span>从下面(under)走(go)，设想你 总走在一个人的下面，或一群人的下面，那就是 过得不如别人啊。是不是要“经受”别人的冷嘲 热讽？</div>          <div class="root"><span class="lbl">根</span>under(在下面) + go(走) → 从下面走过 → 经受</div>          <div class="zt"><span class="lbl">真题</span>As many office workers adapt to remote work, cities may undergo fundamental change if offices remain under-utilized. 随着许多办公 室职员适应远程工作，如果办公室继续得不到充 (038) 分利用，城市可能会发生根本变化。(2021)</div>          <div class="fam"><span class="lbl">族</span>under- 前缀：在……下面</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">endure</span>
+          <span class="ipa">/ın&#x27;dur/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Rosa had to endure many long nights.</div>          <div class="root"><span class="lbl">根</span>en(使) + dur(持久) + e → 使持久 → 忍受</div>          <div class="zt"><span class="lbl">真题</span>These people are usually unable or unprepared to endure the long haul. 这些人通 常无法或没有准备好忍受长途跋涉。</div>          <div class="fam"><span class="lbl">族</span>endurance n. 忍耐力</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">durable</span>
+          <span class="ipa">/&#x27;durəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">持久的，耐用的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She bought durable shelves</div>          <div class="root"><span class="lbl">根</span>dur(持久) + able(能) → 能持久的</div>          <div class="zt"><span class="lbl">真题</span>But these containers were really durable, lasting years on end. 但这些容器真的很耐用， 可以连续使用数年。</div>          <div class="fam"><span class="lbl">族</span>durability n. 耐用性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">duration</span>
+          <span class="ipa">/du&#x27;rei∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">持续时间；期间</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>kept the store open for a longer duration</div>          <div class="mnem"><span class="lbl">记</span>这个单词和介词 during “在……期间”特别像，那这个名词就是“期间”。</div>          <div class="root"><span class="lbl">根</span>dur(持久) + ation(名词) → 持续的时间</div>          <div class="zt"><span class="lbl">真题</span>The average duration of unemployment for older people was 53 weeks. 老年人的平均 失业持续时间为53周。</div>          <div class="fam"><span class="lbl">族</span>during prep. 在……期间</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">suffer</span>
+          <span class="ipa">/&#x27;sΛfər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her back suffered</div>          <div class="root"><span class="lbl">根</span>suf(在下面) + fer(承受) → 在下面扛着 → 遭受</div>          <div class="zt"><span class="lbl">真题</span>But while catchings at sea have suffered, fish-farming has been growing at a fast rate. 虽 然海上捕捞受到了影响，但渔业一直在快速增 长。(2022)</div>          <div class="fam"><span class="lbl">族</span>suffering n. 痛苦</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">infer</span>
+          <span class="ipa">/1n&#x27;f3:(r)/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Tom could infer one thing</div>          <div class="mnem"><span class="lbl">记</span>里面（in），佛（fer的发音类似 “佛”)心里面在想什么？我们不知道，只能“推 测，推论”。</div>          <div class="root"><span class="lbl">根</span>in(向内) + fer(带) → 把线索带进脑袋 → 推断</div>          <div class="zt"><span class="lbl">真题</span>Therefore, it&#x27;s easy to infer from the name what kind of person the parents expect their child to be, or what kind of life to lead. 因此，很容易从名字中推断出父母希望他们的 孩子成为什么样的人，或者过什么样的生活。</div>          <div class="fam"><span class="lbl">族</span>inference n. 推断</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">refer</span>
+          <span class="ipa">/r&#x27;f3:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提到；涉及</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He referred to the neighbours who came every single day.</div>          <div class="mnem"><span class="lbl">记</span>前缀re表示重复，所以该单词 理解为重复地提到佛(fer)，那显然就是“提到； 涉及”。</div>          <div class="root"><span class="lbl">根</span>re(回) + fer(带) → 把话带回某个话题 → 提到</div>          <div class="zt"><span class="lbl">真题</span>The report refers to this as the coming of the“18-hour city”.该报告称这是“18小时城 市”的到来。(2017)</div>          <div class="fam"><span class="lbl">族</span>reference n. 提到；参考</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">referee</span>
+          <span class="ipa">/refə&#x27;ri:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(某些体育比赛的)裁判，裁判员；推荐人；调 解人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a referee blew his whistle on the field</div>          <div class="mnem"><span class="lbl">记</span>refer提到、谈及，后面加 ee表 示人(ee设想成人的两只眼睛)。在比赛场上， 提及那个瞪着眼看的人，不就是“裁判”吗？</div>          <div class="root"><span class="lbl">根</span>refer(提到) + ee(被……的人) → 被请来判定的人 → 裁判</div>          <div class="zt"><span class="lbl">真题</span>A referee refused a player&#x27;s request for a time out for a glove change. 裁判拒绝了一名球 员要求暂停比赛换手套的请求。</div>          <div class="fam"><span class="lbl">族</span>refer v. 提到</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">confer</span>
+          <span class="ipa">/kən&#x27;f3:(r)/</span>
+          <span class="pos">v.</span>
+          <span class="cn">授予；开会，协商</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>came to confer a small award on the oldest shop in town</div>          <div class="mnem"><span class="lbl">记</span>前缀con表示所有的，所有的佛 (fer)都来了，干什么？→开会，协商；给孙大圣 “授予”齐天大圣的称号→授予。</div>          <div class="root"><span class="lbl">根</span>con(一起) + fer(带) → 把意见带到一起 → 协商；授予</div>          <div class="zt"><span class="lbl">真题</span>Honorary degrees are often conferred on non-academic leaders in the arts, business, and politics. 荣誉学位通常授予艺术、商业和政治领 域的非学术领袖。</div>          <div class="fam"><span class="lbl">族</span>conference n. 会议</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 2 · Day 10</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
