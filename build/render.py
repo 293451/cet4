@@ -143,7 +143,16 @@ def render_article(
     中文才 400 多字符挤成一坨。读英文时译文在很远的下方，边听边对照根本对不上。
     改成逐句对照后，听到哪句、译文就在眼皮底下。
 
-    按 sentences 的词数把 merged（逐词时间戳）切分成一句一组。
+    ⚠️ **正文以 `sentences` 为准，`merged` 只提供时间戳。**
+
+    为什么这么定（实测踩过）：`merged` 是音频还原出来的词序列。早先直接拿它
+    当正文渲染，结果 Day 26/27/28 的页面显示的是**旧版正文** ——
+    那三天是先生成音频、后又改了正文，音频没重生成。
+    于是页面上的句子和词卡里的例句（来自新版正文）对不上，
+    用户读到 A、词卡给 B。**这种「内容层不自洽」比时间戳错位严重得多。**
+
+    所以两者词数对不上时：正文照常按 `sentences` 渲染，**只是不加时间戳**
+    （高亮失效，但读到的内容是自洽的），并打印告警提示重跑 tts.py。
     """
     groups: list[list[dict]] = []
     pos = 0
@@ -158,25 +167,35 @@ def render_article(
         else:
             groups.append(merged[pos:])
 
+    # 时间戳是否可信：音频词序列必须和 sentences 逐词一致
+    n_sent = sum(len(s.split()) for s in sentences)
+    ts_ok = n_sent == len(merged)
+    if not ts_ok:
+        print(f"    ⚠️ 音频 {len(merged)} 词 ≠ 正文 {n_sent} 词 —— 正文用 sentences，本次不加时间戳")
+        print(f"       （音频针对旧版正文生成，请重跑：python build/tts.py --day XX）")
+
     out: list[str] = []
     for gi, group in enumerate(groups):
         if not group:
             continue
         spans = []
-        for w in group:
-            t = html.escape(w["text"])
-            info = match_target(w["text"], targets)
+        # 正文文本从 sentences 取，不依赖 merged
+        src_words = sentences[gi].split() if gi < len(sentences) else [w["text"] for w in group]
+        for wi, word_text in enumerate(src_words):
+            t = html.escape(word_text)
+            info = match_target(word_text, targets)
             cls = "w target" if info else "w"
             title = f' title="{html.escape(info["cn"])}"' if info else ""
-            spans.append(
-                f'<span class="{cls}" data-s="{w["start"]:.0f}" '
-                f'data-e="{w["end"]:.0f}"{title}>{t}</span>'
-            )
-        s0 = group[0]["start"]
-        s1 = group[-1]["end"]
+            ts_attr = ""
+            if ts_ok and wi < len(group):
+                ts_attr = f' data-s="{group[wi]["start"]:.0f}" data-e="{group[wi]["end"]:.0f}"'
+            spans.append(f'<span class="{cls}"{ts_attr}{title}>{t}</span>')
+        pair_ts = ""
+        if ts_ok and group:
+            pair_ts = f' data-s0="{group[0]["start"]:.0f}" data-s1="{group[-1]["end"]:.0f}"'
         zh = html.escape(cns[gi]) if gi < len(cns) else ""
         out.append(
-            f'<div class="pair" data-s0="{s0:.0f}" data-s1="{s1:.0f}">'
+            f'<div class="pair"{pair_ts}>'
             f'<p class="en">{" ".join(spans)}</p>'
             f'<p class="zh">{zh}</p>'
             f"</div>"
@@ -291,7 +310,8 @@ def run_day(day: str) -> bool:
     out = ROOT / "docs" / f"day-{day}.html"
     out.write_text(page, encoding="utf-8")
     kb = len(page.encode()) / 1024
-    print(f"  -> docs/day-{day}.html  ({kb:.0f} KB, {len(ts['words'])} 词)")
+    n_art = sum(len(s.split()) for s in data.get("sentences", []))
+    print(f"  -> docs/day-{day}.html  ({kb:.0f} KB, {n_art} 词)")
     return True
 
 

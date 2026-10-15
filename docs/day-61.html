@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 61 · The Station on Green Peak</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 61 · 12/12 · Unit 9 第 1801-1830 词</div>
+  <h1>The Station on Green Peak<span class="cn">绿峰上的气象站</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-61.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4096"><p class="en"><span class="w" data-s="43" data-e="171">The</span> <span class="w" data-s="213" data-e="341">weather</span> <span class="w" data-s="384" data-e="597">station</span> <span class="w" data-s="640" data-e="1280">sits</span> <span class="w" data-s="1323" data-e="1451">at</span> <span class="w" data-s="1493" data-e="1536">the</span> <span class="w target" data-s="1579" data-e="1792" title="最高点，顶峰；峰会(最高级会议)">summit</span> <span class="w" data-s="1835" data-e="1920">of</span> <span class="w" data-s="1963" data-e="2133">Green</span> <span class="w target" data-s="2176" data-e="2432" title="山顶，顶峰 adj. 最高的 v. 到达最高点">Peak,</span> <span class="w" data-s="2603" data-e="2816">the</span> <span class="w" data-s="2987" data-e="3285">highest</span> <span class="w" data-s="3328" data-e="3456">point</span> <span class="w" data-s="3499" data-e="3669">in</span> <span class="w" data-s="3712" data-e="3797">the</span> <span class="w" data-s="3840" data-e="4096">district.</span></p><p class="zh">那座气象站坐落在绿峰顶上，是全区最高的一点。</p></div>
+<div class="pair" data-s0="4267" data-s1="8491"><p class="en"><span class="w" data-s="4267" data-e="4864">At</span> <span class="w" data-s="4907" data-e="5035">this</span> <span class="w target" data-s="5077" data-e="5504" title="高，高度；高处">altitude</span> <span class="w" data-s="5547" data-e="5845">the</span> <span class="w" data-s="5931" data-e="6016">air</span> <span class="w" data-s="6059" data-e="6229">is</span> <span class="w" data-s="6272" data-e="6357">thin,</span> <span class="w" data-s="6613" data-e="6784">and</span> <span class="w" data-s="6955" data-e="7083">the</span> <span class="w" data-s="7125" data-e="7211">wind</span> <span class="w" data-s="7253" data-e="7595">reaches</span> <span class="w" data-s="7637" data-e="7723">its</span> <span class="w target" data-s="7765" data-e="7979" title="山顶，顶峰 adj. 最高的 v. 到达最高点">peak</span> <span class="w" data-s="8021" data-e="8149">in</span> <span class="w" data-s="8192" data-e="8277">the</span> <span class="w" data-s="8320" data-e="8491">afternoon.</span></p><p class="zh">在这样的高度，空气稀薄，风在下午达到最强。</p></div>
+<div class="pair" data-s0="9315" data-s1="13112"><p class="en"><span class="w" data-s="9315" data-e="9443">For</span> <span class="w" data-s="9485" data-e="9571">the</span> <span class="w" data-s="9613" data-e="10040">scientists</span> <span class="w" data-s="10083" data-e="10253">who</span> <span class="w" data-s="10296" data-e="10424">live</span> <span class="w" data-s="10467" data-e="10637">there,</span> <span class="w" data-s="10851" data-e="11533">sunrise</span> <span class="w" data-s="11576" data-e="11917">is</span> <span class="w" data-s="11960" data-e="12045">the</span> <span class="w target" data-s="12088" data-e="12429" title="高潮，极点，顶点 v. 达到极点">climax</span> <span class="w" data-s="12472" data-e="12685">of</span> <span class="w" data-s="12728" data-e="12856">every</span> <span class="w" data-s="12899" data-e="13112">day.</span></p><p class="zh">住在那里的科学家看来，日出是一天中的高潮。</p></div>
+<div class="pair" data-s0="13368" data-s1="16611"><p class="en"><span class="w" data-s="13368" data-e="13581">This</span> <span class="w" data-s="14093" data-e="14563">autumn</span> <span class="w" data-s="14605" data-e="14733">the</span> <span class="w" data-s="14776" data-e="15117">government</span> <span class="w target" data-s="15160" data-e="15757" title="贬值；降低……的价值">devalued</span> <span class="w" data-s="15800" data-e="15885">the</span> <span class="w" data-s="15928" data-e="16099">local</span> <span class="w" data-s="16141" data-e="16611">currency.</span></p><p class="zh">今年秋天，政府让本国货币贬值了。</p></div>
+<div class="pair" data-s0="16824" data-s1="19683"><p class="en"><span class="w" data-s="16824" data-e="17037">The</span> <span class="w target" data-s="17464" data-e="17848" title="委员会(没有 commission 正式)">committee</span> <span class="w" data-s="17891" data-e="17976">in</span> <span class="w" data-s="18019" data-e="18104">the</span> <span class="w" data-s="18147" data-e="18232">city</span> <span class="w" data-s="18275" data-e="18531">had</span> <span class="w" data-s="18573" data-e="18701">to</span> <span class="w" data-s="18744" data-e="18872">cut</span> <span class="w" data-s="18915" data-e="19043">its</span> <span class="w target" data-s="19085" data-e="19683" title="支出，花费(比 expense 更正式)">expenditure.</span></p><p class="zh">城里的委员会不得不削减开支。</p></div>
+<div class="pair" data-s0="20293" data-s1="26608"><p class="en"><span class="w" data-s="20293" data-e="20677">Nobody</span> <span class="w" data-s="20720" data-e="20848">should</span> <span class="w target" data-s="20890" data-e="21317" title="低估……的价值，轻视">undervalue</span> <span class="w" data-s="21360" data-e="21616">a</span> <span class="w" data-s="21658" data-e="21744">weather</span> <span class="w" data-s="21786" data-e="22000">station,</span> <span class="w" data-s="22298" data-e="22512">but</span> <span class="w" data-s="22768" data-e="23109">fuel</span> <span class="w" data-s="23152" data-e="23280">was</span> <span class="w target" data-s="23322" data-e="23706" title="昂贵的，贵重的(同 expensive)">costly,</span> <span class="w" data-s="23877" data-e="24005">and</span> <span class="w" data-s="24304" data-e="24645">heating</span> <span class="w" data-s="24688" data-e="24858">alone</span> <span class="w target" data-s="24901" data-e="25370" title="花费，消耗，支出">expended</span> <span class="w" data-s="25413" data-e="25584">half</span> <span class="w" data-s="25626" data-e="25925">of</span> <span class="w" data-s="25968" data-e="26010">the</span> <span class="w" data-s="26053" data-e="26437">station&#x27;s</span> <span class="w" data-s="26480" data-e="26608">money.</span></p><p class="zh">谁也不该低估一座气象站，但燃料很贵，仅取暖一项就花掉了站里一半的钱。</p></div>
+<div class="pair" data-s0="26821" data-s1="28869"><p class="en"><span class="w" data-s="26821" data-e="27376">Then</span> <span class="w" data-s="27418" data-e="27674">an</span> <span class="w target" data-s="27717" data-e="28101" title="事件；事故">incident</span> <span class="w" data-s="28144" data-e="28357">changed</span> <span class="w" data-s="28400" data-e="28698">the</span> <span class="w" data-s="28741" data-e="28869">plan.</span></p><p class="zh">后来，一件事改变了计划。</p></div>
+<div class="pair" data-s0="29527" data-s1="32172"><p class="en"><span class="w" data-s="29527" data-e="29612">A</span> <span class="w target" data-s="29655" data-e="30039" title="不经意的；非正式的；随便的">casual</span> <span class="w" data-s="30081" data-e="30465">walker</span> <span class="w target" data-s="30508" data-e="30977" title="地点，场所；污点，斑点，点v.认出，发现">spotted</span> <span class="w" data-s="31020" data-e="31319">smoke</span> <span class="w" data-s="31361" data-e="31489">on</span> <span class="w" data-s="31532" data-e="31617">the</span> <span class="w" data-s="31660" data-e="31703">north</span> <span class="w" data-s="31745" data-e="32172">slope.</span></p><p class="zh">一个随意的散步者在北坡发现了烟。</p></div>
+<div class="pair" data-s0="32343" data-s1="35244"><p class="en"><span class="w" data-s="32343" data-e="32727">It</span> <span class="w" data-s="32769" data-e="32897">was</span> <span class="w" data-s="32940" data-e="33025">a</span> <span class="w" data-s="33068" data-e="33196">small</span> <span class="w" data-s="33239" data-e="33495">fire,</span> <span class="w" data-s="33793" data-e="33964">but</span> <span class="w" data-s="34177" data-e="34263">it</span> <span class="w" data-s="34305" data-e="34391">had</span> <span class="w" data-s="34433" data-e="34561">the</span> <span class="w target" data-s="34604" data-e="34775" title="潜能，潜力 adj. 潜在的，可能的">potential</span> <span class="w" data-s="34817" data-e="35031">to</span> <span class="w" data-s="35073" data-e="35244">grow.</span></p><p class="zh">火不大，但它有蔓延的潜力。</p></div>
+<div class="pair" data-s0="35500" data-s1="38956"><p class="en"><span class="w" data-s="35500" data-e="36012">On</span> <span class="w" data-s="36055" data-e="36225">that</span> <span class="w target" data-s="36268" data-e="36609" title="特殊场合，时刻，机会">occasion</span> <span class="w" data-s="36652" data-e="36865">the</span> <span class="w" data-s="36951" data-e="37079">team</span> <span class="w" data-s="37121" data-e="37292">had</span> <span class="w" data-s="37335" data-e="37420">the</span> <span class="w target" data-s="37463" data-e="37804" title="">opportunity</span> <span class="w" data-s="37847" data-e="38145">to</span> <span class="w" data-s="38188" data-e="38316">test</span> <span class="w" data-s="38359" data-e="38529">their</span> <span class="w" data-s="38572" data-e="38700">new</span> <span class="w" data-s="38743" data-e="38956">alarm.</span></p><p class="zh">那一次，团队有机会试试他们的新警报器。</p></div>
+<div class="pair" data-s0="39565" data-s1="45879"><p class="en"><span class="w" data-s="39565" data-e="39693">Their</span> <span class="w target" data-s="39735" data-e="39821" title="使命，任务">mission</span> <span class="w" data-s="39863" data-e="40077">was</span> <span class="w" data-s="40119" data-e="40290">simple:</span> <span class="w target" data-s="40589" data-e="41442" title="传输；传播；发射">transmit</span> <span class="w" data-s="41485" data-e="41613">a</span> <span class="w" data-s="41655" data-e="41741">report</span> <span class="w" data-s="41783" data-e="42082">from</span> <span class="w" data-s="42125" data-e="42210">the</span> <span class="w" data-s="42253" data-e="42509">tower,</span> <span class="w target" data-s="42679" data-e="43234" title="删除；忽略；漏掉；遗漏；不做；未能做">omit</span> <span class="w" data-s="43277" data-e="43447">nothing,</span> <span class="w" data-s="43703" data-e="43917">and</span> <span class="w target" data-s="44130" data-e="44685" title="提交，呈递；服从">submit</span> <span class="w" data-s="44727" data-e="44855">it</span> <span class="w" data-s="44898" data-e="44941">to</span> <span class="w" data-s="44983" data-e="45026">the</span> <span class="w target" data-s="45069" data-e="45367" title="委员会(没有 commission 正式)">committee</span> <span class="w" data-s="45410" data-e="45581">before</span> <span class="w" data-s="45623" data-e="45879">dark.</span></p><p class="zh">他们的任务很简单：从塔上发一份报告，什么都不漏，天黑前提交给委员会。</p></div>
+<div class="pair" data-s0="46135" data-s1="48738"><p class="en"><span class="w" data-s="46135" data-e="46690">The</span> <span class="w" data-s="46733" data-e="46861">old</span> <span class="w" data-s="46903" data-e="47202">tower</span> <span class="w target" data-s="47245" data-e="47629" title="发出，放射；排出">emitted</span> <span class="w" data-s="47671" data-e="47799">a</span> <span class="w" data-s="47842" data-e="47927">low</span> <span class="w" data-s="47970" data-e="48183">hum</span> <span class="w" data-s="48226" data-e="48482">all</span> <span class="w" data-s="48525" data-e="48738">night.</span></p><p class="zh">那座老塔整夜发出低低的嗡鸣。</p></div>
+<div class="pair" data-s0="49037" data-s1="51127"><p class="en"><span class="w" data-s="49037" data-e="49207">Its</span> <span class="w" data-s="49250" data-e="49335">first</span> <span class="w" data-s="49378" data-e="49762">keeper</span> <span class="w" data-s="49805" data-e="49975">had</span> <span class="w" data-s="50018" data-e="50146">been</span> <span class="w" data-s="50189" data-e="50231">a</span> <span class="w target" data-s="50274" data-e="50615" title="传教士">missionary</span> <span class="w" data-s="50658" data-e="50871">from</span> <span class="w" data-s="50914" data-e="50999">the</span> <span class="w" data-s="51042" data-e="51127">south.</span></p><p class="zh">它最早的管理员是从南边来的传教士。</p></div>
+<div class="pair" data-s0="52194" data-s1="54797"><p class="en"><span class="w" data-s="52194" data-e="52237">&quot;We</span> <span class="w" data-s="52279" data-e="52407">must</span> <span class="w" data-s="52450" data-e="52663">not</span> <span class="w target" data-s="52706" data-e="53090" title="不予考虑；驳回；去除，摒除(思想、感情等)； 解雇;让(某人)离开">dismiss</span> <span class="w" data-s="53133" data-e="53431">small</span> <span class="w" data-s="53474" data-e="53901">signals,&quot;</span> <span class="w" data-s="54285" data-e="54327">he</span> <span class="w" data-s="54370" data-e="54541">used</span> <span class="w" data-s="54583" data-e="54669">to</span> <span class="w" data-s="54711" data-e="54797">say.</span></p><p class="zh">“小小的信号也不能不理，”他过去常说。</p></div>
+<div class="pair" data-s0="55627" data-s1="60917"><p class="en"><span class="w" data-s="55627" data-e="55925">Later,</span> <span class="w" data-s="56096" data-e="56267">the</span> <span class="w" data-s="56395" data-e="56523">chief</span> <span class="w target" data-s="56565" data-e="56949" title="承认；准许……进入">admitted</span> <span class="w" data-s="56992" data-e="57163">that</span> <span class="w" data-s="57205" data-e="57333">the</span> <span class="w" data-s="57376" data-e="57504">station</span> <span class="w" data-s="57547" data-e="57803">needed</span> <span class="w" data-s="57845" data-e="58144">money</span> <span class="w" data-s="58187" data-e="58400">and</span> <span class="w" data-s="58443" data-e="59083">promised</span> <span class="w" data-s="59125" data-e="59253">to</span> <span class="w target" data-s="59296" data-e="59424" title="做出(错或非法的事);犯(罪或错等)；承诺， 保证(做某事、遵守协议或遵从安排等)；调拨， 投入">commit</span> <span class="w" data-s="59467" data-e="59680">next</span> <span class="w" data-s="59723" data-e="60107">year&#x27;s</span> <span class="w" data-s="60149" data-e="60320">budget</span> <span class="w" data-s="60363" data-e="60491">to</span> <span class="w" data-s="60533" data-e="60917">repairs.</span></p><p class="zh">后来，站长承认站里需要钱，答应把明年的预算拨一部分来维修。</p></div>
+<div class="pair" data-s0="61131" data-s1="64715"><p class="en"><span class="w" data-s="61131" data-e="61813">On</span> <span class="w" data-s="61856" data-e="61941">the</span> <span class="w" data-s="61984" data-e="62283">radio,</span> <span class="w" data-s="62453" data-e="62667">the</span> <span class="w" data-s="62837" data-e="62965">news</span> <span class="w" data-s="63008" data-e="63221">spoke</span> <span class="w" data-s="63264" data-e="63435">of</span> <span class="w" data-s="63477" data-e="63563">a</span> <span class="w target" data-s="63605" data-e="63819" title="导弹；投射物">missile</span> <span class="w" data-s="63861" data-e="63989">test</span> <span class="w" data-s="64032" data-e="64245">far</span> <span class="w" data-s="64288" data-e="64501">to</span> <span class="w" data-s="64544" data-e="64587">the</span> <span class="w" data-s="64629" data-e="64715">north.</span></p><p class="zh">收音机里，新闻正说着北方远处的一次导弹试验。</p></div>
+<div class="pair" data-s0="65444" data-s1="71802"><p class="en"><span class="w" data-s="65444" data-e="65572">In</span> <span class="w" data-s="65615" data-e="65743">the</span> <span class="w" data-s="65786" data-e="65999">valley</span> <span class="w" data-s="66042" data-e="66212">below,</span> <span class="w" data-s="66383" data-e="67151">farmers</span> <span class="w" data-s="67194" data-e="67322">had</span> <span class="w" data-s="67364" data-e="67492">stopped</span> <span class="w" data-s="67535" data-e="67791">using</span> <span class="w" data-s="67834" data-e="68004">the</span> <span class="w" data-s="68047" data-e="68431">strongest</span> <span class="w target" data-s="68474" data-e="68943" title="杀虫剂">pesticide,</span> <span class="w" data-s="69199" data-e="69327">and</span> <span class="w" data-s="69583" data-e="69711">the</span> <span class="w target" data-s="69754" data-e="70052" title="发生率">incidence</span> <span class="w" data-s="70095" data-e="70266">of</span> <span class="w" data-s="70308" data-e="70607">illness</span> <span class="w" data-s="70650" data-e="70820">among</span> <span class="w" data-s="70863" data-e="71076">children</span> <span class="w" data-s="71119" data-e="71418">had</span> <span class="w" data-s="71460" data-e="71802">fallen.</span></p><p class="zh">下面的山谷里，农民已经不再用最强的杀虫剂，孩子们的发病率也降了下来。</p></div>
+<div class="pair" data-s0="71930" data-s1="76026"><p class="en"><span class="w" data-s="71930" data-e="72314">A</span> <span class="w" data-s="72356" data-e="72612">health</span> <span class="w" data-s="72655" data-e="72868">report</span> <span class="w" data-s="72911" data-e="73210">said</span> <span class="w" data-s="73252" data-e="73380">that</span> <span class="w target" data-s="73423" data-e="73892" title="自杀，自杀事件">suicides</span> <span class="w" data-s="73935" data-e="74106">in</span> <span class="w" data-s="74148" data-e="74191">the</span> <span class="w" data-s="74234" data-e="74532">district</span> <span class="w" data-s="74575" data-e="74788">were</span> <span class="w" data-s="74831" data-e="75130">fewer</span> <span class="w" data-s="75172" data-e="75300">than</span> <span class="w" data-s="75343" data-e="75471">ten</span> <span class="w" data-s="75514" data-e="75770">years</span> <span class="w" data-s="75812" data-e="76026">ago.</span></p><p class="zh">一份健康报告说，这一带的自杀人数比十年前少了。</p></div>
+<div class="pair" data-s0="76324" data-s1="78287"><p class="en"><span class="w" data-s="76324" data-e="76410">A</span> <span class="w" data-s="76452" data-e="76623">small</span> <span class="w" data-s="76666" data-e="77178">keypad</span> <span class="w" data-s="77220" data-e="77519">guards</span> <span class="w" data-s="77562" data-e="77732">the</span> <span class="w" data-s="77775" data-e="77946">station</span> <span class="w" data-s="77988" data-e="78287">door.</span></p><p class="zh">一个小小的密码键盘守着气象站的门。</p></div>
+<div class="pair" data-s0="79279" data-s1="82351"><p class="en"><span class="w" data-s="79279" data-e="79407">The</span> <span class="w target" data-s="79449" data-e="79748" title="暗语；口令；密码">password</span> <span class="w" data-s="79791" data-e="80004">changes</span> <span class="w" data-s="80047" data-e="80303">every</span> <span class="w" data-s="80345" data-e="80601">month,</span> <span class="w" data-s="80857" data-e="81113">and</span> <span class="w" data-s="81241" data-e="81369">only</span> <span class="w" data-s="81412" data-e="81583">four</span> <span class="w" data-s="81625" data-e="81881">people</span> <span class="w" data-s="81924" data-e="82137">know</span> <span class="w" data-s="82180" data-e="82351">it.</span></p><p class="zh">密码每个月换一次，只有四个人知道。</p></div>
+<div class="pair" data-s0="82607" data-s1="86233"><p class="en"><span class="w" data-s="82607" data-e="83289">&quot;Everything</span> <span class="w" data-s="83332" data-e="83460">up</span> <span class="w" data-s="83503" data-e="83631">here</span> <span class="w" data-s="83673" data-e="83801">is</span> <span class="w" data-s="83844" data-e="83972">old,&quot;</span> <span class="w" data-s="84313" data-e="84484">the</span> <span class="w" data-s="84527" data-e="84655">chief</span> <span class="w" data-s="84697" data-e="84911">says,</span> <span class="w" data-s="85337" data-e="85593">&quot;except</span> <span class="w" data-s="85636" data-e="85849">the</span> <span class="w target" data-s="85892" data-e="86233" title="暗语；口令；密码">password.&quot;</span></p><p class="zh">“这里什么都老，”站长说，“除了密码。”</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">devalue</span>
+          <span class="ipa">/di:&#x27;vælju:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">贬值；降低……的价值</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the government devalued the local currency</div>          <div class="mnem"><span class="lbl">记</span>把价值(value)往下(de)说，就 是“贬值”。</div>          <div class="root"><span class="lbl">根</span>de(往下) + value(价值) → 把价值往下压 → 贬值</div>          <div class="fam"><span class="lbl">族</span>value n. 价值 / devaluation n. 贬值</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">undervalue</span>
+          <span class="ipa">/andə&#x27;vælju:/</span>
+          <span class="pos">v.</span>
+          <span class="cn">低估……的价值，轻视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody should undervalue a weather station</div>          <div class="mnem"><span class="lbl">记</span>低于（under）你的价值（value） 看你，就是“低估，轻视”你的意思。</div>          <div class="root"><span class="lbl">根</span>under(低于) + value(价值) → 看得比价值低 → 低估，轻视</div>          <div class="zt"><span class="lbl">真题</span>Under no circumstances should we undervalue the power of doing small things. 在 任何情况下，我们都不应低估做小事的力量。</div>          <div class="fam"><span class="lbl">族</span>value v. 重视 / undervalued adj. 被低估的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">expend</span>
+          <span class="ipa">/ık&#x27;spend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">花费，消耗，支出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>heating alone expended half of the station&#x27;s money</div>          <div class="mnem"><span class="lbl">记</span>这个单词的形容词我们很熟 悉：expensive(昂贵的)。昂贵的东西，就是花很 多钱买的，所以expend的意思是“花费，支出”。 【拓展】expense /ık&#x27;spens/ n.费用，花费</div>          <div class="root"><span class="lbl">根</span>ex(出) + pend(称重；付钱) → 把钱付出去 → 花费，支出</div>          <div class="zt"><span class="lbl">真题</span>Living expenses there are comparatively low.那里的生活费相对较低。 (228)</div>          <div class="fam"><span class="lbl">族</span>expense n. 费用 / expenditure n. 支出</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">expenditure</span>
+          <span class="ipa">/1k&#x27;spendit∫ə(r)/</span>
+          <span class="pos"></span>
+          <span class="cn">支出，花费(比 expense 更正式)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The committee in the city had to cut its expenditure</div>          <div class="root"><span class="lbl">根</span>expend(花费) + iture(名词后缀) → 花出去的钱 → 支出</div>          <div class="zt"><span class="lbl">真题</span>They find consulting caloric-expenditure charts troublesome. 他们发现查询卡路里支出 表很麻烦。</div>          <div class="fam"><span class="lbl">族</span>expend v. 花费 / expensive adj. 昂贵的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">costly</span>
+          <span class="ipa">/&#x27;kpstli/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">昂贵的，贵重的(同 expensive)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>fuel was costly</div>          <div class="root"><span class="lbl">根</span>cost(花费) + ly → 要花很多钱的 → 昂贵的</div>          <div class="zt"><span class="lbl">真题</span>Some desalination plants exist where feasible, but they are costly to run and can need constant repairs. 在可行的地方存在一些 海水淡化厂，但它们的运营成本很高，需要经常 维修。(2018)</div>          <div class="fam"><span class="lbl">族</span>cost n. 成本 / costless adj. 不花钱的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">incident</span>
+          <span class="ipa">/&#x27;Insidənt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">事件；事故</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then an incident changed the plan</div>          <div class="mnem"><span class="lbl">记</span>该单词很像 accident（意外事 故；偶然的事)，所以该单词的意思和 accident 也很相似。</div>          <div class="root"><span class="lbl">根</span>in(在上) + cid(落下) + ent → 落到头上的事 → 事件，事故</div>          <div class="zt"><span class="lbl">真题</span>Some asked subjects about incidents where someone close to them—family or friend—had called them by another person&#x27;s name. 一些人询问了与他们关系密切的人— 家人或朋友——用另一个人的名字叫他们名字 的事件。(2019)</div>          <div class="fam"><span class="lbl">族</span>incidence n. 发生率 / incidental adj. 附带发生的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">incidence</span>
+          <span class="ipa">/&#x27;Insidəns/</span>
+          <span class="pos"></span>
+          <span class="cn">发生率</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the incidence of illness among children had fallen</div>          <div class="mnem"><span class="lbl">记</span>incident事故，既然是“事故”， 不能总发生啊。所以该单词的意思是“发生 率”。</div>          <div class="root"><span class="lbl">根</span>incid(落下) + ence(名词后缀) → 事情落下来的频率 → 发生率</div>          <div class="zt"><span class="lbl">真题</span>It is widely accepted that not eating breakfast is related to the incidence of certain diseases.人们普遍认为，不吃早餐与某些疾病 的发病率有关。</div>          <div class="fam"><span class="lbl">族</span>incident n. 事件 / incidental adj. 偶然的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">spot</span>
+          <span class="ipa">/sppt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">地点，场所；污点，斑点，点v.认出，发现</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A casual walker spotted smoke on the north slope</div>          <div class="mnem"><span class="lbl">记</span>小美女(s)一脚踢翻了泡菜坛子 (pot 发音的第一个音是“泡”→pot 就是“坛子” 的意思)，身上溅了很多的“污点”。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：on the spot 当场 / a spot of 一点</div>          <div class="zt"><span class="lbl">真题</span>A deadly fish has been spotted in the Mediterranean waters. 在地中海水域发现了一 条致命的鱼。(2020)</div>          <div class="fam"><span class="lbl">族</span>spotless adj. 一尘不染的 / spotted adj. 有斑点的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">potential</span>
+          <span class="ipa">/pə&#x27;ten∫l/</span>
+          <span class="pos">n.</span>
+          <span class="cn">潜能，潜力 adj. 潜在的，可能的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it had the potential to grow</div>          <div class="mnem"><span class="lbl">记</span>pot 意为“坛子”；把 ent 想成 enter(进入)。连在一起就是：进入坛子。当你 在一个公司做事情，感觉自己像在坛子中特别 憋屈的时候，说明你很有能力，所以该单词的意 思是“潜能，潜力”。</div>          <div class="root"><span class="lbl">根</span>potent(有力的) + ial → 力气还没使出来 → 潜力</div>          <div class="zt"><span class="lbl">真题</span>These educational experiences have enormous potential to brighten my future—and my family&#x27;s future. 这些教育经历有巨大的潜 力，照亮我的未来和我家庭的未来。(2022)</div>          <div class="fam"><span class="lbl">族</span>potentially adv. 潜在地 / potent adj. 强有力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">occasion</span>
+          <span class="ipa">/ə&#x27;keizn/</span>
+          <span class="pos">n.</span>
+          <span class="cn">特殊场合，时刻，机会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On that occasion the team had the opportunity to test their new alarm</div>          <div class="mnem"><span class="lbl">记</span>重大场合(occasion)都是“偶然 的”，人生没那么多高光时刻，一般都是平平淡 淡地活着。</div>          <div class="root"><span class="lbl">根</span>oc(加强) + cas(落下) + ion → 落到眼前的时候 → 场合，时刻</div>          <div class="zt"><span class="lbl">真题</span>On the rare occasion when she got angry，she was terrifying. 她偶尔生气的时候， 也很吓人。(2015)</div>          <div class="fam"><span class="lbl">族</span>occasional adj. 偶尔的 / occasionally adv. 偶尔</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">casual</span>
+          <span class="ipa">/&#x27;kæ3uəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不经意的；非正式的；随便的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A casual walker spotted smoke on the north slope</div>          <div class="root"><span class="lbl">根</span>cas(落下) + ual → 随便落下的 → 不经意的，随便的</div>          <div class="zt"><span class="lbl">真题</span>Siri has often been praised for its ability to interpret our casual language. Siri 经常受到 称赞，因为它能够解释我们非正式的语言。(2023)</div>          <div class="fam"><span class="lbl">族</span>casually adv. 随意地 / casualty n. 伤亡人员</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">opportunity</span>
+          <span class="ipa">/a:pər&#x27;tu:nəti/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the team had the opportunity to test their new alarm</div>          <div class="root"><span class="lbl">根</span>op(朝向) + port(港口) + unity → 顺风进港 → 机会</div>          <div class="zt"><span class="lbl">真题</span>This is an opportunity that surely all can agree must not be wasted. 这是一个大家肯定 都同意的，绝不能浪费的机会。(2023)</div>          <div class="fam"><span class="lbl">族</span>opportune adj. 恰好的 / opportunism n. 机会主义</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">transmit</span>
+          <span class="ipa">/trænz&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">传输；传播；发射</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>transmit a report from the tower</div>          <div class="mnem"><span class="lbl">记</span>trans 表示“从……到……”；m 想成妹妹；it它。妹妹和它中间来回地→传递。 从此处，我们也引申出来mit词根的意思是： send。所以该单词就是来回地送，即“传递”。</div>          <div class="root"><span class="lbl">根</span>trans(从…到…) + mit(送) → 从这送到那 → 传输，传播</div>          <div class="zt"><span class="lbl">真题</span>Her appearance on a talk show was broadcast three times, transmitting her message to over 40 million people. 她在一个脱口秀节目 中的亮相被播放了三次，向超过4000万人传递 了她的信息。</div>          <div class="fam"><span class="lbl">族</span>transmission n. 传送 / transmitter n. 发射机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">omit</span>
+          <span class="ipa">/ə&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">删除；忽略；漏掉；遗漏；不做；未能做</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>omit nothing</div>          <div class="mnem"><span class="lbl">记</span>。想象成一个圈。在古代，如 果在某个人名字上画个圈，说把他送出去，是什 么意思？→删除。</div>          <div class="root"><span class="lbl">根</span>o(出) + mit(送) → 把它送出去不要了 → 漏掉，删除</div>          <div class="zt"><span class="lbl">真题</span>Nothing healthful should be omitted from the meal. 这顿饭中不能少吃任何有益健 康的东西。</div>          <div class="fam"><span class="lbl">族</span>omission n. 遗漏 / omissive adj. 省略的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">mission</span>
+          <span class="ipa">/&#x27;mi∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">使命，任务</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Their mission was simple</div>          <div class="mnem"><span class="lbl">记</span>谍战片里，相关人员必须完成 的是什么？→使命，任务。</div>          <div class="root"><span class="lbl">根</span>miss(送) + ion(名词后缀) → 被派出去要做的事 → 使命，任务</div>          <div class="zt"><span class="lbl">真题</span>Learning is a daily experience and a lifetime mission.学习是每天的经历，也是一生 的使命。</div>          <div class="fam"><span class="lbl">族</span>missionary n. 传教士 / dismiss v. 解散</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">missionary</span>
+          <span class="ipa">/&#x27;mı∫əneri/</span>
+          <span class="pos"></span>
+          <span class="cn">传教士</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its first keeper had been a missionary from the south</div>          <div class="root"><span class="lbl">根</span>mission(使命) + ary(人) → 带着使命出去的人 → 传教士</div>          <div class="fam"><span class="lbl">族</span>mission n. 使命 / missionary work 传教工作</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">dismiss</span>
+          <span class="ipa">/dıs&#x27;mis/</span>
+          <span class="pos">v.</span>
+          <span class="cn">不予考虑；驳回；去除，摒除(思想、感情等)； 解雇;让(某人)离开</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;We must not dismiss small signals,&quot; he used to say</div>          <div class="mnem"><span class="lbl">记</span>词根 mis= mit，意思是“送”。 比如 transmit来回地送，就是传递、传输。dis 表示往下，那该单词的意思就是“往下放”，即 “去除，解雇”的意思。</div>          <div class="root"><span class="lbl">根</span>dis(离开) + miss(送) → 送走不管 → 不予考虑；解雇</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s a common story—one we frequently ridicule and readily dismiss. 这是一个常见的故 事—一个我们经常嘲笑和轻易忽视的故事。 (2021)</div>          <div class="fam"><span class="lbl">族</span>dismissal n. 解雇 / dismissive adj. 轻视的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">missile</span>
+          <span class="ipa">/&#x27;misl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">导弹；投射物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the news spoke of a missile test far to the north</div>          <div class="mnem"><span class="lbl">记</span>miss 送；i想成“我”；le读成汉 字“了”。我终于把它送出去了→导弹；投射物。</div>          <div class="root"><span class="lbl">根</span>miss(送) + ile(东西) → 被送出去的东西 → 导弹</div>          <div class="zt"><span class="lbl">真题</span>Within two days, the army fired more than two hundred rockets and missiles. 两天之 内，军队发射了200多枚火箭弹和导弹。</div>          <div class="fam"><span class="lbl">族</span>emission n. 排放 / mission n. 任务</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">emit</span>
+          <span class="ipa">/i&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">发出，放射；排出</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old tower emitted a low hum all night</div>          <div class="mnem"><span class="lbl">记</span>e 出去；词根 mit 送。送出去→ 放射，发出。</div>          <div class="root"><span class="lbl">根</span>e(出) + mit(送) → 送出去 → 发出，放射，排出</div>          <div class="zt"><span class="lbl">真题</span>These cars emit more than all the microwaves in the EU. 这些汽车排放的废气比 欧盟所有的微波炉都多。(2019)</div>          <div class="fam"><span class="lbl">族</span>emission n. 排放 / emitter n. 发射体</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">submit</span>
+          <span class="ipa">/səb&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提交，呈递；服从</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>submit it to the committee before dark</div>          <div class="mnem"><span class="lbl">记</span>sub下；mit 送，递。从下往上 递→提交，呈递。</div>          <div class="root"><span class="lbl">根</span>sub(下) + mit(送) → 从下往上递 → 提交，呈递；服从</div>          <div class="zt"><span class="lbl">真题</span>These digital products aren&#x27;t just mechanisms for students to submit homework, they offer all kinds of features. 这些数字产品 不仅仅是学生提交作业的机制，它们提供了各 种各样的功能。(2018)</div>          <div class="fam"><span class="lbl">族</span>submission n. 提交 / submissive adj. 顺从的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">admit</span>
+          <span class="ipa">/əd&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">承认；准许……进入</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the chief admitted that the station needed money</div>          <div class="root"><span class="lbl">根</span>ad(朝向) + mit(送) → 让人进来；把话说出来 → 准许进入；承认</div>          <div class="zt"><span class="lbl">真题</span>In the U.S., 29% of drivers admit they surf behind the wheel, according to insurance firm State Farm. 保险公司 State Farm 的数据 (230) 显示，在美国，29%的司机承认他们开车时上 网。(2023)</div>          <div class="fam"><span class="lbl">族</span>admission n. 承认；入场 / admittedly adv. 诚然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">committee</span>
+          <span class="ipa">/kə&#x27;miti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">委员会(没有 commission 正式)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>submit it to the committee before dark</div>          <div class="root"><span class="lbl">根</span>commit(托付) + ee(被…的人) → 被托付事情的一群人 → 委员会</div>          <div class="zt"><span class="lbl">真题</span>The committee is totally opposed to any changes being made in the plans. 委员会完全反 对对该计划做任何改动。</div>          <div class="fam"><span class="lbl">族</span>commit v. 委托 / commitment n. 承诺</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">commit</span>
+          <span class="ipa">/kə&#x27;mit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">做出(错或非法的事);犯(罪或错等)；承诺， 保证(做某事、遵守协议或遵从安排等)；调拨， 投入</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>promised to commit next year&#x27;s budget to repairs</div>          <div class="root"><span class="lbl">根</span>com(一起) + mit(送) → 把自己交出去 → 承诺；投入</div>          <div class="zt"><span class="lbl">真题</span>Soon after, she knew she had to make a bold move to fully commit to her new future. 不久之后，她知道她必须做出一个大胆的举动， 全身心地投入新的未来中去。(2017)</div>          <div class="fam"><span class="lbl">族</span>commitment n. 承诺 / committee n. 委员会</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">suicide</span>
+          <span class="ipa">/&#x27;suisaid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">自杀，自杀事件</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>suicides in the district were fewer than ten years ago</div>          <div class="mnem"><span class="lbl">记</span>sui(发音类似“衰”)十 cide(发 音类似“杀的”)→小时候我们农村经常有玩把 (231) 第九单元 戏的，一个玩把戏的人耍大刀，很衰地把自己给 杀了→自杀。</div>          <div class="root"><span class="lbl">根</span>sui(自己) + cide(杀) → 杀自己 → 自杀</div>          <div class="zt"><span class="lbl">真题</span>West Windsor-Plainsboro has not had a teenage suicide in recent years. 西温莎-普莱恩 斯伯勒近年来没有发生过青少年自杀事件。</div>          <div class="fam"><span class="lbl">族</span>suicidal adj. 自杀的 / pesticide n. 杀虫剂</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">pesticide</span>
+          <span class="ipa">/&#x27;pestisaid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">杀虫剂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>farmers had stopped using the strongest pesticide</div>          <div class="mnem"><span class="lbl">记</span>pest发音类似“拍死它（害 虫)”；cide为后缀，意思是“砍，杀”。那这个单 词就是杀死害虫→杀虫剂。</div>          <div class="root"><span class="lbl">根</span>pest(害虫) + cide(杀) → 杀害虫的药 → 杀虫剂</div>          <div class="fam"><span class="lbl">族</span>pest n. 害虫 / suicide n. 自杀</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">summit</span>
+          <span class="ipa">/&#x27;sΛmit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">最高点，顶峰；峰会(最高级会议)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The weather station sits at the summit of Green Peak</div>          <div class="mnem"><span class="lbl">记</span>MIT是全世界顶尖的学 府——麻省理工学院，sum是“归纳，合计，总 计”，在麻省理工学院进行归纳总结，那不是“最 高点”吗？</div>          <div class="root"><span class="lbl">根</span>summ(最高点) + it → 最高的那一点 → 顶峰；峰会</div>          <div class="fam"><span class="lbl">族</span>sum n. 总数 / peak n. 峰顶</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">peak</span>
+          <span class="ipa">/pi:k/</span>
+          <span class="pos">n.</span>
+          <span class="cn">山顶，顶峰 adj. 最高的 v. 到达最高点</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the wind reaches its peak in the afternoon</div>          <div class="root"><span class="lbl">根</span>靠搭配记：peak hours 高峰时段 / reach a peak 达到顶峰</div>          <div class="zt"><span class="lbl">真题</span>They reach a peak at the age of 20 for most people. 对大多数人来说，它们在 20岁时 达到顶峰。(2016)</div>          <div class="fam"><span class="lbl">族</span>summit n. 峰顶 / peaked adj. 有尖顶的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">climax</span>
+          <span class="ipa">/&#x27;klaımæks/</span>
+          <span class="pos">n.</span>
+          <span class="cn">高潮，极点，顶点 v. 达到极点</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>sunrise is the climax of every day</div>          <div class="mnem"><span class="lbl">记</span>cli发音类似“可立”；max最大 值。连到一起就是：可立在最大值了，即站在最 高处了啊→顶点。</div>          <div class="root"><span class="lbl">根</span>cli(可立) + max(最大值) → 立在最高处 → 高潮，顶点</div>          <div class="fam"><span class="lbl">族</span>climactic adj. 高潮的 / maximum n. 最大值</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">altitude</span>
+          <span class="ipa">/&#x27;æltitu:d/</span>
+          <span class="pos">n.</span>
+          <span class="cn">高，高度；高处</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At this altitude the air is thin</div>          <div class="mnem"><span class="lbl">记</span>这个单词很像 attitude(态度)， 人生的态度决定了一个人的“高度”啊。</div>          <div class="root"><span class="lbl">根</span>alt(高) + itude(名词后缀) → 高度，高处</div>          <div class="zt"><span class="lbl">真题</span>Although the pressure of the cabin is adjusted to prevent altitude sickness, you could still experience sleepiness or a headache. 虽然机舱内的压力已被调整以防止高原反应， 但你仍可能感到困倦或头痛。(2019)</div>          <div class="fam"><span class="lbl">族</span>altimeter n. 高度计 / attitude n. 态度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">password</span>
+          <span class="ipa">/&#x27;pæswərd/</span>
+          <span class="pos"></span>
+          <span class="cn">暗语；口令；密码</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The password changes every month</div>          <div class="root"><span class="lbl">根</span>pass(通过) + word(词) → 让你通过的词 → 密码</div>          <div class="fam"><span class="lbl">族</span>pass v. 通过 / passcode n. 密码</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 9 · Day 61</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

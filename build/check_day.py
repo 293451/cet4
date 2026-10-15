@@ -11,6 +11,9 @@
   6. 每个词都有 sentence / root / family
   7. 书的字段（ipa/cn/mnemonic/zhenti）没被篡改
 
+另有**警告**（不算不合格）：
+  8. 已生成的音频是否和正文逐词对得上 —— 对不上则高亮会失效
+
 用法：
     python build/check_day.py --day 09
     python build/check_day.py --range 09-15
@@ -81,17 +84,19 @@ def appears(target: str, text_words: set[str]) -> bool:
     return False
 
 
-def check(day: str) -> list[str]:
+def check(day: str) -> tuple[list[str], list[str]]:
+    """返回 (错误列表, 警告列表)。错误 = 不合格；警告 = 内容没问题但需注意。"""
     errs: list[str] = []
+    warns: list[str] = []
     cf = ROOT / "content" / f"day-{day}" / "words.json"
     tf = ROOT / "_task" / f"day-{day}.words.json"
 
     if not cf.exists():
-        return [f"缺文件 {cf.relative_to(ROOT)}"]
+        return [f"缺文件 {cf.relative_to(ROOT)}"], []
     try:
         d = json.loads(cf.read_text(encoding="utf-8"))
     except Exception as e:
-        return [f"JSON 解析失败：{e}"]
+        return [f"JSON 解析失败：{e}"], []
 
     # 必需字段
     for k in ("day", "title", "title_cn", "tts_text", "sentences", "sentences_cn", "words"):
@@ -182,7 +187,32 @@ def check(day: str) -> list[str]:
     if not (150 <= n <= 320):
         errs.append(f"文章 {n} 词，超出 150-320 范围")
 
-    return errs
+    # 音频和正文是否对得上
+    #
+    # 这条是实测踩出来后加的：Day 26/27/28 是先生成音频、后又改了正文，
+    # 音频没重生成。渲染时拿音频的词序列当正文，页面就显示旧版正文，
+    # 而词卡里的例句来自新版 —— 用户读到 A、词卡给 B。
+    #
+    # 注意这里**只警告不报错**：音频缺失/过期不影响内容正确性
+    # （render.py 已经改成正文以 sentences 为准），够不上"不合格"。
+    # 但必须提示，否则高亮会静默失效。
+    wjson = ROOT / "docs" / "audio" / f"day-{day}.words.json"
+    if wjson.exists():
+        try:
+            w = json.loads(wjson.read_text(encoding="utf-8"))
+            got = [norm(x["text"]) for x in w.get("words", []) if norm(x["text"])]
+            if got != orig:
+                i = next((i for i in range(max(len(got), len(orig)))
+                          if (got[i] if i < len(got) else None)
+                          != (orig[i] if i < len(orig) else None)), -1)
+                warns.append(
+                    f"音频 {len(got)} 词 ≠ 正文 {len(orig)} 词"
+                    f"（首个差异 @{i}）—— 需重跑 tts.py"
+                )
+        except Exception as e:
+            warns.append(f"音频 words.json 读不了：{e}")
+
+    return errs, warns
 
 
 def main() -> None:
@@ -200,8 +230,9 @@ def main() -> None:
         sys.exit("请指定 --day 09 或 --range 09-15")
 
     ok = 0
+    n_warn = 0
     for d in days:
-        errs = check(d)
+        errs, warns = check(d)
         if errs:
             print(f"✗ Day {d}")
             for e in errs[:8]:
@@ -209,7 +240,10 @@ def main() -> None:
         else:
             print(f"✓ Day {d}")
             ok += 1
-    print(f"\n通过 {ok}/{len(days)}")
+        for w in warns:
+            n_warn += 1
+            print(f"    ⚠ {w}")
+    print(f"\n通过 {ok}/{len(days)}" + (f"，{n_warn} 条警告" if n_warn else ""))
     if ok < len(days):
         sys.exit(1)
 

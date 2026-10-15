@@ -1,0 +1,696 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 60 · The Tractor in the Rain</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 60 · 12/11 · Unit 9 第 1771-1800 词</div>
+  <h1>The Tractor in the Rain<span class="cn">雨中的拖拉机</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-60.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4565"><p class="en"><span class="w" data-s="43" data-e="171">On</span> <span class="w" data-s="213" data-e="256">a</span> <span class="w" data-s="299" data-e="427">wet</span> <span class="w" data-s="469" data-e="853">Tuesday</span> <span class="w" data-s="896" data-e="1024">in</span> <span class="w" data-s="1067" data-e="1451">October,</span> <span class="w" data-s="1579" data-e="1749">a</span> <span class="w" data-s="1963" data-e="2304">farmer</span> <span class="w" data-s="2347" data-e="2603">drove</span> <span class="w" data-s="2645" data-e="2773">his</span> <span class="w" data-s="2816" data-e="2901">old</span> <span class="w target" data-s="2944" data-e="3285" title="">tractor</span> <span class="w" data-s="3328" data-e="3584">into</span> <span class="w" data-s="3627" data-e="4011">Nina&#x27;s</span> <span class="w" data-s="4053" data-e="4224">repair</span> <span class="w" data-s="4267" data-e="4565">shed.</span></p><p class="zh">十月里一个下雨的星期二，一位农民把旧拖拉机开进了妮娜的修理棚。</p></div>
+<div class="pair" data-s0="5376" data-s1="7775"><p class="en"><span class="w" data-s="5376" data-e="5419">&quot;It</span> <span class="w" data-s="5461" data-e="5589">is</span> <span class="w target" data-s="5632" data-e="5973" title="不可能的；难处理的">impossible</span> <span class="w" data-s="6016" data-e="6315">to</span> <span class="w" data-s="6357" data-e="6485">finish</span> <span class="w" data-s="6528" data-e="6784">today,&quot;</span> <span class="w" data-s="7519" data-e="7562">she</span> <span class="w" data-s="7604" data-e="7775">said.</span></p><p class="zh">“今天修不完，”她说。</p></div>
+<div class="pair" data-s0="8330" data-s1="12596"><p class="en"><span class="w" data-s="8330" data-e="8372">&quot;The</span> <span class="w target" data-s="8714" data-e="9055" title="很可能发生(或存在)的">probable</span> <span class="w" data-s="9098" data-e="9354">problem</span> <span class="w" data-s="9396" data-e="9652">is</span> <span class="w" data-s="9695" data-e="9823">the</span> <span class="w" data-s="9866" data-e="10079">fuel</span> <span class="w" data-s="10122" data-e="10292">pump,</span> <span class="w" data-s="10506" data-e="10676">and</span> <span class="w" data-s="10890" data-e="11146">the</span> <span class="w" data-s="11188" data-e="11274">only</span> <span class="w" data-s="11316" data-e="11530">one</span> <span class="w target" data-s="11572" data-e="11743" title="可获得的；可购得的；可找到的；有空的">available</span> <span class="w" data-s="11786" data-e="12127">is</span> <span class="w" data-s="12170" data-e="12298">in</span> <span class="w" data-s="12340" data-e="12383">the</span> <span class="w" data-s="12426" data-e="12596">city.&quot;</span></p><p class="zh">“最可能出问题的是燃油泵，而唯一能弄到的泵在城里。”</p></div>
+<div class="pair" data-s0="13066" data-s1="17802"><p class="en"><span class="w" data-s="13066" data-e="13407">Her</span> <span class="w" data-s="13450" data-e="13578">father</span> <span class="w" data-s="13620" data-e="13876">said</span> <span class="w" data-s="13919" data-e="14346">patience</span> <span class="w target" data-s="14388" data-e="14858" title="普遍存在；盛行；流行；被接受；战胜；压倒">prevails</span> <span class="w" data-s="14900" data-e="14986">in</span> <span class="w" data-s="15028" data-e="15114">a</span> <span class="w" data-s="15156" data-e="15242">small</span> <span class="w" data-s="15284" data-e="15796">workshop,</span> <span class="w" data-s="16052" data-e="16479">so</span> <span class="w" data-s="16522" data-e="16650">she</span> <span class="w" data-s="16692" data-e="16778">told</span> <span class="w" data-s="16820" data-e="16991">him</span> <span class="w" data-s="17034" data-e="17119">to</span> <span class="w" data-s="17162" data-e="17247">come</span> <span class="w" data-s="17290" data-e="17375">on</span> <span class="w" data-s="17418" data-e="17802">Friday.</span></p><p class="zh">她父亲说过，小铺子里靠的是耐心，于是她让他星期五再来。</p></div>
+<div class="pair" data-s0="18366" data-s1="21822"><p class="en"><span class="w" data-s="18366" data-e="18579">While</span> <span class="w" data-s="18622" data-e="18750">he</span> <span class="w" data-s="18793" data-e="19049">waited,</span> <span class="w" data-s="19219" data-e="19731">Nina</span> <span class="w" data-s="19774" data-e="19945">read</span> <span class="w" data-s="19987" data-e="20115">the</span> <span class="w target" data-s="20158" data-e="20329" title="合同，合约，契约v.与……订立合同(或契 约);缩小 n. 承包人；承包商；承包公司">contract</span> <span class="w" data-s="20371" data-e="20755">he</span> <span class="w" data-s="20798" data-e="20926">had</span> <span class="w" data-s="20969" data-e="21225">signed</span> <span class="w" data-s="21267" data-e="21395">with</span> <span class="w" data-s="21438" data-e="21523">the</span> <span class="w" data-s="21566" data-e="21822">co-op.</span></p><p class="zh">他等着的时候，妮娜读了他跟合作社签的那份合同。</p></div>
+<div class="pair" data-s0="22078" data-s1="28435"><p class="en"><span class="w" data-s="22078" data-e="22633">She</span> <span class="w target" data-s="22675" data-e="23230" title="减去，扣除">subtracted</span> <span class="w" data-s="23273" data-e="23401">the</span> <span class="w" data-s="23443" data-e="23529">price</span> <span class="w" data-s="23571" data-e="23785">of</span> <span class="w" data-s="23827" data-e="23955">oil,</span> <span class="w target" data-s="24211" data-e="24851" title="(从总量中)扣除，减去">deducted</span> <span class="w" data-s="24894" data-e="25022">the</span> <span class="w" data-s="25065" data-e="25150">cost</span> <span class="w" data-s="25193" data-e="25449">of</span> <span class="w" data-s="25491" data-e="25619">two</span> <span class="w" data-s="25662" data-e="26046">tires,</span> <span class="w" data-s="26217" data-e="26387">and</span> <span class="w target" data-s="26515" data-e="27070" title="减少，缩小(尺寸、数量、价格等)；减轻体重； 节食">reduced</span> <span class="w" data-s="27113" data-e="27198">the</span> <span class="w" data-s="27241" data-e="27369">total</span> <span class="w" data-s="27411" data-e="27710">to</span> <span class="w" data-s="27753" data-e="27881">fit</span> <span class="w" data-s="27923" data-e="28051">his</span> <span class="w" data-s="28094" data-e="28435">budget.</span></p><p class="zh">她减去油钱，扣掉两条轮胎的费用，再把总价压下来，好配得上他那点预算。</p></div>
+<div class="pair" data-s0="28915" data-s1="30920"><p class="en"><span class="w" data-s="28915" data-e="29000">It</span> <span class="w" data-s="29043" data-e="29171">took</span> <span class="w" data-s="29213" data-e="29299">an</span> <span class="w" data-s="29341" data-e="29427">hour</span> <span class="w" data-s="29469" data-e="29683">to</span> <span class="w target" data-s="29725" data-e="29981" title="提取，提炼；选取，摘录；获得">extract</span> <span class="w" data-s="30024" data-e="30237">the</span> <span class="w" data-s="30280" data-e="30408">pump</span> <span class="w" data-s="30451" data-e="30621">from</span> <span class="w" data-s="30664" data-e="30749">the</span> <span class="w" data-s="30792" data-e="30920">engine.</span></p><p class="zh">把油泵从发动机里取出来，花了她一个小时。</p></div>
+<div class="pair" data-s0="31176" data-s1="35101"><p class="en"><span class="w" data-s="31176" data-e="31517">A</span> <span class="w" data-s="31645" data-e="31901">lamp</span> <span class="w" data-s="31944" data-e="32115">above</span> <span class="w" data-s="32157" data-e="32285">the</span> <span class="w" data-s="32328" data-e="32541">bench</span> <span class="w target" data-s="32584" data-e="33011" title="吸引">attracted</span> <span class="w" data-s="33053" data-e="33480">moths,</span> <span class="w" data-s="33608" data-e="33821">and</span> <span class="w" data-s="33864" data-e="34120">the</span> <span class="w" data-s="34163" data-e="34376">radio</span> <span class="w target" data-s="34419" data-e="34931" title="分散注意力；使分心">distracted</span> <span class="w" data-s="34973" data-e="35101">her.</span></p><p class="zh">工作台上方的一盏灯招来了飞蛾，收音机也让她分心。</p></div>
+<div class="pair" data-s0="35272" data-s1="38557"><p class="en"><span class="w" data-s="35272" data-e="35912">On</span> <span class="w" data-s="35955" data-e="36083">the</span> <span class="w" data-s="36125" data-e="36211">wall</span> <span class="w" data-s="36253" data-e="36680">hung</span> <span class="w" data-s="36723" data-e="36808">her</span> <span class="w" data-s="36851" data-e="37235">father&#x27;s</span> <span class="w target" data-s="37277" data-e="37661" title="抽象的 η.(文献等的)摘要，概要；抽象 作品v. 提取；抽取；写摘要 (225) 第九单元">abstract</span> <span class="w" data-s="37704" data-e="38088">drawings</span> <span class="w" data-s="38131" data-e="38216">of</span> <span class="w" data-s="38259" data-e="38557">machines.</span></p><p class="zh">墙上挂着她父亲画的机器图纸，都是些抽象的东西。</p></div>
+<div class="pair" data-s0="39289" data-s1="42276"><p class="en"><span class="w" data-s="39289" data-e="39375">Her</span> <span class="w" data-s="39417" data-e="39759">fingers</span> <span class="w" data-s="39801" data-e="39972">were</span> <span class="w target" data-s="40015" data-e="40356" title="不易弯曲(或活动)的；僵硬的；稠的；艰难 的；激烈的">stiff,</span> <span class="w" data-s="40527" data-e="40697">and</span> <span class="w" data-s="40953" data-e="41124">every</span> <span class="w" data-s="41167" data-e="41380">movement</span> <span class="w" data-s="41423" data-e="41764">felt</span> <span class="w target" data-s="41807" data-e="42276" title="笨拙的，不得体的 不灵活的">clumsy.</span></p><p class="zh">她的手指发僵，每个动作都显得笨拙。</p></div>
+<div class="pair" data-s0="42447" data-s1="47353"><p class="en"><span class="w" data-s="42447" data-e="42916">Her</span> <span class="w" data-s="43001" data-e="43257">gloves</span> <span class="w" data-s="43300" data-e="43513">were</span> <span class="w" data-s="43556" data-e="43641">not</span> <span class="w target" data-s="43684" data-e="44111" title="能适应新情况的；灵活的；可变动的；柔韧 的；可弯曲的；有弹性的">flexible</span> <span class="w" data-s="44153" data-e="44367">enough,</span> <span class="w" data-s="44580" data-e="44708">so</span> <span class="w" data-s="45007" data-e="45177">she</span> <span class="w" data-s="45220" data-e="45348">used</span> <span class="w" data-s="45391" data-e="45604">an</span> <span class="w target" data-s="45647" data-e="45945" title="橡皮圈；松紧带 adj. 有弹性的，灵活的">elastic</span> <span class="w" data-s="45988" data-e="46201">band</span> <span class="w" data-s="46244" data-e="46585">and</span> <span class="w" data-s="46628" data-e="46713">a</span> <span class="w" data-s="46756" data-e="46841">sheet</span> <span class="w" data-s="46884" data-e="47012">of</span> <span class="w target" data-s="47055" data-e="47353" title="塑料 adj. 塑料的，人造的">plastic.</span></p><p class="zh">手套不够灵活，她只好用一根松紧带和一张塑料片凑合。</p></div>
+<div class="pair" data-s0="47995" data-s1="50256"><p class="en"><span class="w" data-s="47995" data-e="48080">The</span> <span class="w" data-s="48123" data-e="48293">wet</span> <span class="w" data-s="48336" data-e="48592">metal</span> <span class="w target" data-s="48635" data-e="49147" title="反射；反映；反省">reflected</span> <span class="w" data-s="49189" data-e="49275">the</span> <span class="w" data-s="49317" data-e="49488">grey</span> <span class="w" data-s="49531" data-e="49659">sky</span> <span class="w" data-s="49701" data-e="49915">back</span> <span class="w" data-s="49957" data-e="50128">at</span> <span class="w" data-s="50171" data-e="50256">her.</span></p><p class="zh">湿漉漉的金属把灰白的天空反射回她脸上。</p></div>
+<div class="pair" data-s0="50981" data-s1="54437"><p class="en"><span class="w" data-s="50981" data-e="51195">&quot;Nothing</span> <span class="w" data-s="51237" data-e="51365">here</span> <span class="w" data-s="51408" data-e="51579">is</span> <span class="w target" data-s="51621" data-e="51963" title="永久的，持久的，固定的">permanent,&quot;</span> <span class="w" data-s="52261" data-e="52304">her</span> <span class="w" data-s="52347" data-e="52517">father</span> <span class="w" data-s="52560" data-e="52773">had</span> <span class="w" data-s="52816" data-e="52944">said,</span> <span class="w" data-s="53285" data-e="53328">&quot;not</span> <span class="w" data-s="53712" data-e="53883">even</span> <span class="w" data-s="53925" data-e="54096">this</span> <span class="w" data-s="54139" data-e="54437">shed.&quot;</span></p><p class="zh">“这里没有什么是永久的，”她父亲说过，“连这间棚子也不是。”</p></div>
+<div class="pair" data-s0="54821" data-s1="60325"><p class="en"><span class="w" data-s="54821" data-e="55419">But</span> <span class="w" data-s="55461" data-e="55589">the</span> <span class="w" data-s="55632" data-e="55717">old</span> <span class="w target" data-s="55760" data-e="56101" title="">tractor</span> <span class="w" data-s="56144" data-e="56357">looked</span> <span class="w target" data-s="56400" data-e="56869" title="不朽的；永久的；无休止的；没完没了的">eternal</span> <span class="w" data-s="56912" data-e="57040">to</span> <span class="w" data-s="57083" data-e="57211">her:</span> <span class="w" data-s="57381" data-e="57893">thirty</span> <span class="w" data-s="57936" data-e="58149">years</span> <span class="w" data-s="58192" data-e="58491">in</span> <span class="w" data-s="58533" data-e="58619">the</span> <span class="w" data-s="58661" data-e="58747">same</span> <span class="w" data-s="58789" data-e="59045">field,</span> <span class="w" data-s="59344" data-e="59557">in</span> <span class="w" data-s="59728" data-e="59899">the</span> <span class="w" data-s="59941" data-e="60027">same</span> <span class="w" data-s="60069" data-e="60325">rain.</span></p><p class="zh">可那台旧拖拉机在她眼里却是永恒的：在同一个田里、同一场雨里，待了三十年。</p></div>
+<div class="pair" data-s0="61318" data-s1="65201"><p class="en"><span class="w" data-s="61318" data-e="61404">She</span> <span class="w" data-s="61446" data-e="61617">worked</span> <span class="w" data-s="61660" data-e="61873">alone:</span> <span class="w" data-s="62214" data-e="62342">a</span> <span class="w target" data-s="62726" data-e="62982" title="单一的；单身的；未婚的；无伴侣的；仅，唯 一的">single</span> <span class="w" data-s="63025" data-e="63196">pair</span> <span class="w" data-s="63238" data-e="63366">of</span> <span class="w" data-s="63409" data-e="63494">hands,</span> <span class="w" data-s="63793" data-e="64006">the</span> <span class="w target" data-s="64220" data-e="64433" title="仅有的；唯一的；专有的">sole</span> <span class="w" data-s="64476" data-e="64774">worker</span> <span class="w" data-s="64817" data-e="64902">in</span> <span class="w" data-s="64945" data-e="64988">the</span> <span class="w" data-s="65030" data-e="65201">shed.</span></p><p class="zh">她一个人干活：一双手，是棚子里唯一的工人。</p></div>
+<div class="pair" data-s0="65457" data-s1="66822"><p class="en"><span class="w" data-s="65457" data-e="65542">A</span> <span class="w target" data-s="65585" data-e="65713" title="连接；结合；结婚；使成对n. 一对，一双；夫 妻，情侣">couple</span> <span class="w" data-s="65756" data-e="65926">of</span> <span class="w" data-s="65969" data-e="66310">neighbours</span> <span class="w" data-s="66353" data-e="66524">stopped</span> <span class="w" data-s="66566" data-e="66822">by.</span></p><p class="zh">几个邻居顺路过来看。</p></div>
+<div class="pair" data-s0="67804" data-s1="70108"><p class="en"><span class="w" data-s="67804" data-e="67846">&quot;You</span> <span class="w" data-s="67932" data-e="68102">are</span> <span class="w target" data-s="68145" data-e="68358" title="仅仅;只不过">merely</span> <span class="w" data-s="68401" data-e="68572">one</span> <span class="w" data-s="68614" data-e="68870">person,&quot;</span> <span class="w" data-s="69254" data-e="69638">one</span> <span class="w" data-s="69681" data-e="69809">of</span> <span class="w" data-s="69852" data-e="69894">them</span> <span class="w" data-s="69937" data-e="70108">said.</span></p><p class="zh">“你只不过是一个人，”其中一个说。</p></div>
+<div class="pair" data-s0="70961" data-s1="72028"><p class="en"><span class="w" data-s="70961" data-e="71046">&quot;You</span> <span class="w" data-s="71089" data-e="71302">cannot</span> <span class="w" data-s="71345" data-e="71601">do</span> <span class="w target" data-s="71644" data-e="71772" title="两倍的；成双的；双人的；双重的 adv.成 双地v.(使)加倍；击出二垒安打；对折">double</span> <span class="w" data-s="71814" data-e="72028">work.&quot;</span></p><p class="zh">“你干不了双份的活。”</p></div>
+<div class="pair" data-s0="72540" data-s1="75740"><p class="en"><span class="w" data-s="72540" data-e="72753">But</span> <span class="w" data-s="72796" data-e="72924">the</span> <span class="w" data-s="72966" data-e="73137">reward</span> <span class="w" data-s="73180" data-e="73393">was</span> <span class="w target" data-s="73436" data-e="73777" title="双重的，两倍的">duple:</span> <span class="w" data-s="73948" data-e="74332">the</span> <span class="w" data-s="74374" data-e="74460">money</span> <span class="w" data-s="74502" data-e="74801">and</span> <span class="w" data-s="74844" data-e="75100">the</span> <span class="w" data-s="75142" data-e="75526">farmer&#x27;s</span> <span class="w" data-s="75569" data-e="75740">smile.</span></p><p class="zh">但回报是双重的：钱，还有农民的笑。</p></div>
+<div class="pair" data-s0="76579" data-s1="77944"><p class="en"><span class="w" data-s="76579" data-e="76707">There</span> <span class="w" data-s="76749" data-e="76835">was</span> <span class="w" data-s="76877" data-e="77005">something</span> <span class="w target" data-s="77048" data-e="77560" title="单数(形式)的;非凡的;奇特的">singular</span> <span class="w" data-s="77603" data-e="77773">in</span> <span class="w" data-s="77816" data-e="77944">that.</span></p><p class="zh">这里面有种不同寻常的东西。</p></div>
+<div class="pair" data-s0="78157" data-s1="81144"><p class="en"><span class="w" data-s="78157" data-e="78328">On</span> <span class="w" data-s="78755" data-e="79267">Friday</span> <span class="w" data-s="79309" data-e="79437">the</span> <span class="w" data-s="79480" data-e="79736">farmer</span> <span class="w" data-s="79779" data-e="79864">asked</span> <span class="w" data-s="79907" data-e="80077">her</span> <span class="w" data-s="80120" data-e="80248">to</span> <span class="w target" data-s="80291" data-e="80717" title="评价，评估">evaluate</span> <span class="w" data-s="80760" data-e="80888">the</span> <span class="w target" data-s="80931" data-e="81144" title="">tractor.</span></p><p class="zh">星期五，农民请她给这台拖拉机估个价。</p></div>
+<div class="pair" data-s0="81357" data-s1="83448"><p class="en"><span class="w" data-s="81357" data-e="81997">She</span> <span class="w" data-s="82083" data-e="82296">wrote</span> <span class="w" data-s="82339" data-e="82467">a</span> <span class="w" data-s="82509" data-e="82595">number</span> <span class="w" data-s="82637" data-e="82851">on</span> <span class="w" data-s="82893" data-e="82979">a</span> <span class="w" data-s="83021" data-e="83064">piece</span> <span class="w" data-s="83107" data-e="83235">of</span> <span class="w" data-s="83277" data-e="83448">paper.</span></p><p class="zh">她在一张纸上写了个数字。</p></div>
+<div class="pair" data-s0="84387" data-s1="86904"><p class="en"><span class="w" data-s="84387" data-e="84429">&quot;It</span> <span class="w" data-s="84472" data-e="84600">is</span> <span class="w" data-s="84643" data-e="84728">more</span> <span class="w target" data-s="84771" data-e="85240" title="有价值的，贵重的">valuable</span> <span class="w" data-s="85283" data-e="85667">repaired</span> <span class="w" data-s="85709" data-e="85837">than</span> <span class="w" data-s="85880" data-e="86051">sold,&quot;</span> <span class="w" data-s="86477" data-e="86648">she</span> <span class="w" data-s="86691" data-e="86904">said.</span></p><p class="zh">“修好了比卖掉更值钱，”她说。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">impossible</span>
+          <span class="ipa">/ım&#x27;pa:səbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不可能的；难处理的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;It is impossible to finish today,&quot; she said</div>          <div class="root"><span class="lbl">根</span>im(不) + possible(可能的) → 不可能的</div>          <div class="zt"><span class="lbl">真题</span>Unfortunately, for the most ambitious entrepreneurs, a failure is seen as disastrous, and impossible to recover from. 不幸的是，对于 最雄心勃勃的企业家来说，失败被视为灾难性 的，而且不可能从中恢复。(2023)</div>          <div class="fam"><span class="lbl">族</span>possible adj. 可能的 / impossibility n. 不可能</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">probable</span>
+          <span class="ipa">/&#x27;pra:bəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">很可能发生(或存在)的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The probable problem is the fuel pump</div>          <div class="root"><span class="lbl">根</span>prob(证明) + able(可…的) → 可以被证明的 → 很可能的</div>          <div class="zt"><span class="lbl">真题</span>The most probable reason for the popularity of plastic lunch boxes is that they are less expensive. 塑料午餐盒流行的最可能的 原因是它们更便宜。 一半。</div>          <div class="fam"><span class="lbl">族</span>probably adv. 大概 / probability n. 可能性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">abstract</span>
+          <span class="ipa">/&#x27;æbstrækt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">抽象的 η.(文献等的)摘要，概要；抽象 作品v. 提取；抽取；写摘要 (225) 第九单元</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>her father&#x27;s abstract drawings of machines</div>          <div class="mnem"><span class="lbl">记</span>tract 发音类似“拽个它”，意思 就是“拖、拉、拽”。ab(一再地)+tract(拽)→摘 要；提取。</div>          <div class="root"><span class="lbl">根</span>abs(离开) + tract(拉) → 从具体里拉出来 → 抽象的</div>          <div class="zt"><span class="lbl">真题</span>Nothing defines humans so much as our ability to communicate abstract thoughts. 没有 什么比我们交流抽象思想的能力更能定义人类 的了。</div>          <div class="fam"><span class="lbl">族</span>abstraction n. 抽象 / attract v. 吸引</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">tractor</span>
+          <span class="ipa">/&#x27;træktər/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a farmer drove his old tractor into Nina&#x27;s repair shed</div>          <div class="mnem"><span class="lbl">记</span>拖、拉、拽（tract)的东西(or，名 词后缀），就是“拖拉机”。</div>          <div class="root"><span class="lbl">根</span>tract(拉) + or(东西) → 拉东西的机器 → 拖拉机</div>          <div class="zt"><span class="lbl">真题</span>What&#x27;s needed to build a complex airliner or a tractor？建造一架复杂的客机或拖拉机需 要什么？</div>          <div class="fam"><span class="lbl">族</span>tract n. 地带 / extract v. 提取</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">subtract</span>
+          <span class="ipa">/səb&#x27;trækt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">减去，扣除</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She subtracted the price of oil</div>          <div class="mnem"><span class="lbl">记</span>sub(往下)十 tract(拽)→往下 拽→减去，扣除。</div>          <div class="root"><span class="lbl">根</span>sub(往下) + tract(拉) → 往下拉 → 减去</div>          <div class="zt"><span class="lbl">真题</span>This totals the value of all goods and services produced and subtracts loss in value of factories and equipment. 这是生产的所有商品 和服务的价值，减去工厂和设备的损失。</div>          <div class="fam"><span class="lbl">族</span>subtraction n. 减法 / subtractive adj. 减去的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">deduct</span>
+          <span class="ipa">/dı&#x27;dakt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(从总量中)扣除，减去</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>deducted the cost of two tires</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“弟打个他（老 板)”。弟弟把他打了，工资就被他“扣除”了</div>          <div class="root"><span class="lbl">根</span>de(往下) + duct(引导) → 往下引走 → 扣除</div>          <div class="fam"><span class="lbl">族</span>deduction n. 扣除 / deduce v. 推断</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">reduce</span>
+          <span class="ipa">/rı&#x27;du:s/</span>
+          <span class="pos">v.</span>
+          <span class="cn">减少，缩小(尺寸、数量、价格等)；减轻体重； 节食</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>reduced the total to fit his budget</div>          <div class="root"><span class="lbl">根</span>re(往回) + duc(引导) → 往回引 → 减少</div>          <div class="zt"><span class="lbl">真题</span>There is no indication that increasing food skills or budgeting skills will reduce food insecurity. 没有迹象表明提高粮食技能或预算 技能将减少粮食不安全。(2022)</div>          <div class="fam"><span class="lbl">族</span>reduction n. 减少 / reduced adj. 缩减的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">extract</span>
+          <span class="ipa">/&#x27;ekstrækt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">提取，提炼；选取，摘录；获得</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It took an hour to extract the pump from the engine</div>          <div class="mnem"><span class="lbl">记</span>ex(往外)十tract(拽)→往外拽 →抽出，拔出，引申为“提取，摘录”。</div>          <div class="root"><span class="lbl">根</span>ex(往外) + tract(拉) → 往外拉 → 提取，拔出</div>          <div class="zt"><span class="lbl">真题</span>Due to new pumping practices, water deeper than this can now be extracted. 由于新 的抽水方法，现在可以抽取比这更深的水。(2018)</div>          <div class="fam"><span class="lbl">族</span>extraction n. 提取 / extractor n. 提取器</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">attract</span>
+          <span class="ipa">/ə&#x27;trækt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">吸引</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A lamp above the bench attracted moths</div>          <div class="mnem"><span class="lbl">记</span>一再(at)地拽(tract)→吸引。</div>          <div class="root"><span class="lbl">根</span>at(一再) + tract(拉) → 一再地拉 → 吸引</div>          <div class="zt"><span class="lbl">真题</span>All the key words in the article are printed in bold type so as to attract readers&#x27; attention.文章中所有的关键词都是用粗体字 体印刷的，以吸引读者的注意。</div>          <div class="fam"><span class="lbl">族</span>attraction n. 吸引力 / attractive adj. 有吸引力的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">distract</span>
+          <span class="ipa">/dr&#x27;strækt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">分散注意力；使分心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the radio distracted her</div>          <div class="root"><span class="lbl">根</span>dis(分开) + tract(拉) → 把注意力拉开 → 使分心</div>          <div class="zt"><span class="lbl">真题</span>Members of poorly managed teams are easily distracted from their work. 管理不善的 团队成员很容易在工作中分心。(2017)</div>          <div class="fam"><span class="lbl">族</span>distraction n. 分心的事 / distracted adj. 心烦意乱的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">contract</span>
+          <span class="ipa">/&#x27;ka:ntrækt, kən&#x27;trækt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">合同，合约，契约v.与……订立合同(或契 约);缩小 n. 承包人；承包商；承包公司</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nina read the contract he had signed with the co-op</div>          <div class="root"><span class="lbl">根</span>con(共同) + tract(拉) → 拉到一起定下的东西 → 合同</div>          <div class="zt"><span class="lbl">真题</span>One of the best things my company has done is to contract with a language service. 我 的公司做过的最好的一件事就是与语言服务公 司签订了合同。</div>          <div class="fam"><span class="lbl">族</span>contractor n. 承包商 / contraction n. 收缩</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">available</span>
+          <span class="ipa">/ə&#x27;verləbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可获得的；可购得的；可找到的；有空的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the only one available is in the city</div>          <div class="root"><span class="lbl">根</span>avail(有用) + able(可…的) → 可以用的 → 可获得的</div>          <div class="zt"><span class="lbl">真题</span>I want my students to search out the answers to questions by using all the resources available to them. 我希望我的学生利用所有可 用的资源来寻找问题的答案。(2017)</div>          <div class="fam"><span class="lbl">族</span>avail v. 有用 / availability n. 可获得性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">prevail</span>
+          <span class="ipa">/prı&#x27;verl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">普遍存在；盛行；流行；被接受；战胜；压倒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her father said patience prevails in a small workshop</div>          <div class="mnem"><span class="lbl">记</span>pre 前面;vail 得到的(vail 想成 available)。说明这个东西在这个地方很“流 行”啊。</div>          <div class="root"><span class="lbl">根</span>pre(前面) + vail(有力) → 力量占上风 → 盛行；战胜</div>          <div class="zt"><span class="lbl">真题</span>There&#x27;s an ancient legend that as long as these eggs are made, evil will not prevail in the world.有一个古老的传说，只要这些蛋被制作 出来，邪恶就不会在世上横行。(2017)</div>          <div class="fam"><span class="lbl">族</span>prevalent adj. 普遍的 / prevailing adj. 主要的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">stiff</span>
+          <span class="ipa">/stif/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不易弯曲(或活动)的；僵硬的；稠的；艰难 的；激烈的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her fingers were stiff</div>          <div class="mnem"><span class="lbl">记</span>一个美女(s)提(ti)着心，扶着 (f)栏杆上楼，为什么？腰疼→僵硬的。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a stiff neck 脖子发僵 / stiff fingers 手指僵硬</div>          <div class="zt"><span class="lbl">真题</span>Her hands are now less stiff and painful. 她的手现在不那么僵硬和疼痛了。</div>          <div class="fam"><span class="lbl">族</span>stiffly adv. 僵硬地 / stiffen v. 变硬</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">clumsy</span>
+          <span class="ipa">/&#x27;klamzi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">笨拙的，不得体的 不灵活的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every movement felt clumsy</div>          <div class="mnem"><span class="lbl">记</span>clum发音类似“哥拉妹”。第 一次带妹妹出去玩，哥哥显得很“笨拙”啊！</div>          <div class="root"><span class="lbl">根</span>谐音联想：哥拉妹 → 哥哥拉着妹妹，动作很笨拙</div>          <div class="fam"><span class="lbl">族</span>clumsily adv. 笨拙地 / clumsiness n. 笨拙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">flexible</span>
+          <span class="ipa">/&#x27;fleksəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">能适应新情况的；灵活的；可变动的；柔韧 的；可弯曲的；有弹性的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her gloves were not flexible enough</div>          <div class="mnem"><span class="lbl">记</span>飞(fl 想成 fly)出去(ex 表示往 外)，ble形容词的后缀，那该单词就是可以飞出 (226) 去的。《西游记》里有一集是把悟空关到金箔中 了，悟空依然钻了一个小孔，化作一缕青烟飞出 去了。→灵活的。</div>          <div class="root"><span class="lbl">根</span>flex(弯曲) + ible(能…的) → 能弯的 → 灵活的</div>          <div class="zt"><span class="lbl">真题</span>This might mean thinking of non- financial ways to reward employees, like unpaid time off or flexible work schedules. 这 可能意味着考虑非经济方式来奖励员工，比如 无薪休假或灵活的工作时间表。(2023)</div>          <div class="fam"><span class="lbl">族</span>flexibility n. 灵活性 / flex v. 弯曲</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">reflect</span>
+          <span class="ipa">/rı&#x27;flekt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">反射；反映；反省</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The wet metal reflected the grey sky back at her</div>          <div class="mnem"><span class="lbl">记</span>词根flect的意思是“弯曲”，那 reflect 就是“弯回来(re 回来)”，用镜子反射光 线就是把光给弯回来→反射。</div>          <div class="root"><span class="lbl">根</span>re(往回) + flect(弯) → 把光弯回来 → 反射</div>          <div class="zt"><span class="lbl">真题</span>By encouraging self-reflection and daydreaming，it can spur creativity. 通过鼓励 自我反省和做白日梦，它可以激发创造力。</div>          <div class="fam"><span class="lbl">族</span>reflection n. 反射；反省 / reflective adj. 反光的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">elastic</span>
+          <span class="ipa">/r&#x27;læstik/</span>
+          <span class="pos">n.</span>
+          <span class="cn">橡皮圈；松紧带 adj. 有弹性的，灵活的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she used an elastic band and a sheet of plastic</div>          <div class="mnem"><span class="lbl">记</span>e(出去)十last(延续，持续)→ 延伸出去，拉长→有弹性的。</div>          <div class="root"><span class="lbl">根</span>e(出) + last(持续) + ic → 能一直拉出去 → 有弹性的</div>          <div class="fam"><span class="lbl">族</span>elasticity n. 弹性 / elastic band 松紧带</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">plastic</span>
+          <span class="ipa">/&#x27;plæstık/</span>
+          <span class="pos">n.</span>
+          <span class="cn">塑料 adj. 塑料的，人造的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a sheet of plastic</div>          <div class="root"><span class="lbl">根</span>plast(塑造) + ic → 能被塑造成型的 → 塑料</div>          <div class="zt"><span class="lbl">真题</span>When travelling overseas, do you buy water in plastic bottles or take your chances with tap water？出国旅游时，你会买塑料瓶的 水还是碰碰运气用自来水？(2019)</div>          <div class="fam"><span class="lbl">族</span>plasticity n. 可塑性 / plaster n. 石膏</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">permanent</span>
+          <span class="ipa">/&#x27;p3:mənənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">永久的，持久的，固定的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;Nothing here is permanent,&quot; her father had said</div>          <div class="mnem"><span class="lbl">记</span>per(每一个)十man(人)十ent (227) 第九单元 (联想为 enter 进入)→每一个人都想进入永恒， 谁不渴望永恒？→永久的，持久的。</div>          <div class="root"><span class="lbl">根</span>per(自始至终) + man(停留) + ent → 一直留着 → 永久的</div>          <div class="zt"><span class="lbl">真题</span>If working from home becomes permanent, employees will have to dedicate part of their private space to work. 如果居家办公成为永久 性，员工将不得不拿出部分私人空间来工作。</div>          <div class="fam"><span class="lbl">族</span>permanently adv. 永久地 / permanence n. 永久</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">eternal</span>
+          <span class="ipa">/r&#x27;t3:rnl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不朽的；永久的；无休止的；没完没了的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the old tractor looked eternal to her</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“一特恼”。一 (e)件特(ter)别恼(nal)人的事“无休止的”折 磨我。</div>          <div class="root"><span class="lbl">根</span>etern(永恒) + al(形容词后缀) → 永恒的</div>          <div class="fam"><span class="lbl">族</span>eternity n. 永恒 / eternally adv. 永远地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">double</span>
+          <span class="ipa">/&#x27;dabl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">两倍的；成双的；双人的；双重的 adv.成 双地v.(使)加倍；击出二垒安打；对折</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;You cannot do double work.&quot;</div>          <div class="root"><span class="lbl">根</span>dou(二) + ble → 两倍的，双份的</div>          <div class="zt"><span class="lbl">真题</span>As a result, wheat prices elsewhere more than doubled, pulling rice and corn prices up with them. 结果，其他地区的小麦价格翻了一 倍多，带动了大米和玉米价格的上涨。(2016)</div>          <div class="fam"><span class="lbl">族</span>doubly adv. 双重地 / double v. 使加倍</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">duple</span>
+          <span class="ipa">/&#x27;du:pəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">双重的，两倍的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the reward was duple</div>          <div class="root"><span class="lbl">根</span>du(二) + ple(倍) → 两倍的，双重的</div>          <div class="fam"><span class="lbl">族</span>double adj. 两倍的 / duplicate v. 复制</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">couple</span>
+          <span class="ipa">/&#x27;kapl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">连接；结合；结婚；使成对n. 一对，一双；夫 妻，情侣</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A couple of neighbours stopped by</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“cup(杯子)”，杯 子都是一对一对的啊。</div>          <div class="root"><span class="lbl">根</span>coupl(连接) + e → 连在一起的两个 → 一对</div>          <div class="zt"><span class="lbl">真题</span>There are a couple of ways to compromise on the issue. 在这个问题上有几种 折中的方法。(2023) 例 As a compromise, a bride will in most cases adopt a name that combines the couple&#x27;s last names.为了折中，在大多数情况下，新娘会 选择一个结合夫妻姓氏的名字。(2023)</div>          <div class="fam"><span class="lbl">族</span>couple v. 结合 / coupling n. 联结</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">single</span>
+          <span class="ipa">/&#x27;singl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">单一的；单身的；未婚的；无伴侣的；仅，唯 一的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a single pair of hands</div>          <div class="mnem"><span class="lbl">记</span>唱歌（sing），一个人（1），阿姨 (e)。连在一起就是：阿姨一个人在唱歌→单一 的；单身的。</div>          <div class="root"><span class="lbl">根</span>sing(一个) + le → 单一的</div>          <div class="zt"><span class="lbl">真题</span>To cover multiple domains and to be able to have a conversation with users on every single topic is still a long way off. 要覆盖多个 领域，并能够与用户就每个主题进行对话，还有 很长的路要走。(2023)</div>          <div class="fam"><span class="lbl">族</span>singular adj. 单数的 / singly adv. 单个地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">singular</span>
+          <span class="ipa">/&#x27;sıngjələr/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">单数(形式)的;非凡的;奇特的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>There was something singular in that</div>          <div class="mnem"><span class="lbl">记</span>单词可以联想成：唱歌(sing)，u (谐音 you，你)，l(想成一根棍子)，ar(矮人的拼 音首字母)。你唱歌的时候，矮人用一根棍子为 你打节拍，这一现象真是太奇特了→奇特的。</div>          <div class="root"><span class="lbl">根</span>singul(单个) + ar → 独一无二 → 非凡的，奇特的</div>          <div class="zt"><span class="lbl">真题</span>Jobs, of course, has enjoyed singular success. 当然，乔布斯取得了非凡的成功。</div>          <div class="fam"><span class="lbl">族</span>singularity n. 奇特 / single adj. 单一的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">merely</span>
+          <span class="ipa">/&#x27;mirli/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">仅仅;只不过</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;You are merely one person,&quot; one of them said</div>          <div class="mnem"><span class="lbl">记</span>单词读音类似“米儿粒”。一顿 饭没有菜，“仅仅”有米儿粒。</div>          <div class="root"><span class="lbl">根</span>mere(仅仅的) + ly(副词后缀) → 仅仅，只不过</div>          <div class="zt"><span class="lbl">真题</span>However, merely having contact with children does not guarantee happiness in old age.然而，仅仅与孩子接触并不能保证晚年幸 福。(2016)</div>          <div class="fam"><span class="lbl">族</span>mere adj. 仅仅的 / merest adj. 最微小的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">sole</span>
+          <span class="ipa">/səl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">仅有的；唯一的；专有的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sole worker in the shed</div>          <div class="root"><span class="lbl">根</span>sol(单独) + e → 单独的 → 唯一的，仅有的</div>          <div class="fam"><span class="lbl">族</span>solely adv. 仅仅 / solitude n. 独处</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">evaluate</span>
+          <span class="ipa">/r&#x27;væljueit/</span>
+          <span class="pos">v.</span>
+          <span class="cn">评价，评估</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the farmer asked her to evaluate the tractor</div>          <div class="mnem"><span class="lbl">记</span>value n. 价值，价格；重要性。 evaluate：把价值（value）说出来（e表示“出 来”)，ate是动词后缀。你把我手表的价格说出 来，就是在给我的手表“估价”。</div>          <div class="root"><span class="lbl">根</span>e(出) + valu(价值) + ate(动词后缀) → 把价值说出来 → 评估</div>          <div class="zt"><span class="lbl">真题</span>To evaluate the risks of infection, the study team flew on 10 different flights in the US.为了评估感染的风险，研究小组在美国乘 坐了10个不同的航班。(2019)</div>          <div class="fam"><span class="lbl">族</span>evaluation n. 评估 / value n. 价值</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">valuable</span>
+          <span class="ipa">/&#x27;væljuəbl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">有价值的，贵重的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;It is more valuable repaired than sold,&quot; she said</div>          <div class="root"><span class="lbl">根</span>valu(价值) + able(可…的) → 有价值的</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s not the knowledge that is valuable, it&#x27;s the practice of learning new things and understanding how things work. 有价值的不是 知识，而是学习新事物和理解事物如何运作的 实践。(2019)</div>          <div class="fam"><span class="lbl">族</span>value n. 价值 / invaluable adj. 无价的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 9 · Day 60</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

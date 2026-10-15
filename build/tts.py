@@ -46,6 +46,37 @@ def load_key() -> str:
     return k
 
 
+# ── 原始响应缓存 ─────────────────────────────────────────
+#
+# 为什么要有这个：调 merge_syllables 的逻辑时反复踩坑（错误日志 #18），
+# 每改一次匹配规则就要重调一次 API 才能拿到原始音节数据 —— 既慢又烧配额，
+# 而且 MiniMax 每次返回的条目还会有细微差异，没法做稳定的对照实验。
+#
+# 所以把每次 synthesize 的原始结果落盘：改 merge 逻辑时用 --from-cache
+# 反复跑，零成本、零配额、结果完全可复现。
+CACHE_DIR = ROOT / "_cache" / "tts"
+
+
+def _cache_paths(day: str, speed: float) -> tuple[Path, Path]:
+    suffix = "" if speed == 1.0 else f"-{speed}x"
+    base = CACHE_DIR / f"day-{day}{suffix}"
+    return base.with_suffix(".mp3"), base.with_suffix(".syllables.json")
+
+
+def load_cache(day: str, speed: float) -> tuple[bytes, list] | None:
+    mp3, syl = _cache_paths(day, speed)
+    if mp3.exists() and syl.exists():
+        return mp3.read_bytes(), json.loads(syl.read_text(encoding="utf-8"))
+    return None
+
+
+def save_cache(day: str, speed: float, audio: bytes, syllables: list) -> None:
+    mp3, syl = _cache_paths(day, speed)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    mp3.write_bytes(audio)
+    syl.write_text(json.dumps(syllables, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def synthesize(key: str, text: str, speed: float) -> tuple[bytes, list]:
     """调 MiniMax，返回 (mp3 字节, 音节级时间戳列表)"""
     payload = {
@@ -276,7 +307,7 @@ def verify(merged: list[dict], original: str) -> bool:
     return ok
 
 
-def run_day(day: str, speed: float, key: str) -> bool:
+def run_day(day: str, speed: float, key: str, from_cache: bool = False) -> bool:
     src = ROOT / "content" / f"day-{day}" / "words.json"
     if not src.exists():
         print(f"  [跳过] {src} 不存在")
@@ -296,11 +327,22 @@ def run_day(day: str, speed: float, key: str) -> bool:
     audio = syllables = merged = None
     ok = False
     for attempt in range(1, 4):
-        audio, syllables = synthesize(key, text, speed)
+        cached = load_cache(day, speed) if from_cache else None
+        if cached:
+            audio, syllables = cached
+            print("    用缓存（不调 API）")
+        elif from_cache:
+            print(f"    [跳过] 缓存里没有 day-{day}，先不带 --from-cache 跑一次")
+            return False
+        else:
+            audio, syllables = synthesize(key, text, speed)
+            save_cache(day, speed, audio, syllables)
         merged = merge_syllables(syllables, text)
         ok = verify(merged, text)
         if ok:
             break
+        if from_cache:
+            break  # 缓存模式下重试没意义，数据是同一份
         got = len([w for w in merged if w["text"].strip()])
         print(f"    [重试 {attempt}/3] 只还原出 {got}/{n_words} 词，重来 ...")
     if not ok:
@@ -336,9 +378,18 @@ def main() -> None:
     ap.add_argument("--day", help="只跑某一天，如 01")
     ap.add_argument("--all", action="store_true", help="跑 content/ 下所有天")
     ap.add_argument("--speed", type=float, default=1.0, help="语速，1.0 为正常")
+    ap.add_argument(
+        "--from-cache",
+        action="store_true",
+        help="用 _cache/tts 里的原始响应重跑合并（不调 API，改 merge 逻辑时用）",
+    )
     args = ap.parse_args()
 
-    key = load_key()
+    if args.from_cache:
+        # 缓存模式不需要 key —— 这正是它的价值：配额耗尽时也能调逻辑
+        key = ""
+    else:
+        key = load_key()
     days = (
         sorted(p.name.split("-")[1] for p in (ROOT / "content").glob("day-*"))
         if args.all
@@ -349,7 +400,7 @@ def main() -> None:
 
     all_ok = True
     for d in days:
-        all_ok &= run_day(d, args.speed, key)
+        all_ok &= run_day(d, args.speed, key, from_cache=args.from_cache)
     print("\n完成。" if all_ok else "\n完成，但有校验未通过项。")
 
 
