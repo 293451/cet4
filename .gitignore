@@ -20,6 +20,11 @@ _cards.png
 build/_*.py
 build/_*.js
 
+# MiniMax 原始响应缓存（tts.py 落盘的 mp3 + 音节数据）
+# 用途：改 merge 逻辑时用 --from-cache 反复跑，不烧配额。
+# 体积大（含音频二进制）且可重新生成，不入库。
+_cache/
+
 # ═══ 任务分发文件（子 Agent 用，不必入库）═══
 _task/
 
