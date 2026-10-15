@@ -130,20 +130,25 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
     if not toks:
         return []
 
-    # 音节流：非空条目按顺序拼接，同时记录每个字符的起止时间。
+    # 音节流：按顺序拼接所有条目，同时记录每个字符的起止时间。
     #
-    # ⚠️ 这里要**压掉连续重复的条目**。MiniMax 对数字会吐重复，次数还不固定：
+    # ⚠️ **空格条目必须保留** —— 它就是词边界。
+    #    MiniMax 把 "Green Harbor was" 拆成：
+    #      ['G','re','en', ' ', 'Har','bor', ' ', 'was', ' ']
+    #    去掉空格条目后变成 'GreenHarborwas'，词边界信息全丢了，
+    #    匹配就会跨词误配（实测 'the' 匹配到 38 字符外某个词内部的 "the"，
+    #    指针一跳远，后面全崩 —— Day 11 只还原出 257/258 词）。
+    #
+    # ⚠️ 同时压掉**连续重复**的条目。MiniMax 对数字会吐重复，次数还不固定：
     #      "in 1960. He"     -> '1960' 重复 2 次
     #      "from 1978. She"  -> '1978' 重复 16 次
-    #    如果在匹配阶段处理，得考虑"重复之间夹着标点""重复次数未知"等各种情况，
-    #    实测很难写对（Day 62 因此只还原出 248/279 词）。
-    #    在**构建阶段**压掉最干净 —— 下游所有逻辑都不需要知道这回事。
+    #    在构建阶段压掉最干净 —— 下游逻辑都不需要知道这回事。
     stream_chars: list[str] = []
     stream_time: list[tuple[float, float]] = []
     prev_token = None
     for s in syllables:
         t = s.get("word", "")
-        if not t.strip():
+        if not t:
             continue
         if t == prev_token:
             continue  # 和上一条完全相同 —— 是 MiniMax 的重复条目，丢掉
@@ -173,14 +178,26 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
             p = j + probe
             if p >= len(stream):
                 break
+            # 跳到词首：跳过空白/标点。流里保留了 MiniMax 的空格条目，
+            # 它就是词边界 —— 从这个位置往后读才是完整的一个词。
+            while p < len(stream) and not _is_word_char(stream[p]):
+                p += 1
+            if p >= len(stream):
+                break
             k = 0
             first = last = None
             q = p
             while q < len(stream) and k < len(core):
                 c = stream[q]
-                if not _is_word_char(c):
+                if c in "'’":
+                    # 撇号：MiniMax 把它当独立条目（morning's -> 'morning', "'", 's'），
+                    # 而原文的 core 里没有它（'mornings'）。跳过不比对，但**不断词**
+                    # —— 它和空格不同，不构成词边界。
                     q += 1
                     continue
+                if not _is_word_char(c):
+                    # 空格或其他标点 —— 这是词边界，不能再往后读
+                    break
                 if c.lower() == core[k]:
                     if first is None:
                         first = q
