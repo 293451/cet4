@@ -23,23 +23,49 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+# ⚠️ 只在 stdout 还没包过时才包 —— 这个模块会被 push.py import，
+#    那边已经包过一次。重复包会让第一次的 wrapper 被 GC 关闭，
+#    后续 print 报 "I/O operation on closed file"（实测踩过）。
+if getattr(sys.stdout, "encoding", "").lower() not in ("utf-8", "utf8"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from review import due_reviews, day_of  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 API = "http://www.pushplus.plus/send"
 
 
-def today_day() -> int | None:
-    """按 progress.json 的 start_date 算今天该学第几天"""
+def start_date() -> date | None:
+    """读 progress.json 的起始日"""
     pf = ROOT / "progress.json"
     if not pf.exists():
         return None
-    st = json.loads(pf.read_text(encoding="utf-8"))
-    start = date.fromisoformat(st["start_date"])
-    n = (date.today() - start).days + 1
+    try:
+        return date.fromisoformat(
+            json.loads(pf.read_text(encoding="utf-8"))["start_date"]
+        )
+    except Exception:
+        return None
+
+
+def all_days() -> list[str]:
+    """content/ 下所有已有内容的天（01..69）"""
+    return sorted(
+        p.name.split("-")[1] for p in (ROOT / "content").glob("day-*")
+        if (p / "words.json").exists()
+    )
+
+
+def today_day() -> int | None:
+    """按 progress.json 的 start_date 算今天该学第几天"""
+    s = start_date()
+    if s is None:
+        return None
+    n = day_of(s, date.today())
     return n if n >= 1 else None
 
 
@@ -146,6 +172,62 @@ def build_catalog(current: str) -> str:
     return "\n".join(parts)
 
 
+def build_review(day: str) -> str:
+    """
+    生成「今日复习」HTML 片段 —— 间隔重复的提醒。
+
+    设计：学完第 N 天后，在第 1/2/4/7/15 天各复习一次。
+    排期从 start_date **纯推算**（见 review.py 的说明），
+    不依赖任何人写进度文件 —— 线上环境拿不到那个信号。
+
+    放到推送的**最前面**（而不是像总目录那样放最后）：
+    复习是「该做的事」，新文章是「想做的事」。
+    用户每天只扫一眼推送，重要的放上面。
+    没有到期复习时整块不出现 —— 不占位置、不制造噪音。
+    """
+    s = start_date()
+    days = all_days()
+    if s is None or not days:
+        return ""
+
+    revs = due_reviews(s, date.today(), len(days))
+    if not revs:
+        return ""
+
+    # 每组显示前 8 个词，多的收起来
+    rows = []
+    for r in revs:
+        p = ROOT / "content" / f"day-{r['day']}" / "words.json"
+        if not p.exists():
+            continue
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ws = [w["w"] for w in d["words"]]
+        shown = " · ".join(ws[:8]) + (" …" if len(ws) > 8 else "")
+        # 标出这是第几轮复习（间隔越大说明记得越久）
+        tag = f"第 {r['round']} 轮"
+        rows.append(
+            f'<div style="margin:6px 0 0 0;font-size:13px;line-height:1.6">'
+            f'<a href="__BASE__/day-{r["day"]}.html" '
+            f'style="color:#2563eb;font-weight:600;text-decoration:none">'
+            f'Day {r["day"]}</a>'
+            f'<span style="color:#aaa;font-size:12px">'
+            f'　学完 {r["gap"]} 天 · {tag}</span>'
+            f'<div style="color:#666">{shown}</div></div>'
+        )
+    if not rows:
+        return ""
+
+    return (
+        '<div style="margin:0 0 14px 0;padding:10px 12px;background:#f0f7ff;'
+        'border-radius:8px">'
+        '<p style="margin:0 0 2px 0;font-size:14px"><b>🔁 今日复习</b>'
+        '<span style="color:#888;font-size:12px">'
+        f'　{len(rows)} 组，点标题回看</span></p>'
+        + "".join(rows) +
+        "</div>"
+    )
+
+
 def build_msg(day: str) -> tuple[str, str]:
     p = ROOT / "content" / f"day-{day}" / "words.json"
     if not p.exists():
@@ -157,7 +239,7 @@ def build_msg(day: str) -> tuple[str, str]:
 
     title = f"Day {day} · {d['title_cn']}"
     content = f"""<div style="font-size:15px;line-height:1.8">
-<p><b>{d['title']}</b><br>
+{build_review(day)}<p><b>{d['title']}</b><br>
 <span style="color:#888;font-size:13px">{d['title_cn']}</span></p>
 <p style="color:#888;font-size:13px">今日 {n} 词：{preview}</p>
 <p><a href="__URL__" style="display:inline-block;background:#d97706;color:#fff;
@@ -216,7 +298,9 @@ def main() -> None:
     title, content = build_msg(day)
     url = f"{base}/day-{day}.html"
     index_url = f"{base}/index.html"
-    body = content.replace("__URL__", url).replace("__INDEX__", index_url)
+    body = (content.replace("__URL__", url)
+                   .replace("__INDEX__", index_url)
+                   .replace("__BASE__", base))
 
     if args.dry_run:
         print(f"标题：{title}\n")

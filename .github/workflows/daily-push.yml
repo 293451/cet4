@@ -1,10 +1,12 @@
 name: 每日推送
 
-# 每天早上把当天的精读页面推到微信。
+# 每天早上做三件事：
+#   1. 调 PushPlus 把当天的精读页面推到微信（含总目录、今日复习）
+#   2. 追平 progress.json（--sync）
+#   3. 空提交保活，避免 60 天无活动被 GitHub 禁用定时任务
 #
 # 注意：这里 **不生成任何内容**。
 # 文章和音频都是本地生成好、随仓库一起提交的。
-# 本工作流只做一件事：调 PushPlus API 发一条消息。
 #
 # 之所以这样做：GitHub 服务器在国内网络环境下调 MiniMax 不稳定，
 # 而且音频生成是重活，放本地做更可控。
@@ -47,15 +49,24 @@ jobs:
           fi
 
       # 让仓库保持「活跃」，避免 GitHub 在 60 天无活动后自动禁用定时任务。
-      # 用空提交，不产生文件，也就不和 .gitignore 打架。
       #
-      # continue-on-error：保活只是辅助手段，它失败不该让整个任务显示红叉 ——
+      # 顺便把 progress.json 追平（--sync）—— 用户从不手动标记学完，
+      # 这个文件会永远停在 Day 01，看着像"只学了一天"。
+      # 复习排期**不依赖**它（见 review.py：改成了从 start_date 纯推算），
+      # 但留一份过时数据会误导人，所以每天顺手补上。
+      #
+      # 用 --allow-empty 是为了「即使 sync 没产生变化也提交」——
+      # 保活本身就需要一个提交。两者合并，不增加额外提交。
+      #
+      # continue-on-error：保活+同步都只是辅助，失败不该让整个任务显示红叉 ——
       # 否则从 Actions 页面看不出「推送到底成没成功」（实测踩过：保活 403 报红，
       # 但推送其实是成功的）。信号清晰比表面全绿重要。
-      - name: 保活
+      - name: 保活 + 同步进度
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "chore: 每日保活 $(date -u +%Y-%m-%d)"
+          python build/progress.py --sync
+          git add progress.json
+          git commit --allow-empty -m "chore: 每日保活 + 同步进度 $(date -u +%Y-%m-%d)"
           git push

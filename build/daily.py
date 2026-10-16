@@ -144,9 +144,13 @@ def main() -> None:
     log(f"推送 Day {latest} -> {url}")
     run([sys.executable, str(BUILD / "push.py"), "--day", latest, "--url", url])
 
-    # 记录进度
-    for d in built:
-        run([sys.executable, str(BUILD / "progress.py"), "--done", d])
+    # 记录进度。
+    #
+    # ⚠️ 用 --sync（按日期追平）而不是逐天 --done —— 后者把日期记成"今天"，
+    #    补跑多天时会全部记成同一天，那是错的。
+    #    而排期已改为从 start_date 纯推算（见 review.py），
+    #    这份记录只为留档，--sync 能让它准确。
+    run([sys.executable, str(BUILD / "progress.py"), "--sync"])
 
     log(f"完成。本次生成 {len(built)} 天，推送 Day {latest}。")
 

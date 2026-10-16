@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-微信推送（PushPlus）。
+微信推送（PushPlus）—— **本地版**。
 
-推送内容：当天课文的标题 + 链接 + 今日词表前几个词。
+和云端版 `push_web.py` 的唯一区别：token 从 `.secrets/` 读，
+云端版从环境变量读（GitHub Secrets 注入）。
+
+⚠️ **消息内容一律委托给 push_web.py 构造**，本文件不再自己拼 HTML。
+
+为什么改：这里原来有一份独立的 `build_msg`，和 push_web.py 各写各的。
+结果云端推送加了总目录和今日复习、本地这份**一直没有** ——
+两条路径行为不一致（错误日志 #13 的同类教训：
+同一逻辑实现两遍，必然漂移）。
 
 用法：
     python build/push.py --day 01 --url https://xxx/day-01.html
-    python build/push.py --day 01 --dry-run        # 只打印，不发送
+    python build/push.py --day 01 --url https://xxx --dry-run
 
 token 读取顺序：.secrets/pushplus.token -> 环境变量 PUSHPLUS_TOKEN
 """
@@ -15,12 +23,16 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from push_web import build_msg  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 API = "http://www.pushplus.plus/send"
@@ -32,37 +44,10 @@ def load_token() -> str:
         t = f.read_text(encoding="utf-8").strip()
         if t:
             return t
-    import os
-
     t = os.environ.get("PUSHPLUS_TOKEN", "").strip()
     if not t:
         sys.exit("找不到 PushPlus token：请写入 .secrets/pushplus.token")
     return t
-
-
-def build_msg(day: str, url: str) -> tuple[str, str]:
-    """返回 (标题, 正文 HTML)"""
-    p = ROOT / "content" / f"day-{day}" / "words.json"
-    data = json.loads(p.read_text(encoding="utf-8"))
-    words = [w["w"] for w in data["words"]]
-    preview = " · ".join(words[:6]) + (" …" if len(words) > 6 else "")
-
-    title = f"Day {day} · {data['title_cn']}"
-    content = f"""<div style="font-size:15px;line-height:1.8">
-<p><b>{data['title']}</b><br>
-<span style="color:#888;font-size:13px">{data['title_cn']}</span></p>
-
-<p style="color:#888;font-size:13px">
-今日 {len(words)} 词：{preview}</p>
-
-<p><a href="{url}" style="display:inline-block;background:#d97706;color:#fff;
-padding:10px 18px;border-radius:8px;text-decoration:none;font-size:15px">
-▶ 打开精读页面</a></p>
-
-<p style="color:#aaa;font-size:12px">
-页面里可以播放朗读、逐词跟读高亮、点词跳转、切换 0.75x 慢速。</p>
-</div>"""
-    return title, content
 
 
 def send(token: str, title: str, content: str) -> None:
@@ -93,18 +78,29 @@ def send(token: str, title: str, content: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--day", required=True)
-    ap.add_argument("--url", required=True, help="页面链接（手机能访问的）")
+    ap.add_argument("--url", required=True,
+                    help="页面链接前缀，如 https://293451.github.io/cet4")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    title, content = build_msg(args.day, args.url)
+    base = args.url.rstrip("/")
+    # 如果传进来的是完整页面链接（.../day-01.html），取它的前缀
+    if base.endswith(".html"):
+        base = base.rsplit("/", 1)[0]
+
+    title, content = build_msg(args.day)
+    body = (content.replace("__URL__", f"{base}/day-{args.day}.html")
+                   .replace("__INDEX__", f"{base}/index.html")
+                   .replace("__BASE__", base))
+
     if args.dry_run:
         print(f"标题：{title}")
         print("正文：")
-        print(content)
+        print(body)
         return
-    send(load_token(), title, content)
+    send(load_token(), title, body)
 
 
 if __name__ == "__main__":
     main()
+

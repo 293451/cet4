@@ -2,15 +2,25 @@
 """
 学习进度 + 滚动复习排期。
 
-设计目标：让用户在读新文章时，不知不觉复习旧词。
+⚠️ **排期逻辑已抽出到 `review.py`，本文件从那里 import。**
+
+为什么改（错误日志 #13 的同类教训）：这里原来有一份自己的
+`due_words()`，靠 `st["days"]` 里的「何时标记学完」算复习。
+但线上环境**永远拿不到那个信号**（用户不标记、云端只读），
+所以线上复习从来没触发过。
+
+现在统一以 `review.py` 的**从 start_date 纯推算**为准 ——
+一份逻辑、一个间隔表，本地和云端结论必然一致。
+`progress.json` 的 `days` 保留，但只用于「记录学了什么」，
+不再参与排期计算。
 
 两类复习：
-  1. 新文章里「故意塞旧词」—— 我写 content 时按 review_words 输出
-  2. 每 5 天一篇「纯复习文章」—— 不加新词，把前 5 天的词换个场景再讲一遍
+  1. 每天推送里附「今日复习」（已接入，见 push_web.py）
+  2. 每 5 天一篇「纯复习文章」—— 尚未实现，见 --plan
 
 用法：
     python build/progress.py --status                 # 看当前进度
-    python build/progress.py --plan                   # 出下一课的计划（含该复习哪些词）
+    python build/progress.py --plan                   # 出下一课的计划
     python build/progress.py --done 01                # 标记 Day 01 已学完
     python build/progress.py --due                    # 列出到期待复习的词
 """
@@ -25,11 +35,12 @@ from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from review import REVIEW_OFFSETS, due_reviews, day_of  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 STATE = ROOT / "progress.json"
 
-# 间隔重复：学完之后第 N 天复习（艾宾浩斯简化版）
-REVIEW_OFFSETS = [1, 2, 4, 7, 15]
 # 每几天插入一篇纯复习文章
 REVIEW_EVERY = 5
 # 每天新词量
@@ -58,20 +69,40 @@ def next_day_num(st: dict) -> str:
     return f"{(max(days) + 1) if days else 1:02d}"
 
 
+def total_days() -> int:
+    """content/ 下一共有多少天（排期的上界）"""
+    return len([p for p in (ROOT / "content").glob("day-*")
+                if (p / "words.json").exists()])
+
+
 def due_words(st: dict, on: date | None = None) -> list[dict]:
-    """算出某天该复习哪些词"""
+    """
+    算出某天该复习哪些词。
+
+    走 `review.py` 的纯推算（从 start_date 起，与 progress 记录无关）。
+    读 content/ 拿词表 —— 那才是「该复习什么」的权威来源，
+    `st["days"]` 里的 words 只作兜底。
+    """
     on = on or date.today()
+    start = date.fromisoformat(st["start_date"])
     out = []
-    for day, info in st["days"].items():
-        learned = date.fromisoformat(info["date"])
-        gap = (on - learned).days
-        if gap in REVIEW_OFFSETS:
-            out.append({
-                "day": day,
-                "round": REVIEW_OFFSETS.index(gap) + 1,
-                "gap_days": gap,
-                "words": info["words"],
-            })
+    for r in due_reviews(start, on, total_days()):
+        ws: list[str] = []
+        p = ROOT / "content" / f"day-{r['day']}" / "words.json"
+        if p.exists():
+            try:
+                ws = [w["w"] for w in
+                      json.loads(p.read_text(encoding="utf-8"))["words"]]
+            except Exception:
+                ws = []
+        if not ws:
+            ws = st.get("days", {}).get(r["day"], {}).get("words", [])
+        out.append({
+            "day": r["day"],
+            "round": r["round"],
+            "gap_days": r["gap"],
+            "words": ws,
+        })
     return out
 
 
@@ -105,17 +136,43 @@ def cmd_status(st: dict) -> None:
 
 
 def cmd_plan(st: dict) -> None:
-    nxt = next_day_num(st)
-    start_idx = sum(len(st["days"][d]["words"]) for d in st["days"])
-    end_idx = start_idx + st["words_per_day"]
+    """
+    出下一课计划。
+
+    ⚠️ 「下一课」按 **日期** 算，不按 progress.json 的记录 ——
+       那个记录只有用户手动 --done 才更新，线上从来不写，
+       所以永远停在 Day 01，算出来的"下一课"是错的。
+    """
+    start = date.fromisoformat(st["start_date"])
+    cur = day_of(start, date.today())
+    nxt = max(1, cur)
+
+    # 词序号区间直接读 content 里的 `range` 字段。
+    #
+    # ⚠️ **不要自己累加计数** —— 实测会偏。Day 03 实际有 31 词
+    #    （早先补词时整段多带了一个），但它的 range 是 '61-90'。
+    #    按计数累加得 91 → 算出 '92-121'，而权威值是 '91-120'。
+    #    **书里给的 range 才是事实来源，计数只是推算。**
+    rf = ROOT / "content" / f"day-{nxt:02d}" / "words.json"
+    rng = ""
+    n_new = st["words_per_day"]
+    if rf.exists():
+        try:
+            x = json.loads(rf.read_text(encoding="utf-8"))
+            rng = x.get("range", "")
+            n_new = len(x["words"])
+        except Exception:
+            pass
 
     dl = due_words(st)
-    rev = is_review_day(st, nxt)
+    rev = is_review_day(st, f"{nxt:02d}")
 
-    print(f"=== 下一课计划：Day {nxt} ===")
-    print(f"类型：{'纯复习文章（不加新词）' if rev else f'新词 {start_idx + 1}-{end_idx}'}")
-    if not rev:
-        print(f"新词数：{st['words_per_day']}")
+    print(f"=== 今天的课：Day {nxt:02d}（{date.today()}）===")
+    if rev:
+        print("类型：纯复习文章（不加新词）")
+    else:
+        print(f"类型：新词 {rng or f'约 {n_new} 个'}")
+        print(f"新词数：{n_new}")
     if dl:
         pool = [w for d in dl for w in d["words"]]
         print(f"\n要顺带复习的旧词（从 {len(pool)} 个里挑 3-5 个塞进文章）：")
@@ -126,6 +183,13 @@ def cmd_plan(st: dict) -> None:
 
 
 def cmd_done(st: dict, day: str) -> None:
+    """
+    标记某天已学完 —— **只作记录，不参与排期**。
+
+    ⚠️ 排期已改为从 start_date 纯推算（见 review.py），
+       所以这份记录即使缺失/过时，复习提醒也照样正确。
+       它现在的价值是「留一份学过什么的快照」。
+    """
     src = ROOT / "content" / f"day-{day}" / "words.json"
     if not src.exists():
         sys.exit(f"找不到 {src}")
@@ -138,6 +202,41 @@ def cmd_done(st: dict, day: str) -> None:
     }
     save(st)
     print(f"已标记 Day {day} 学完（{len(data['words'])} 词）。")
+
+
+def cmd_sync(st: dict) -> None:
+    """
+    按日期把 progress.json 追平 —— 把「截至今天该学过的天」都补上记录。
+
+    为什么需要：用户从不手动 --done，线上也不写这个文件，
+    于是它永远停在 Day 01，看着像"只学了一天"。
+    排期虽然不依赖它（改为纯推算），但**留一份过时数据会误导人**
+    （错误日志 H14：待做表不更新会让人判断错卡点）。
+
+    用「该学那天」的日期记账，而不是今天 —— 这样补出来的记录是对的。
+    """
+    start = date.fromisoformat(st["start_date"])
+    cur = day_of(start, date.today())
+    n = total_days()
+    added = 0
+    for i in range(1, min(cur, n) + 1):
+        d = f"{i:02d}"
+        if d in st["days"]:
+            continue
+        src = ROOT / "content" / f"day-{d}" / "words.json"
+        if not src.exists():
+            continue
+        data = json.loads(src.read_text(encoding="utf-8"))
+        st["days"][d] = {
+            "date": str(start + timedelta(days=i - 1)),   # 该学那天的日期
+            "unit": data.get("unit", ""),
+            "range": data.get("range", ""),
+            "words": [w["w"] for w in data["words"]],
+        }
+        added += 1
+    save(st)
+    print(f"已追平：补了 {added} 天，现共 {len(st['days'])} 天记录"
+          f"（截至今天第 {cur} 天）。")
 
 
 def cmd_due(st: dict) -> None:
@@ -157,6 +256,8 @@ def main() -> None:
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--due", action="store_true")
     ap.add_argument("--done", metavar="DAY")
+    ap.add_argument("--sync", action="store_true",
+                    help="按日期把 progress.json 追平（补记截至今天的每一天）")
     ap.add_argument("--start-date", metavar="YYYY-MM-DD")
     args = ap.parse_args()
 
@@ -168,6 +269,8 @@ def main() -> None:
 
     if args.done:
         cmd_done(st, args.done)
+    elif args.sync:
+        cmd_sync(st)
     elif args.plan:
         cmd_plan(st)
     elif args.due:
