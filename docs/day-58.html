@@ -1,0 +1,693 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 58 · The Torn Page in the Lane House</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 58 · 12/9 · Unit 9 第 1711-1740 词</div>
+  <h1>The Torn Page in the Lane House<span class="cn">巷子老屋里那页破纸</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-58.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3029"><p class="en"><span class="w" data-s="43" data-e="213">Old</span> <span class="w" data-s="256" data-e="427">Mr.</span> <span class="w" data-s="555" data-e="768">Gu</span> <span class="w" data-s="811" data-e="1067">died</span> <span class="w" data-s="1109" data-e="1323">in</span> <span class="w" data-s="1365" data-e="1408">the</span> <span class="w" data-s="1451" data-e="1579">lane</span> <span class="w" data-s="1621" data-e="1792">house,</span> <span class="w" data-s="2005" data-e="2347">leaving</span> <span class="w" data-s="2389" data-e="2645">two</span> <span class="w" data-s="2688" data-e="3029">sons.</span></p><p class="zh">老顾先生在那栋巷房里去世，留下两个儿子。</p></div>
+<div class="pair" data-s0="3200" data-s1="7296"><p class="en"><span class="w" data-s="3200" data-e="3968">Gu</span> <span class="w" data-s="4011" data-e="4267">Ping</span> <span class="w" data-s="4309" data-e="4523">found</span> <span class="w" data-s="4565" data-e="4779">a</span> <span class="w" data-s="4821" data-e="4992">torn</span> <span class="w target" data-s="5035" data-e="5248" title="记录,记载(详情) n. 文件;公文;文献;证件">document:</span> <span class="w" data-s="5589" data-e="6272">a</span> <span class="w" data-s="6315" data-e="6443">list</span> <span class="w" data-s="6485" data-e="6699">of</span> <span class="w" data-s="6741" data-e="6784">the</span> <span class="w" data-s="6827" data-e="6955">family</span> <span class="w target" data-s="6997" data-e="7296" title="所有物；财产；不动产；房地产">property.</span></p><p class="zh">顾平找到一份撕破的文件：一张家产清单。</p></div>
+<div class="pair" data-s0="8154" data-s1="12420"><p class="en"><span class="w" data-s="8154" data-e="8282">Gu</span> <span class="w" data-s="8324" data-e="8538">An</span> <span class="w" data-s="8580" data-e="8836">read</span> <span class="w" data-s="8879" data-e="8964">it</span> <span class="w" data-s="9007" data-e="9092">for</span> <span class="w" data-s="9135" data-e="9220">a</span> <span class="w target" data-s="9263" data-e="9604" title="两星期，十四天">fortnight,</span> <span class="w" data-s="9732" data-e="10116">called</span> <span class="w" data-s="10159" data-e="10372">it</span> <span class="w target" data-s="10415" data-e="10756" title="锻造，伪造；艰苦干成">forged,</span> <span class="w" data-s="10970" data-e="11140">and</span> <span class="w" data-s="11311" data-e="11482">said</span> <span class="w" data-s="11524" data-e="11652">it</span> <span class="w" data-s="11695" data-e="11738">would</span> <span class="w target" data-s="11780" data-e="11994" title="冒犯，使不愉快">offend</span> <span class="w" data-s="12036" data-e="12207">their</span> <span class="w" data-s="12250" data-e="12420">father.</span></p><p class="zh">顾安读了两个星期，说这是伪造的，还说这会冒犯他们的父亲。</p></div>
+<div class="pair" data-s0="12719" data-s1="16943"><p class="en"><span class="w" data-s="12719" data-e="13402">By</span> <span class="w" data-s="13444" data-e="13658">custom,</span> <span class="w" data-s="13956" data-e="14340">the</span> <span class="w" data-s="14383" data-e="14639">younger</span> <span class="w" data-s="14682" data-e="14810">son</span> <span class="w" data-s="14852" data-e="15066">got</span> <span class="w" data-s="15108" data-e="15279">only</span> <span class="w" data-s="15322" data-e="15492">a</span> <span class="w target" data-s="15535" data-e="15620" title="一系列；范围，界限；射程；山脉 v.(在一定的范围内)变化，变动">range</span> <span class="w" data-s="15663" data-e="15834">of</span> <span class="w" data-s="15876" data-e="16175">rooms</span> <span class="w" data-s="16218" data-e="16431">behind</span> <span class="w" data-s="16474" data-e="16687">the</span> <span class="w" data-s="16730" data-e="16943">kitchen.</span></p><p class="zh">按巷子里的规矩，小儿子只分到厨房后面的几间小屋。</p></div>
+<div class="pair" data-s0="17507" data-s1="22541"><p class="en"><span class="w" data-s="17507" data-e="17635">Gu</span> <span class="w" data-s="17677" data-e="17891">Ping</span> <span class="w target" data-s="17933" data-e="18531" title="安排；筹备；谱写，改编(乐曲)">arranged</span> <span class="w" data-s="18573" data-e="18659">the</span> <span class="w" data-s="18701" data-e="18957">funeral:</span> <span class="w" data-s="19171" data-e="19768">the</span> <span class="w target" data-s="19811" data-e="20152" title="一连串，一系列；顺序">sequence</span> <span class="w" data-s="20195" data-e="20323">of</span> <span class="w" data-s="20365" data-e="20451">the</span> <span class="w" data-s="20493" data-e="20792">speeches</span> <span class="w" data-s="20835" data-e="21091">and</span> <span class="w" data-s="21133" data-e="21475">the</span> <span class="w target" data-s="21517" data-e="21645" title="">series</span> <span class="w" data-s="21688" data-e="21944">of</span> <span class="w" data-s="21987" data-e="22200">small</span> <span class="w target" data-s="22243" data-e="22541" title="事件，大事，活动">events.</span></p><p class="zh">顾平操办了葬礼：致辞的顺序，以及那一连串细小的环节。</p></div>
+<div class="pair" data-s0="22797" data-s1="27064"><p class="en"><span class="w target" data-s="22797" data-e="23821" title="频繁的；经常发生的">Frequent</span> <span class="w" data-s="23864" data-e="24163">questions</span> <span class="w" data-s="24205" data-e="24547">tired</span> <span class="w" data-s="24589" data-e="24888">him,</span> <span class="w" data-s="25016" data-e="25059">and</span> <span class="w" data-s="25101" data-e="25613">at</span> <span class="w" data-s="25656" data-e="25699">the</span> <span class="w target" data-s="25741" data-e="25869" title="最终的；最后的；不可改变的 n. 决赛；大 学毕业考试；结业考试">final</span> <span class="w" data-s="25912" data-e="26211">reading</span> <span class="w" data-s="26253" data-e="26509">he</span> <span class="w" data-s="26552" data-e="26893">stepped</span> <span class="w" data-s="26936" data-e="27064">back.</span></p><p class="zh">频繁的追问让他疲惫，念到最后一段时，他往后退了一步。</p></div>
+<div class="pair" data-s0="27655" data-s1="31879"><p class="en"><span class="w" data-s="27655" data-e="27740">At</span> <span class="w" data-s="27783" data-e="27911">last</span> <span class="w" data-s="27953" data-e="28209">he</span> <span class="w" data-s="28252" data-e="28508">admitted</span> <span class="w" data-s="28551" data-e="28679">the</span> <span class="w" data-s="28721" data-e="28849">line</span> <span class="w" data-s="28892" data-e="29063">was</span> <span class="w" data-s="29105" data-e="29276">his,</span> <span class="w" data-s="29532" data-e="29745">written</span> <span class="w" data-s="30001" data-e="30257">to</span> <span class="w target" data-s="30300" data-e="30513" title="防御；保卫；防守；替……辩护；参加……以保 住……">defend</span> <span class="w" data-s="30556" data-e="30727">his</span> <span class="w" data-s="30769" data-e="31153">mother&#x27;s</span> <span class="w" data-s="31196" data-e="31281">piece</span> <span class="w" data-s="31324" data-e="31452">of</span> <span class="w" data-s="31495" data-e="31580">the</span> <span class="w target" data-s="31623" data-e="31879" title="财产；遗产；大片私有土地">estate.</span></p><p class="zh">最后他承认那行字是他写的，为的是保住母亲那份遗产。</p></div>
+<div class="pair" data-s0="32092" data-s1="38321"><p class="en"><span class="w" data-s="32092" data-e="32817">The</span> <span class="w target" data-s="32860" data-e="33287" title="主要的；首要的，最初的；初等教育的">primary</span> <span class="w" data-s="33329" data-e="33500">rule</span> <span class="w" data-s="33543" data-e="33841">was</span> <span class="w" data-s="33884" data-e="34268">that</span> <span class="w" data-s="34311" data-e="34396">a</span> <span class="w" data-s="34439" data-e="34524">brother</span> <span class="w" data-s="34567" data-e="34823">must</span> <span class="w" data-s="34865" data-e="35079">never</span> <span class="w" data-s="35121" data-e="35335">be</span> <span class="w" data-s="35377" data-e="35676">shamed</span> <span class="w" data-s="35719" data-e="35889">in</span> <span class="w" data-s="35932" data-e="36060">public;</span> <span class="w" data-s="36401" data-e="36956">the</span> <span class="w target" data-s="36999" data-e="37425" title="次要的；从属的；间接引发的；中等教育的； 中学的">secondary</span> <span class="w" data-s="37468" data-e="37681">matter</span> <span class="w" data-s="37724" data-e="37980">had</span> <span class="w" data-s="38023" data-e="38151">to</span> <span class="w" data-s="38193" data-e="38321">wait.</span></p><p class="zh">首要的规矩是：兄弟绝不能被当众羞辱；那件次要的事只能往后放。</p></div>
+<div class="pair" data-s0="38970" data-s1="41359"><p class="en"><span class="w" data-s="38970" data-e="39141">Aunt</span> <span class="w" data-s="39183" data-e="39397">Feng</span> <span class="w" data-s="39439" data-e="39738">stood</span> <span class="w" data-s="39781" data-e="39909">by</span> <span class="w" data-s="39951" data-e="40079">the</span> <span class="w target" data-s="40122" data-e="40250" title="">fence</span> <span class="w" data-s="40293" data-e="40506">to</span> <span class="w" data-s="40549" data-e="40847">settle</span> <span class="w" data-s="40890" data-e="40975">the</span> <span class="w" data-s="41018" data-e="41359">quarrel.</span></p><p class="zh">冯阿姨站在篱笆边，来平息这场争吵。</p></div>
+<div class="pair" data-s0="41487" data-s1="48783"><p class="en"><span class="w" data-s="41487" data-e="41658">A</span> <span class="w" data-s="42042" data-e="42298">family</span> <span class="w" data-s="42341" data-e="42597">is</span> <span class="w" data-s="42639" data-e="42725">like</span> <span class="w" data-s="42767" data-e="42895">a</span> <span class="w" data-s="42938" data-e="43023">yard,</span> <span class="w" data-s="43365" data-e="43663">she</span> <span class="w" data-s="43706" data-e="43877">said:</span> <span class="w" data-s="44175" data-e="44687">guard</span> <span class="w" data-s="44730" data-e="44901">the</span> <span class="w target" data-s="44943" data-e="45071" title="所有物；财产；不动产；房地产">property</span> <span class="w" data-s="45114" data-e="45541">inside,</span> <span class="w" data-s="45882" data-e="46053">but</span> <span class="w" data-s="46309" data-e="46522">throw</span> <span class="w" data-s="46565" data-e="46906">stones</span> <span class="w" data-s="46949" data-e="47162">around</span> <span class="w" data-s="47205" data-e="47546">and</span> <span class="w" data-s="47589" data-e="47930">you</span> <span class="w" data-s="47973" data-e="48058">break</span> <span class="w" data-s="48101" data-e="48314">your</span> <span class="w" data-s="48357" data-e="48485">own</span> <span class="w target" data-s="48527" data-e="48783" title="">fence.</span></p><p class="zh">她说，一个家就像一个院子：里面的财产要守，可到处扔石头，砸断的就是自己的篱笆。</p></div>
+<div class="pair" data-s0="49438" data-s1="54302"><p class="en"><span class="w" data-s="49438" data-e="49694">Her</span> <span class="w" data-s="49736" data-e="49907">words</span> <span class="w" data-s="49950" data-e="50206">were</span> <span class="w" data-s="50248" data-e="50376">so</span> <span class="w target" data-s="50419" data-e="51016" title="适当的；合适的 v. 私占；盗用；挪用；拨 出(专款)">appropriate</span> <span class="w" data-s="51059" data-e="51187">that</span> <span class="w" data-s="51230" data-e="51358">both</span> <span class="w" data-s="51400" data-e="51784">brothers</span> <span class="w" data-s="51827" data-e="52168">bowed,</span> <span class="w" data-s="52339" data-e="52467">and</span> <span class="w" data-s="52595" data-e="52766">the</span> <span class="w" data-s="52808" data-e="52936">lane</span> <span class="w" data-s="52979" data-e="53235">stood</span> <span class="w" data-s="53278" data-e="53406">in</span> <span class="w" data-s="53448" data-e="53619">perfect</span> <span class="w target" data-s="53662" data-e="54302" title="得体的举止；有分寸的行为；行为规范；礼节； 规矩">propriety.</span></p><p class="zh">她的话如此恰当，兄弟俩都低下了头，整条巷子举止得体。</p></div>
+<div class="pair" data-s0="54515" data-s1="57715"><p class="en"><span class="w" data-s="54515" data-e="54984">&#x27;The</span> <span class="w target" data-s="55027" data-e="55240" title="财富，财产；大量；富有">wealth</span> <span class="w" data-s="55283" data-e="55368">of</span> <span class="w" data-s="55411" data-e="55496">this</span> <span class="w" data-s="55539" data-e="55710">family</span> <span class="w" data-s="55752" data-e="56051">is</span> <span class="w" data-s="56094" data-e="56222">not</span> <span class="w" data-s="56264" data-e="56435">in</span> <span class="w" data-s="56478" data-e="56520">the</span> <span class="w" data-s="56563" data-e="56819">rooms,&#x27;</span> <span class="w" data-s="57416" data-e="57502">she</span> <span class="w" data-s="57544" data-e="57715">said.</span></p><p class="zh">“这个家的财富不在那些屋子里，”她说。</p></div>
+<div class="pair" data-s0="58363" data-s1="61861"><p class="en"><span class="w target" data-s="58363" data-e="58832" title="">Ownership,</span> <span class="w" data-s="59088" data-e="59259">Gu</span> <span class="w" data-s="59472" data-e="59685">An</span> <span class="w" data-s="59728" data-e="59941">saw,</span> <span class="w" data-s="60240" data-e="60453">is</span> <span class="w" data-s="60624" data-e="60795">not</span> <span class="w" data-s="60837" data-e="61051">paper</span> <span class="w" data-s="61093" data-e="61477">but</span> <span class="w" data-s="61648" data-e="61733">a</span> <span class="w" data-s="61776" data-e="61861">promise.</span></p><p class="zh">顾安明白了，所有权不是纸张，而是一个承诺。</p></div>
+<div class="pair" data-s0="62203" data-s1="65915"><p class="en"><span class="w" data-s="62203" data-e="62629">He</span> <span class="w" data-s="62672" data-e="63056">had</span> <span class="w" data-s="63099" data-e="63184">come</span> <span class="w" data-s="63227" data-e="63397">to</span> <span class="w target" data-s="63440" data-e="63653" title="">possess</span> <span class="w" data-s="63696" data-e="63867">the</span> <span class="w" data-s="63909" data-e="63995">house</span> <span class="w" data-s="64037" data-e="64464">and</span> <span class="w" data-s="64507" data-e="64805">left</span> <span class="w" data-s="64848" data-e="65061">with</span> <span class="w" data-s="65104" data-e="65275">something</span> <span class="w target" data-s="65317" data-e="65616" title="值……钱的；值得的n. 价值">worth</span> <span class="w" data-s="65659" data-e="65915">more.</span></p><p class="zh">他本是回来占这栋房子的，走时却带走了更值得的东西。</p></div>
+<div class="pair" data-s0="66171" data-s1="71035"><p class="en"><span class="w" data-s="66171" data-e="66853">As</span> <span class="w" data-s="66896" data-e="67024">a</span> <span class="w target" data-s="67067" data-e="67493" title="预备性的；初步的 n. 初步行动(或活 动);预备性措施">preliminary</span> <span class="w" data-s="67536" data-e="67792">step,</span> <span class="w" data-s="68048" data-e="68219">the</span> <span class="w" data-s="68389" data-e="68688">brothers</span> <span class="w" data-s="68731" data-e="68987">carried</span> <span class="w" data-s="69029" data-e="69115">out</span> <span class="w" data-s="69157" data-e="69285">a</span> <span class="w" data-s="69328" data-e="69413">chair,</span> <span class="w" data-s="69712" data-e="69925">a</span> <span class="w" data-s="70011" data-e="70139">bed</span> <span class="w" data-s="70181" data-e="70565">and</span> <span class="w" data-s="70693" data-e="70821">a</span> <span class="w target" data-s="70864" data-e="71035" title="">chain.</span></p><p class="zh">作为第一步，兄弟俩抬出一把椅子、一张床，还有一条链子。</p></div>
+<div class="pair" data-s0="71686" data-s1="75057"><p class="en"><span class="w" data-s="71686" data-e="71814">The</span> <span class="w" data-s="71857" data-e="71942">house</span> <span class="w" data-s="71985" data-e="72241">had</span> <span class="w" data-s="72284" data-e="72326">been</span> <span class="w target" data-s="72369" data-e="72753" title="原始的；粗糙的；简单的">primitive:</span> <span class="w" data-s="72966" data-e="73265">one</span> <span class="w" data-s="73308" data-e="73606">bowl,</span> <span class="w" data-s="73734" data-e="73905">one</span> <span class="w" data-s="74033" data-e="74289">lamp,</span> <span class="w" data-s="74460" data-e="74630">one</span> <span class="w" data-s="74673" data-e="75057">stove.</span></p><p class="zh">这栋房子一直很简陋：一只碗、一盏灯、一个炉子。</p></div>
+<div class="pair" data-s0="75270" data-s1="78641"><p class="en"><span class="w" data-s="75270" data-e="75910">Every</span> <span class="w target" data-s="75953" data-e="76508" title="随后的；后来的">subsequent</span> <span class="w" data-s="76550" data-e="76721">question</span> <span class="w" data-s="76764" data-e="77062">about</span> <span class="w" data-s="77105" data-e="77233">the</span> <span class="w" data-s="77276" data-e="77361">will</span> <span class="w" data-s="77404" data-e="77702">still</span> <span class="w" data-s="77958" data-e="78214">had</span> <span class="w" data-s="78257" data-e="78342">to</span> <span class="w" data-s="78385" data-e="78470">be</span> <span class="w" data-s="78513" data-e="78641">answered.</span></p><p class="zh">关于遗嘱的随后每一个问题，仍然必须回答。</p></div>
+<div class="pair" data-s0="78897" data-s1="81585"><p class="en"><span class="w" data-s="78897" data-e="79324">It</span> <span class="w" data-s="79494" data-e="79708">was</span> <span class="w" data-s="79750" data-e="79836">the</span> <span class="w" data-s="79878" data-e="79964">last</span> <span class="w" data-s="80006" data-e="80177">of</span> <span class="w" data-s="80220" data-e="80305">a</span> <span class="w target" data-s="80348" data-e="80476" title="">series</span> <span class="w" data-s="80518" data-e="80732">of</span> <span class="w target" data-s="80774" data-e="80902" title="事件，大事，活动">events</span> <span class="w" data-s="80945" data-e="81201">in</span> <span class="w" data-s="81244" data-e="81329">that</span> <span class="w" data-s="81372" data-e="81585">lane.</span></p><p class="zh">那是那条巷子里一连串事件中的最后一件。</p></div>
+<div class="pair" data-s0="82189" data-s1="86925"><p class="en"><span class="w" data-s="82189" data-e="82317">In</span> <span class="w" data-s="82360" data-e="82445">his</span> <span class="w target" data-s="82488" data-e="82701" title="主要的；优质的；典型的 n. 盛年；鼎盛时 期 v. 事先指点；使(某人)做好准备">prime</span> <span class="w" data-s="82744" data-e="83042">the</span> <span class="w" data-s="83085" data-e="83213">old</span> <span class="w" data-s="83256" data-e="83469">man</span> <span class="w" data-s="83512" data-e="83682">was</span> <span class="w" data-s="83725" data-e="83853">a</span> <span class="w" data-s="83896" data-e="84194">giant</span> <span class="w" data-s="84237" data-e="84365">of</span> <span class="w" data-s="84408" data-e="84493">the</span> <span class="w" data-s="84536" data-e="84706">lane;</span> <span class="w" data-s="85005" data-e="85560">the</span> <span class="w" data-s="85602" data-e="85730">snow</span> <span class="w" data-s="85773" data-e="86157">came</span> <span class="w" data-s="86200" data-e="86370">as</span> <span class="w" data-s="86413" data-e="86456">a</span> <span class="w target" data-s="86498" data-e="86925" title="结果；价值；重要性">consequence.</span></p><p class="zh">在盛年时，老人曾是巷子里的一个巨人；那场雪，就是随之而来的结果。</p></div>
+<div class="pair" data-s0="87138" data-s1="89613"><p class="en"><span class="w" data-s="87138" data-e="87736">The</span> <span class="w target" data-s="87778" data-e="88077" title="记录,记载(详情) n. 文件;公文;文献;证件">document</span> <span class="w" data-s="88120" data-e="88376">was</span> <span class="w target" data-s="88418" data-e="88760" title="终于;最后">eventually</span> <span class="w" data-s="88802" data-e="89229">framed</span> <span class="w" data-s="89272" data-e="89357">on</span> <span class="w" data-s="89400" data-e="89485">the</span> <span class="w" data-s="89528" data-e="89613">wall.</span></p><p class="zh">那份文件最终被装进框里，挂在了墙上。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">document</span>
+          <span class="ipa">/&#x27;da:kjumənt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">记录,记载(详情) n. 文件;公文;文献;证件</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>found a torn document</div>          <div class="root"><span class="lbl">根</span>doc(教，使知道) + ument → 用来让人知道的东西 → 文件</div>          <div class="zt"><span class="lbl">真题</span>A study of 12-to 19-month-olds learning how to walk documented that these children fell down a lot. 一项研究表明，12 到 19 个月大 的婴儿学习走路时，经常摔倒。(2021)</div>          <div class="fam"><span class="lbl">族</span>documentary n. 纪录片 / documentation n. 文件证明</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">forge</span>
+          <span class="ipa">/fə:rd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">锻造，伪造；艰苦干成</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>called it forged</div>          <div class="mnem"><span class="lbl">记</span>四个（for发音类似 four)哥哥 (ge汉语拼音是“哥”)。父母去世了，为了得到 遗产，四个哥哥居然“伪造”了父母的遗书，想要 得到遗产。</div>          <div class="root"><span class="lbl">根</span>联想：铁匠在炉边「锻」东西 → 假东西也是这样造出来的 → 伪造</div>          <div class="zt"><span class="lbl">真题</span>As he traveled through the homes of early 19th century nobility, Carême forged the new art of French gourmet food. 当他在 19 世 纪早期贵族的家中游历时，卡莱姆创造了法国 美食的新艺术。</div>          <div class="fam"><span class="lbl">族</span>forgery n. 伪造品 / forger n. 伪造者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">fortnight</span>
+          <span class="ipa">/&#x27;foirtnait/</span>
+          <span class="pos">n.</span>
+          <span class="cn">两星期，十四天</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>read it for a fortnight</div>          <div class="root"><span class="lbl">根</span>fort(十四) + night(夜) → 十四个夜晚 → 两星期</div>          <div class="zt"><span class="lbl">真题</span>Professor Smith recently persuaded 35 people, 23 of them women, to keep a diary of all their absent-minded actions for a fortnight. 史密斯教授最近说服35 人(其中 23 人是女性) 连续两周把他们所有心不在焉的行为记下来。</div>          <div class="fam"><span class="lbl">族</span>fortnightly adj. 每两星期的 / fortnight n. 两星期</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">range</span>
+          <span class="ipa">/reind3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一系列；范围，界限；射程；山脉 v.(在一定的范围内)变化，变动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>only a range of rooms behind the kitchen</div>          <div class="root"><span class="lbl">根</span>rank(排，行列) + e → 排成一片的地方 → 范围；一系列</div>          <div class="zt"><span class="lbl">真题</span>So far, participants have ranged in age from 2 to 85. 到目前为止，参与者的年龄从 2 岁到 85 岁不等。(2019)</div>          <div class="fam"><span class="lbl">族</span>arrange v. 安排 / range n. 射程，山脉</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">arrange</span>
+          <span class="ipa">/ə&#x27;reind3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">安排；筹备；谱写，改编(乐曲)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Gu Ping arranged the funeral</div>          <div class="root"><span class="lbl">根</span>ar(一再) + range(排列) → 反复排好位置 → 安排</div>          <div class="zt"><span class="lbl">真题</span>Doris helped him arrange the furniture. 多丽丝帮他布置家具。 再地在一个范围内。我们的能力都是有限的， 只能在一定的范围内“安排”事情。</div>          <div class="fam"><span class="lbl">族</span>arrangement n. 安排 / rearrange v. 重新安排</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">event</span>
+          <span class="ipa">/ı&#x27;vent/</span>
+          <span class="pos">n.</span>
+          <span class="cn">事件，大事，活动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the series of small events</div>          <div class="mnem"><span class="lbl">记</span>走(vent 想成 went)出去(e 表 示往外)。要走出去，看看这个大世界，就是你 的人生“大事”。</div>          <div class="root"><span class="lbl">根</span>e(出) + vent(走) → 走出去发生的事 → 事件</div>          <div class="zt"><span class="lbl">真题</span>Most people do not have clear memories of past events. 大多数人对过去的事情没有清 晰的记忆。(2017)</div>          <div class="fam"><span class="lbl">族</span>eventful adj. 多事的 / eventually adv. 最终</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">eventually</span>
+          <span class="ipa">/ı&#x27;vent∫uəli/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">终于;最后</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The document was eventually framed on the wall</div>          <div class="root"><span class="lbl">根</span>eventual(最终的) + ly(副词后缀) → 最终地</div>          <div class="zt"><span class="lbl">真题</span>The waste problem will eventually hurt all of us. 浪费的问题最终会伤害我们所有人。</div>          <div class="fam"><span class="lbl">族</span>eventual adj. 最终的 / event n. 事件</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">final</span>
+          <span class="ipa">/&#x27;fainl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">最终的；最后的；不可改变的 n. 决赛；大 学毕业考试；结业考试</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>at the final reading he stepped back</div>          <div class="mnem"><span class="lbl">记</span>这个单词乍一看有点陌生，其 实它的副词我们很熟悉：finally最终，最后。</div>          <div class="root"><span class="lbl">根</span>fin(结束，界限) + al → 走到界限上 → 最后的</div>          <div class="zt"><span class="lbl">真题</span>She is never sure what the final design will look like until the end. 直到最后，她才确 定最终的设计是什么样子。(2017)</div>          <div class="fam"><span class="lbl">族</span>finally adv. 最后 / finish v. 完成</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">consequence</span>
+          <span class="ipa">/&#x27;kpnsikwəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">结果；价值；重要性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the snow came as a consequence</div>          <div class="mnem"><span class="lbl">记</span>ar(一再地)十range(范围)，一</div>          <div class="root"><span class="lbl">根</span>con(一起) + sequ(跟随) + ence → 跟着一起来的东西 → 结果</div>          <div class="zt"><span class="lbl">真题</span>Focusing on output alone can have unintended consequences. 只关注产出可能会产 生意想不到的后果。(2022)</div>          <div class="fam"><span class="lbl">族</span>consequent adj. 随之而来的 / consequently adv. 因此</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">sequence</span>
+          <span class="ipa">/&#x27;si:kwəns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">一连串，一系列；顺序</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the sequence of the speeches</div>          <div class="root"><span class="lbl">根</span>sequ(跟随) + ence(名词后缀) → 一个跟着一个 → 顺序</div>          <div class="zt"><span class="lbl">真题</span>What each person does is to put together 安排方式；商定；改编 out of the pages of that day&#x27;s paper, his own selection and sequence, his own newspaper. 每 个人所做的就是把当天的报纸，按照自己的选 择和顺序，整理成自己的报纸。 (218)</div>          <div class="fam"><span class="lbl">族</span>sequential adj. 连续的 / consequence n. 结果</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">series</span>
+          <span class="ipa">/&#x27;siəriiz/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the series of small events</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音特别像 serious (严重的)，我们中国有句古话叫“福不双至，祸 不单行”，所以严重的事情(通常是祸)一发生就 是一连串的→连续，一系列。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a series of + 复数名词 → 一系列</div>          <div class="zt"><span class="lbl">真题</span>The researchers carried out a series of experiments to see if people would choose a smaller meal if it was paired with a non-food item.研究人员进行了一系列的实验，看看人们 是否会为了除食物之外的福利而选择更小分量 的套餐。(2016)</div>          <div class="fam"><span class="lbl">族</span>serial adj. 连续的 / series n. 系列</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">chain</span>
+          <span class="ipa">/t∫emn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a chair, a bed and a chain</div>          <div class="mnem"><span class="lbl">记</span>cha（插）十in（里面，内），“链 条”要穿插进自行车轮，才能锁住自行车。</div>          <div class="root"><span class="lbl">根</span>谐音联想：拆(chai)成一个一个环，再穿(chain)起来 → 链条</div>          <div class="zt"><span class="lbl">真题</span>The microwave and fast-food chains were the biggest catalysts(催化剂). 微波炉和快餐连 锁店是最大的催化剂。(2020)</div>          <div class="fam"><span class="lbl">族</span>chain n. 连锁店 / chained adj. 被锁住的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">subsequent</span>
+          <span class="ipa">/&#x27;sabsikwənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">随后的；后来的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Every subsequent question about the will</div>          <div class="mnem"><span class="lbl">记</span>sub(下面)十sequent(连续的) →下面还有→随后的；后来的。</div>          <div class="root"><span class="lbl">根</span>sub(下面) + sequ(跟随) + ent → 跟在后面的 → 随后的</div>          <div class="zt"><span class="lbl">真题</span>More on this study and the star ratings will appear in a subsequent post. 关于这项研究 和星级评分的更多信息将出现在随后的帖子 中。(2016)</div>          <div class="fam"><span class="lbl">族</span>subsequently adv. 随后 / consequence n. 结果</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">frequent</span>
+          <span class="ipa">/&#x27;fri:kwənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">频繁的；经常发生的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Frequent questions tired him</div>          <div class="root"><span class="lbl">根</span>frequ(挤满，反复) + ent → 一再出现的 → 频繁的</div>          <div class="zt"><span class="lbl">真题</span>Frequency of crying varies widely: some shed tears at any novel or movie, others only a handful of times in their lives. 哭泣的频率差别 很大：有些人在看任何一部小说或电影时会流 泪，而有些人一生中只哭过几次。</div>          <div class="fam"><span class="lbl">族</span>frequency n. 频率 / frequently adv. 频繁地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">secondary</span>
+          <span class="ipa">/&#x27;sekənderi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">次要的；从属的；间接引发的；中等教育的； 中学的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the secondary matter had to wait</div>          <div class="mnem"><span class="lbl">记</span>该单词源自 second(第二的)， ary是形容词后缀，所以该单词的意思就是“次 要的，从属的”。</div>          <div class="root"><span class="lbl">根</span>second(第二) + ary(形容词后缀) → 排在第二的 → 次要的</div>          <div class="zt"><span class="lbl">真题</span>She finished her secondary school. 她完 成了中学学业。(2015)</div>          <div class="fam"><span class="lbl">族</span>secondly adv. 其次 / second v. 支持</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">primary</span>
+          <span class="ipa">/&#x27;praimeri/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">主要的；首要的，最初的；初等教育的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The primary rule was that a brother</div>          <div class="mnem"><span class="lbl">记</span>primary school 小学，这个我们 很熟悉，那 primary不就是“最初的”吗？幼儿 园不纳入我们九年义务教育的，所以小学就是 我们的基础教育。</div>          <div class="root"><span class="lbl">根</span>prim(第一) + ary(形容词后缀) → 排在第一的 → 首要的</div>          <div class="zt"><span class="lbl">真题</span>Their primary requirement for their children is to study hard, get good grades and go to famous universities. 他们对孩子的首要要 求就是努力学习，取得好成绩，上名牌大学。 (2015)</div>          <div class="fam"><span class="lbl">族</span>primarily adv. 主要地 / prime adj. 首要的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">prime</span>
+          <span class="ipa">/praim/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">主要的；优质的；典型的 n. 盛年；鼎盛时 期 v. 事先指点；使(某人)做好准备</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In his prime the old man was a giant of the lane</div>          <div class="mnem"><span class="lbl">记</span>primary是“基础的，主要的”， 那一个人最主要的时期就是他的“盛年；鼎盛时 期”(prime)。</div>          <div class="root"><span class="lbl">根</span>prim(第一) + e → 人生排在第一的阶段 → 盛年</div>          <div class="zt"><span class="lbl">真题</span>She primed herself to new opportunities she may otherwise have overlooked. 她为自己 准备好迎接新的机会，否则她可能会忽视这些 机会。(2017)</div>          <div class="fam"><span class="lbl">族</span>primary adj. 首要的 / primer n. 入门书</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">preliminary</span>
+          <span class="ipa">/prı&#x27;limineri/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">预备性的；初步的 n. 初步行动(或活 动);预备性措施</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>As a preliminary step</div>          <div class="root"><span class="lbl">根</span>pre(前) + limin(门槛) + ary → 门槛之前的 → 预备的</div>          <div class="zt"><span class="lbl">真题</span>A preliminary review of Mexico&#x27;s taxation found a fall in purchases of taxed drinks as well as a rise in sales of untaxed and healthier drinks. 一项对墨西哥税收的初步审 查发现，征税饮料的购买量有所下降，免税和更 健康饮料的销量有所上升。</div>          <div class="fam"><span class="lbl">族</span>preliminaries n. 预备程序 / preparatory adj. 准备的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">primitive</span>
+          <span class="ipa">/&#x27;primətiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">原始的；粗糙的；简单的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The house had been primitive</div>          <div class="mnem"><span class="lbl">记</span>人最初级的(primary)阶段不就 是原始的(primitive)吗？</div>          <div class="root"><span class="lbl">根</span>prim(第一，最初) + itive → 最初阶段的 → 原始的；简陋的</div>          <div class="zt"><span class="lbl">真题</span>And bacteria, primitive forms of life, have been seen there. 细菌是一种原始的生命 形式，已经在那里被发现。</div>          <div class="fam"><span class="lbl">族</span>primitively adv. 原始地 / primeval adj. 远古的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">offend</span>
+          <span class="ipa">/ə&#x27;fend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">冒犯，使不愉快</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it would offend their father</div>          <div class="mnem"><span class="lbl">记</span>of 表示“方向”；把f想象成小 时候玩的小手枪；end意为“最后”。连在一起就 是：某人拿着一把枪对着你到最后，他对你做了 什么？→冒犯。</div>          <div class="root"><span class="lbl">根</span>of(对着) + fend(打) → 对着人打过去 → 冒犯</div>          <div class="zt"><span class="lbl">真题</span>It may sound safe to avoid all physical contact so as not to offend anyone. 避免所有的 身体接触以不冒犯任何人听起来可能是安全 的。(2021)</div>          <div class="fam"><span class="lbl">族</span>offence n. 冒犯 / offensive adj. 无礼的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">defend</span>
+          <span class="ipa">/dr&#x27;fend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">防御；保卫；防守；替……辩护；参加……以保 住……</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>written to defend his mother&#x27;s piece of the estate</div>          <div class="mnem"><span class="lbl">记</span>弟弟(de)也拿着一把枪(f)，对 着某人到最后(end)，弟弟在干什么呢？→保 卫，防守。</div>          <div class="root"><span class="lbl">根</span>de(去掉) + fend(打) → 把打过来的挡开 → 保卫</div>          <div class="zt"><span class="lbl">真题</span>A tiger usually fights another tiger to defend its own territory. 老虎通常会与同类搏 斗来保卫自己的领地。</div>          <div class="fam"><span class="lbl">族</span>defence n. 防御 / defensive adj. 防御性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">fence</span>
+          <span class="ipa">/fens/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stood by the fence to settle the quarrel</div>          <div class="root"><span class="lbl">根</span>fenc(=fend 挡住) + e → 用来挡住的东西 → 篱笆</div>          <div class="zt"><span class="lbl">真题</span>Officers use soccer goals to fence the animal in. 警官们用足球球门把这只动物围起 来。(2019)</div>          <div class="fam"><span class="lbl">族</span>fencing n. 栅栏 / fenced adj. 围起来的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">appropriate</span>
+          <span class="ipa">/ə&#x27;prəupriət, ə&#x27;prəuprieit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">适当的；合适的 v. 私占；盗用；挪用；拨 出(专款)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her words were so appropriate</div>          <div class="mnem"><span class="lbl">记</span>词根 proper适当的，合适的。 一再地(ap)合适(propri 很像 proper)，还是“合 适的”意思。</div>          <div class="root"><span class="lbl">根</span>ap(一再) + propri(=proper 合适) + ate → 一再合适的 → 恰当的</div>          <div class="zt"><span class="lbl">真题</span>It was thought appropriate to award her the prize. 大家都认为应该把奖颁给她。</div>          <div class="fam"><span class="lbl">族</span>appropriately adv. 恰当地 / inappropriate adj. 不合适的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">propriety</span>
+          <span class="ipa">/prə&#x27;praiəti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">得体的举止；有分寸的行为；行为规范；礼节； 规矩</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the lane stood in perfect propriety</div>          <div class="mnem"><span class="lbl">记</span>这个单词我们可以用 proper来 记忆。proper就是“合适的”，那该单词为名词， 就是“得体的举止，有分寸的行为”。</div>          <div class="root"><span class="lbl">根</span>propri(=proper 合适) + ety(名词后缀) → 合适的行为 → 得体的举止</div>          <div class="fam"><span class="lbl">族</span>proper adj. 恰当的 / property n. 财产</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">property</span>
+          <span class="ipa">/&#x27;pra:pərti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">所有物；财产；不动产；房地产</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a list of the family property</div>          <div class="mnem"><span class="lbl">记</span>贫穷(poverty)的人没有很多财 产(property)。</div>          <div class="root"><span class="lbl">根</span>propri(自己的) + erty → 属于自己的东西 → 财产</div>          <div class="zt"><span class="lbl">真题</span>How was he supposed to do this: by making all property he had cleaned dirty again? 这件事他该怎么做呢：把他清洗过的所有东西 再次弄脏吗？(2020） (220</div>          <div class="fam"><span class="lbl">族</span>properties n. 性质，特性 / propertied adj. 有财产的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">possess</span>
+          <span class="ipa">/pə&#x27;zes/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had come to possess the house</div>          <div class="root"><span class="lbl">根</span>pos(放) + sess(坐) → 坐下来占住 → 拥有</div>          <div class="zt"><span class="lbl">真题</span>Interesting people usually possess certain unique qualities. 有趣的人通常具有某些独特的 品质。</div>          <div class="fam"><span class="lbl">族</span>possession n. 拥有 / possessive adj. 占有欲强的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">ownership</span>
+          <span class="ipa">/&#x27;əunər∫ip/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Ownership, Gu An saw, is not paper but a promise</div>          <div class="root"><span class="lbl">根</span>owner(所有者) + ship(身份) → 所有者的身份 → 所有权</div>          <div class="zt"><span class="lbl">真题</span>Giving students the choice encourages them to take ownership for their classes. 给学 生选择会鼓励他们对自己的课程当家作主。</div>          <div class="fam"><span class="lbl">族</span>owner n. 主人 / own v. 拥有</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">estate</span>
+          <span class="ipa">/i&#x27;steit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">财产；遗产；大片私有土地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his mother&#x27;s piece of the estate</div>          <div class="mnem"><span class="lbl">记</span>e(出去)十stat(=stand 站)十e →站出来的东西→(房子等)不动产。</div>          <div class="root"><span class="lbl">根</span>e(出) + stat(=stand 站) + e → 站出来立着的东西 → 不动产；遗产</div>          <div class="zt"><span class="lbl">真题</span>Employers argue they make considerable savings on real estate when workers shift from office to home work. 雇主们辩称，当员工从办 公室搬到家里工作时，他们在房地产上节省了 大量开支。(2021)</div>          <div class="fam"><span class="lbl">族</span>real estate 房地产 / estate agent 房产中介</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">wealth</span>
+          <span class="ipa">/welθ/</span>
+          <span class="pos">n.</span>
+          <span class="cn">财富，财产；大量；富有</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&#x27;The wealth of this family is not in the rooms,&#x27; she said</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“威尔士”。威尔 士是个国家(但不是一个主权国家)，是拥有城 堡最多的国家，所以这个国家很“富有”。</div>          <div class="root"><span class="lbl">根</span>weal(安康，幸福) + th → 让人过得好的东西 → 财富</div>          <div class="zt"><span class="lbl">真题</span>It can bring wealth and honor to them. 它可以给他们带来财富和荣誉。(2017)</div>          <div class="fam"><span class="lbl">族</span>wealthy adj. 富有的 / wealth n. 大量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">worth</span>
+          <span class="ipa">/w3:r0/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">值……钱的；值得的n. 价值</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>left with something worth more</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“我死”。我 “死”得有价值吗？值得吗？人生自古谁无死？ 留取丹心照汗青。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：be worth doing 值得做 / worth the money 值这个钱</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s worth asking if things are necessary. 如果有必要的话，问一问是值得的。(2022) (221) 第九单元</div>          <div class="fam"><span class="lbl">族</span>worthy adj. 值得的 / worthless adj. 无价值的</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 9 · Day 58</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

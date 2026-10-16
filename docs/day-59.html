@@ -1,0 +1,695 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 59 · A Letter About the Leak</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 59 · 12/10 · Unit 9 第 1741-1770 词</div>
+  <h1>A Letter About the Leak<span class="cn">一封关于漏水的信</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-59.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4267"><p class="en"><span class="w" data-s="43" data-e="128">In</span> <span class="w" data-s="171" data-e="512">autumn</span> <span class="w" data-s="555" data-e="768">Lin</span> <span class="w target" data-s="853" data-e="1280" title="安顿；定居;解决">settled</span> <span class="w" data-s="1323" data-e="1451">into</span> <span class="w" data-s="1493" data-e="1664">a</span> <span class="w" data-s="1707" data-e="1749">flat</span> <span class="w" data-s="1792" data-e="2048">above</span> <span class="w" data-s="2091" data-e="2261">a</span> <span class="w" data-s="2304" data-e="2560">bakery,</span> <span class="w" data-s="2731" data-e="2987">meaning</span> <span class="w" data-s="3200" data-e="3456">to</span> <span class="w target" data-s="3499" data-e="3669" title="居住;栖身;(~on)总是想着">dwell</span> <span class="w" data-s="3712" data-e="3883">there</span> <span class="w" data-s="3925" data-e="4053">for</span> <span class="w" data-s="4096" data-e="4267">years.</span></p><p class="zh">秋天，林搬进面包房楼上的一间小屋，打算在那儿住上好几年。</p></div>
+<div class="pair" data-s0="4565" data-s1="8149"><p class="en"><span class="w" data-s="4565" data-e="5291">Its</span> <span class="w" data-s="5333" data-e="5419">only</span> <span class="w target" data-s="5461" data-e="5845" title="资产，财产">asset</span> <span class="w" data-s="5888" data-e="6016">was</span> <span class="w" data-s="6059" data-e="6187">the</span> <span class="w" data-s="6229" data-e="6315">morning</span> <span class="w" data-s="6357" data-e="6613">light,</span> <span class="w" data-s="6869" data-e="6997">and</span> <span class="w" data-s="7253" data-e="7381">the</span> <span class="w" data-s="7424" data-e="7509">rent</span> <span class="w" data-s="7552" data-e="7723">was</span> <span class="w target" data-s="7765" data-e="8149" title="值得的;值得花时间的">worthwhile.</span></p><p class="zh">它唯一的资产是早晨的光线，房租也算值得了。</p></div>
+<div class="pair" data-s0="8804" data-s1="13198"><p class="en"><span class="w" data-s="8804" data-e="8932">Then</span> <span class="w" data-s="8974" data-e="9316">three</span> <span class="w" data-s="9358" data-e="9572">days</span> <span class="w" data-s="9614" data-e="9742">of</span> <span class="w" data-s="9785" data-e="9913">rain</span> <span class="w" data-s="9956" data-e="10212">came,</span> <span class="w" data-s="10468" data-e="10638">and</span> <span class="w" data-s="10894" data-e="11065">every</span> <span class="w" data-s="11108" data-e="11492">drop</span> <span class="w" data-s="11534" data-e="11748">on</span> <span class="w" data-s="11790" data-e="11876">the</span> <span class="w" data-s="11918" data-e="12046">window</span> <span class="w" data-s="12089" data-e="12473">left</span> <span class="w" data-s="12686" data-e="12900">her</span> <span class="w target" data-s="12942" data-e="13198" title="心烦的，苦恼的 v. 使心烦意乱，使心情 不好；搅乱">upset.</span></p><p class="zh">接着下了三天的雨，窗上的每一滴都让她心烦。</p></div>
+<div class="pair" data-s0="13497" data-s1="17209"><p class="en"><span class="w" data-s="13497" data-e="14137">Water</span> <span class="w" data-s="14180" data-e="14308">ran</span> <span class="w" data-s="14350" data-e="14564">down</span> <span class="w" data-s="14606" data-e="14734">the</span> <span class="w" data-s="14777" data-e="14862">wall</span> <span class="w" data-s="14905" data-e="15289">and</span> <span class="w" data-s="15460" data-e="15630">spread</span> <span class="w" data-s="15673" data-e="15972">over</span> <span class="w" data-s="16014" data-e="16185">it</span> <span class="w" data-s="16228" data-e="16356">like</span> <span class="w" data-s="16398" data-e="16526">a</span> <span class="w target" data-s="16569" data-e="16868" title="巨大的；特大的；伟大的 n. 巨人；大公 司；伟人">giant</span> <span class="w" data-s="16910" data-e="17209">map.</span></p><p class="zh">水顺着墙流下来，像一张巨大的地图一样在墙上铺开。</p></div>
+<div class="pair" data-s0="17422" data-s1="23576"><p class="en"><span class="w" data-s="17422" data-e="18020">Above</span> <span class="w" data-s="18062" data-e="18105">her</span> <span class="w" data-s="18148" data-e="18404">lived</span> <span class="w" data-s="18446" data-e="18660">Mr.</span> <span class="w" data-s="19480" data-e="19651">Feng,</span> <span class="w" data-s="19950" data-e="20163">a</span> <span class="w target" data-s="20462" data-e="20846" title="巨大的，巨人般的">gigantic</span> <span class="w" data-s="20888" data-e="21144">man</span> <span class="w" data-s="21187" data-e="21443">with</span> <span class="w" data-s="21486" data-e="21571">a</span> <span class="w target" data-s="21614" data-e="21784" title="巨大的，广大的">vast</span> <span class="w" data-s="21827" data-e="22040">voice;</span> <span class="w" data-s="22382" data-e="22723">his</span> <span class="w" data-s="22766" data-e="23064">bath</span> <span class="w" data-s="23107" data-e="23235">was</span> <span class="w" data-s="23278" data-e="23363">the</span> <span class="w" data-s="23406" data-e="23576">source.</span></p><p class="zh">她楼上住着冯先生，一个巨人般的男人，嗓门极大；源头就是他家的浴室。</p></div>
+<div class="pair" data-s0="23832" data-s1="29208"><p class="en"><span class="w" data-s="23832" data-e="24387">The</span> <span class="w" data-s="24430" data-e="24558">damage</span> <span class="w" data-s="24600" data-e="24899">was</span> <span class="w target" data-s="24942" data-e="25240" title="极大的，巨大的">immense</span> <span class="w" data-s="25283" data-e="25624">and</span> <span class="w" data-s="25795" data-e="25880">the</span> <span class="w" data-s="25923" data-e="26136">repair</span> <span class="w" data-s="26179" data-e="26392">an</span> <span class="w target" data-s="26435" data-e="26819" title="巨大的；庞大的；极大的">enormous</span> <span class="w" data-s="26862" data-e="26990">sum,</span> <span class="w" data-s="27246" data-e="27715">too</span> <span class="w" data-s="27758" data-e="27971">much</span> <span class="w" data-s="28014" data-e="28142">for</span> <span class="w" data-s="28184" data-e="28355">any</span> <span class="w target" data-s="28398" data-e="28867" title="巨大的，极大的；极好的">tremendous</span> <span class="w" data-s="28910" data-e="29208">fortune.</span></p><p class="zh">损失极大，修理费是一笔庞大的数目，再大的财富也会觉得吃力。</p></div>
+<div class="pair" data-s0="29671" data-s1="32316"><p class="en"><span class="w" data-s="29671" data-e="29756">She</span> <span class="w" data-s="29799" data-e="29969">found</span> <span class="w" data-s="30012" data-e="30225">the</span> <span class="w target" data-s="30268" data-e="30396" title="">address</span> <span class="w" data-s="30439" data-e="30652">of</span> <span class="w" data-s="30695" data-e="30780">the</span> <span class="w" data-s="30823" data-e="31079">owner</span> <span class="w" data-s="31121" data-e="31207">on</span> <span class="w" data-s="31249" data-e="31335">the</span> <span class="w" data-s="31377" data-e="31463">last</span> <span class="w" data-s="31505" data-e="31719">page</span> <span class="w" data-s="31761" data-e="32017">of</span> <span class="w" data-s="32060" data-e="32103">the</span> <span class="w" data-s="32145" data-e="32316">contract.</span></p><p class="zh">她在合同的最后一页上找到了房主的地址。</p></div>
+<div class="pair" data-s0="32700" data-s1="36369"><p class="en"><span class="w" data-s="32700" data-e="33297">She</span> <span class="w" data-s="33340" data-e="33681">chose</span> <span class="w" data-s="33724" data-e="33809">to</span> <span class="w target" data-s="33852" data-e="33980" title="处理，应付(局势、人、工作或感情) n. 柄；把手">handle</span> <span class="w" data-s="34023" data-e="34279">it</span> <span class="w" data-s="34321" data-e="34577">herself,</span> <span class="w" data-s="34876" data-e="35303">not</span> <span class="w" data-s="35345" data-e="35559">to</span> <span class="w target" data-s="35601" data-e="35900" title="应付，处理，解决(难题或局面) disease, we are not going to be able to tackle it. 但除非我们接受肥胖是一种疾病，否则我们 将无法解决它。">tackle</span> <span class="w" data-s="35943" data-e="36028">it</span> <span class="w" data-s="36071" data-e="36113">with</span> <span class="w" data-s="36156" data-e="36369">anger.</span></p><p class="zh">她决定自己来处理，而不是带着怒气去对付。</p></div>
+<div class="pair" data-s0="36625" data-s1="39996"><p class="en"><span class="w" data-s="36625" data-e="37223">Such</span> <span class="w" data-s="37265" data-e="37351">a</span> <span class="w" data-s="37393" data-e="37521">problem</span> <span class="w" data-s="37564" data-e="37820">is</span> <span class="w target" data-s="37863" data-e="38033" title="简单的；朴素的；(表示强调)纯粹的">simple</span> <span class="w" data-s="38076" data-e="38289">to</span> <span class="w target" data-s="38332" data-e="38588" title="解决;处理">solve</span> <span class="w" data-s="38631" data-e="38972">but</span> <span class="w" data-s="39185" data-e="39356">hard</span> <span class="w" data-s="39399" data-e="39612">to</span> <span class="w target" data-s="39655" data-e="39996" title="解决；决定，下决心">resolve.</span></p><p class="zh">这样的问题好解决，却很难真正化解。</p></div>
+<div class="pair" data-s0="40556" data-s1="42775"><p class="en"><span class="w" data-s="40556" data-e="40684">Her</span> <span class="w target" data-s="40727" data-e="41068" title="决心；解决">resolution</span> <span class="w" data-s="41111" data-e="41367">was</span> <span class="w" data-s="41410" data-e="41580">one</span> <span class="w" data-s="41623" data-e="41794">page,</span> <span class="w" data-s="42092" data-e="42306">and</span> <span class="w" data-s="42434" data-e="42562">no</span> <span class="w" data-s="42604" data-e="42775">more.</span></p><p class="zh">她的决心是只写一页，不能再多。</p></div>
+<div class="pair" data-s0="42988" data-s1="47340"><p class="en"><span class="w" data-s="42988" data-e="43244">Her</span> <span class="w" data-s="43714" data-e="43884">first</span> <span class="w" data-s="43927" data-e="44098">two</span> <span class="w" data-s="44140" data-e="44567">drafts,</span> <span class="w" data-s="44652" data-e="44780">however,</span> <span class="w" data-s="44951" data-e="45591">dissolved</span> <span class="w" data-s="45634" data-e="45762">into</span> <span class="w" data-s="45804" data-e="46274">complaints</span> <span class="w" data-s="46316" data-e="46530">about</span> <span class="w" data-s="46572" data-e="46786">rain</span> <span class="w" data-s="46828" data-e="47084">and</span> <span class="w" data-s="47127" data-e="47340">rent.</span></p><p class="zh">可她头两稿都化成了对雨水和房租的抱怨。</p></div>
+<div class="pair" data-s0="47596" data-s1="51138"><p class="en"><span class="w" data-s="47596" data-e="48236">She</span> <span class="w" data-s="48279" data-e="48407">made</span> <span class="w" data-s="48450" data-e="48620">the</span> <span class="w" data-s="48663" data-e="48748">page</span> <span class="w target" data-s="48791" data-e="49260" title="准确的；确切的；(强调时间或方式等)就， 恰好">precise</span> <span class="w" data-s="49303" data-e="49559">and</span> <span class="w target" data-s="49602" data-e="50071" title="简明的;简洁的">concise,</span> <span class="w" data-s="50242" data-e="50626">in</span> <span class="w target" data-s="50668" data-e="50839" title="简单的；朴素的；(表示强调)纯粹的">simple</span> <span class="w" data-s="50882" data-e="51138">words.</span></p><p class="zh">于是她把这一页写得准确而简洁，用最简单的词。</p></div>
+<div class="pair" data-s0="51918" data-s1="54990"><p class="en"><span class="w" data-s="51918" data-e="52003">She</span> <span class="w" data-s="52046" data-e="52217">kept</span> <span class="w" data-s="52259" data-e="52430">the</span> <span class="w" data-s="52473" data-e="52686">tone</span> <span class="w target" data-s="52729" data-e="52899" title="典型的；正常的；一般的 n. 常态；通常 标准">normal</span> <span class="w" data-s="52942" data-e="53326">and</span> <span class="w" data-s="53539" data-e="53667">cut</span> <span class="w" data-s="53710" data-e="53881">every</span> <span class="w target" data-s="53923" data-e="54393" title="微妙的;敏锐的">subtle</span> <span class="w" data-s="54435" data-e="54563">hint</span> <span class="w" data-s="54606" data-e="54691">of</span> <span class="w" data-s="54734" data-e="54990">blame.</span></p><p class="zh">她保持语气平常，删掉了每一处微妙的责怪。</p></div>
+<div class="pair" data-s0="55203" data-s1="59555"><p class="en"><span class="w" data-s="55203" data-e="55843">Only</span> <span class="w" data-s="55886" data-e="56014">one</span> <span class="w" data-s="56057" data-e="56270">thing</span> <span class="w" data-s="56313" data-e="56441">was</span> <span class="w target" data-s="56483" data-e="56867" title="不正常的；反常的">abnormal:</span> <span class="w" data-s="57337" data-e="57550">the</span> <span class="w" data-s="57593" data-e="57763">contract</span> <span class="w" data-s="57806" data-e="58489">printed</span> <span class="w" data-s="58531" data-e="59001">dissolve</span> <span class="w" data-s="59043" data-e="59129">as</span> <span class="w target" data-s="59171" data-e="59555" title="">dissove.</span></p><p class="zh">只有一件事不正常：合同把 dissolve 印成了 dissove。</p></div>
+<div class="pair" data-s0="60127" data-s1="63369"><p class="en"><span class="w" data-s="60127" data-e="60212">She</span> <span class="w" data-s="60255" data-e="60425">wrote</span> <span class="w" data-s="60468" data-e="60639">with</span> <span class="w" data-s="60681" data-e="60809">the</span> <span class="w target" data-s="60852" data-e="61108" title="最大的；极度的 n. 最大量;最大限度">utmost</span> <span class="w" data-s="61151" data-e="61364">care,</span> <span class="w" data-s="61663" data-e="61791">and</span> <span class="w" data-s="62047" data-e="62473">signed</span> <span class="w" data-s="62516" data-e="62601">her</span> <span class="w" data-s="62644" data-e="62772">full</span> <span class="w" data-s="62815" data-e="63071">name</span> <span class="w" data-s="63113" data-e="63369">below.</span></p><p class="zh">她极其用心地写，并在下面签了全名。</p></div>
+<div class="pair" data-s0="63583" data-s1="67337"><p class="en"><span class="w" data-s="63583" data-e="64180">That</span> <span class="w" data-s="64223" data-e="64436">week</span> <span class="w" data-s="64479" data-e="64735">the</span> <span class="w" data-s="64777" data-e="64905">weather</span> <span class="w" data-s="64948" data-e="65161">was</span> <span class="w target" data-s="65204" data-e="65460" title="极度的；严重的；极端的；尽头的 η. 极端不同的感情(或境况、行为方式等)；完全 相反的事物">extreme,</span> <span class="w" data-s="65801" data-e="66015">and</span> <span class="w" data-s="66185" data-e="66399">the</span> <span class="w" data-s="66441" data-e="66484">whole</span> <span class="w" data-s="66527" data-e="66783">street</span> <span class="w" data-s="66825" data-e="67039">was</span> <span class="w" data-s="67081" data-e="67337">wet.</span></p><p class="zh">那一周的天气很极端，整条街都是湿的。</p></div>
+<div class="pair" data-s0="67551" data-s1="71817"><p class="en"><span class="w" data-s="67551" data-e="67977">The</span> <span class="w target" data-s="68020" data-e="68319" title="完全的；陡峭的 adv. 垂直地；陡峭地">sheer</span> <span class="w" data-s="68361" data-e="68532">weight</span> <span class="w" data-s="68575" data-e="68788">of</span> <span class="w" data-s="68831" data-e="68959">water</span> <span class="w" data-s="69001" data-e="69343">had</span> <span class="w" data-s="69385" data-e="69556">broken</span> <span class="w" data-s="69599" data-e="69812">a</span> <span class="w" data-s="69855" data-e="70111">pipe;</span> <span class="w" data-s="70409" data-e="70665">there</span> <span class="w" data-s="70708" data-e="70836">was</span> <span class="w" data-s="70879" data-e="71007">no</span> <span class="w target" data-s="71049" data-e="71433" title="完全的；绝对的；确凿的；独裁的">absolute</span> <span class="w" data-s="71476" data-e="71817">doubt.</span></p><p class="zh">纯粹是水的重量压破了管道；这一点毫无疑问。</p></div>
+<div class="pair" data-s0="72591" data-s1="75365"><p class="en"><span class="w" data-s="72591" data-e="72677">There</span> <span class="w" data-s="72719" data-e="72805">was</span> <span class="w" data-s="72847" data-e="72975">still</span> <span class="w" data-s="73018" data-e="73189">a</span> <span class="w" data-s="73231" data-e="73274">real</span> <span class="w target" data-s="73317" data-e="73829" title="可能；可能性">possibility</span> <span class="w" data-s="73871" data-e="74170">that</span> <span class="w" data-s="74213" data-e="74341">the</span> <span class="w" data-s="74383" data-e="74597">owner</span> <span class="w" data-s="74639" data-e="74682">would</span> <span class="w" data-s="74725" data-e="74981">refuse</span> <span class="w" data-s="75023" data-e="75194">to</span> <span class="w" data-s="75237" data-e="75365">pay.</span></p><p class="zh">但房主仍有拒付的可能。</p></div>
+<div class="pair" data-s0="75621" data-s1="79418"><p class="en"><span class="w" data-s="75621" data-e="75834">The</span> <span class="w" data-s="76175" data-e="76346">wall</span> <span class="w" data-s="76389" data-e="76602">was</span> <span class="w" data-s="76645" data-e="76730">an</span> <span class="w target" data-s="76773" data-e="77029" title="完全的；十足的；彻底的 v.出声；说；讲">utter</span> <span class="w" data-s="77071" data-e="77157">mess,</span> <span class="w" data-s="77413" data-e="77754">yet</span> <span class="w" data-s="77797" data-e="77925">she</span> <span class="w" data-s="77967" data-e="78309">folded</span> <span class="w" data-s="78351" data-e="78437">the</span> <span class="w" data-s="78479" data-e="78607">letter</span> <span class="w" data-s="78650" data-e="78863">and</span> <span class="w" data-s="78906" data-e="79247">posted</span> <span class="w" data-s="79290" data-e="79418">it.</span></p><p class="zh">墙上乱成一片，她还是把信折好寄了出去。</p></div>
+<div class="pair" data-s0="79589" data-s1="83727"><p class="en"><span class="w" data-s="79589" data-e="80186">Two</span> <span class="w" data-s="80229" data-e="80399">days</span> <span class="w" data-s="80442" data-e="80613">later</span> <span class="w" data-s="80655" data-e="80911">Mr.</span> <span class="w" data-s="80997" data-e="81210">Feng</span> <span class="w" data-s="81253" data-e="81594">knocked</span> <span class="w" data-s="81637" data-e="81765">at</span> <span class="w" data-s="81807" data-e="81850">her</span> <span class="w" data-s="81893" data-e="82021">door,</span> <span class="w" data-s="82234" data-e="82703">quiet</span> <span class="w" data-s="82746" data-e="83087">and</span> <span class="w" data-s="83130" data-e="83727">ashamed.</span></p><p class="zh">两天后，冯先生来敲门，安静又羞愧。</p></div>
+<div class="pair" data-s0="83983" data-s1="86458"><p class="en"><span class="w" data-s="83983" data-e="84111">He</span> <span class="w" data-s="84154" data-e="84282">paid</span> <span class="w" data-s="84325" data-e="84453">the</span> <span class="w" data-s="84495" data-e="84581">whole</span> <span class="w" data-s="84623" data-e="84794">sum,</span> <span class="w" data-s="85093" data-e="85178">and</span> <span class="w" data-s="85519" data-e="85647">the</span> <span class="w" data-s="85690" data-e="85818">stain</span> <span class="w" data-s="85861" data-e="85989">was</span> <span class="w" data-s="86031" data-e="86330">painted</span> <span class="w" data-s="86373" data-e="86458">white.</span></p><p class="zh">他付了全部的钱，那片水渍也被刷白了。</p></div>
+<div class="pair" data-s0="87307" data-s1="92000"><p class="en"><span class="w" data-s="87307" data-e="87563">Lin</span> <span class="w" data-s="87605" data-e="87904">stayed,</span> <span class="w" data-s="88075" data-e="88245">and</span> <span class="w" data-s="88629" data-e="88843">learned</span> <span class="w" data-s="88885" data-e="89141">that</span> <span class="w" data-s="89184" data-e="89269">a</span> <span class="w" data-s="89312" data-e="89397">kind,</span> <span class="w" data-s="89739" data-e="90080">firm</span> <span class="w" data-s="90123" data-e="90421">page</span> <span class="w" data-s="90464" data-e="90805">can</span> <span class="w target" data-s="90848" data-e="91531" title="安顿；定居;解决">settle</span> <span class="w" data-s="91573" data-e="91659">a</span> <span class="w" data-s="91701" data-e="92000">quarrel.</span></p><p class="zh">林留了下来，也明白了一张有分寸的纸能平息一场争吵。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">worthwhile</span>
+          <span class="ipa">/w3:rθ&#x27;wail/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">值得的;值得花时间的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the rent was worthwhile</div>          <div class="root"><span class="lbl">根</span>worth(值得) + while(一段时间) → 值得花时间的</div>          <div class="zt"><span class="lbl">真题</span>Fire insurance is seldom a worthwhile investment.火灾保险很少是值得投资的。</div>          <div class="fam"><span class="lbl">族</span>worth adj. 值……的 / worthy adj. 值得的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">asset</span>
+          <span class="ipa">/&#x27;æset/</span>
+          <span class="pos">n.</span>
+          <span class="cn">资产，财产</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its only asset was the morning light</div>          <div class="mnem"><span class="lbl">记</span>set的意思有“设置，放；(日、 月)往下沉”。例如，“The sun rises in the east and sets in the west. 太阳从东方升起，在西方 落下。”asset:一再地(as)放(set)。当一个人破 产的时候，会把他的财产一再地放到门前，让债 权人挑选→财产，资产。</div>          <div class="root"><span class="lbl">根</span>as(一再) + set(放) → 放出来能换钱的东西 → 资产</div>          <div class="zt"><span class="lbl">真题</span>Saying “no” is an important skill to develop at any stage of your career because it retains the most important asset in life: your time.在你职业生涯的任何阶段，说“不”都是一 项要培养的重要技能，因为它保留了你生命中 最重要的资产：你的时间。(2022)</div>          <div class="fam"><span class="lbl">族</span>assets n. 资产 / set v. 放置</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">upset</span>
+          <span class="ipa">/ap&#x27;set, Λp&#x27;set/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">心烦的，苦恼的 v. 使心烦意乱，使心情 不好；搅乱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>every drop on the window left her upset</div>          <div class="mnem"><span class="lbl">记</span>上面的(up）朝下(set)了，就是 使一个东西不正常了，那形容人的心情就是“使 心烦意乱，使心情不好；搅乱”。</div>          <div class="root"><span class="lbl">根</span>up(向上) + set(放) → 放翻了 → 使心烦意乱</div>          <div class="zt"><span class="lbl">真题</span>If you were like most children, you probably got upset when your mother called you by a sibling&#x27;s name. 如果你像大多数孩子 一样，当你妈妈叫你兄弟姐妹的名字时，你可能 会感到沮丧。(2019)</div>          <div class="fam"><span class="lbl">族</span>upsetting adj. 令人心烦的 / upset v. 打翻</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">settle</span>
+          <span class="ipa">/&#x27;setl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">安顿；定居;解决</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Lin settled into a flat above a bakery</div>          <div class="mnem"><span class="lbl">记</span>放(set)下来，把自己放下来，不 再漂泊，就是“定居”。把一个问题给放下来了， 那就是把这个问题“解决”了。</div>          <div class="root"><span class="lbl">根</span>set(放) + tle → 把自己放下来不再漂泊 → 定居；解决</div>          <div class="zt"><span class="lbl">真题</span>Refugees who settle in other countries often find themselves unable to continue on their previous career path due to a new set of employer standards or skills requirements. 在 其他国家定居的难民往往发现，由于一系列新 的雇主标准或技能要求，他们无法继续以前的 职业道路。(2023)</div>          <div class="fam"><span class="lbl">族</span>settlement n. 解决，定居点 / settler n. 定居者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">dwell</span>
+          <span class="ipa">/dwel/</span>
+          <span class="pos">v.</span>
+          <span class="cn">居住;栖身;(~on)总是想着</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>meaning to dwell there for years</div>          <div class="mnem"><span class="lbl">记</span>发音类似“拽了”。出去打拼多 年，最终在大城市定居了下来，你真拽了啊→居住。</div>          <div class="root"><span class="lbl">根</span>谐音联想：在大城市住下来很「拽了」(dwell) → 居住</div>          <div class="zt"><span class="lbl">真题</span>He refused to dwell on the dreams he had dreamed when young. 他拒绝回想他年轻时的 梦想。</div>          <div class="fam"><span class="lbl">族</span>dwelling n. 住所 / dweller n. 居民</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">handle</span>
+          <span class="ipa">/&#x27;hændl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">处理，应付(局势、人、工作或感情) n. 柄；把手</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She chose to handle it herself</div>          <div class="root"><span class="lbl">根</span>hand(手) + le → 手里握得住的东西就能摆平 → 处理</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s time to re-evaluate how women handle conflict at work. 是时候重新考虑女性 如何处理工作冲突了。(2017) 先生在“处理”问题时是不是总会出现问题？</div>          <div class="fam"><span class="lbl">族</span>handful n. 一把 / handling n. 处理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">tackle</span>
+          <span class="ipa">/&#x27;tækl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">应付，处理，解决(难题或局面) disease, we are not going to be able to tackle it. 但除非我们接受肥胖是一种疾病，否则我们 将无法解决它。</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>not to tackle it with anger</div>          <div class="mnem"><span class="lbl">记</span>发音类似“太抠”。你身边有那 种特别抠门的人吧？“应付”这种人是很困难 的，也就是让他们掏点钱是很难的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：太抠(tackle)的人最难应付 → 应付，处理</div>          <div class="fam"><span class="lbl">族</span>tackle n. 阻截 / tackling n. 应对</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">solve</span>
+          <span class="ipa">/sa:lv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">解决;处理</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>simple to solve but hard to resolve</div>          <div class="root"><span class="lbl">根</span>solv(松开) + e → 把结松开 → 解决</div>          <div class="zt"><span class="lbl">真题</span>Environmental problems must be solved to ease the current global food shortage. 必须 解决环境问题，以缓解目前的全球粮食短缺。 (2016)</div>          <div class="fam"><span class="lbl">族</span>solution n. 解决办法 / solvable adj. 可解决的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">resolve</span>
+          <span class="ipa">/ri&#x27;zplv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">解决；决定，下决心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>hard to resolve</div>          <div class="mnem"><span class="lbl">记</span>re 重复；solve 解决。一件事情 开始没有解决，后来“下决心”再次解决。再次 解决也仍然是“解决”啊，所以这个单词有两个 意思→解决；下决心。</div>          <div class="root"><span class="lbl">根</span>re(再) + solve(解决) → 再下一次决心去解决 → 决心；解决</div>          <div class="zt"><span class="lbl">真题</span>The mystery of life could not be resolved. 生命的奥秘无法解开。</div>          <div class="fam"><span class="lbl">族</span>resolute adj. 坚决的 / resolution n. 决心</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">resolution</span>
+          <span class="ipa">/irezə&#x27;lu:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">决心；解决</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her resolution was one page</div>          <div class="mnem"><span class="lbl">记</span>发音类似“憨豆(先生）”。憨豆</div>          <div class="root"><span class="lbl">根</span>re(再) + solut(松开) + ion → 松开的动作 → 解决；决心</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s no secret that some of the resolutions that many of us vowed to pursue in the new year—eat healthy, lose weight, quit smoking, save more money—have already fallen by the wayside.众所周知，我们很多人在新的一年里 发誓要追求的一些决心——健康饮食、减肥、戒 烟、存更多的钱已经半途而废了。</div>          <div class="fam"><span class="lbl">族</span>resolve v. 决心，解决 / resolute adj. 坚决的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">dissove</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the contract printed dissolve as dissove</div>          <div class="root"><span class="lbl">根</span>书上是 dissolve 的误印：dis(分开) + solv(松开) → 散开，溶解</div>          <div class="fam"><span class="lbl">族</span>dissolve v. 溶解，消散 / dissolved adj. 溶解的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">address</span>
+          <span class="ipa">/ə&#x27;dres/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She found the address of the owner</div>          <div class="mnem"><span class="lbl">记</span>ad(一再地)十 dress(裙子)，你 一再地在网上买裙子，需要有收件“地址”呀！</div>          <div class="root"><span class="lbl">根</span>ad(一再) + dress(整理，导向) → 把信引到某个地方 → 地址</div>          <div class="zt"><span class="lbl">真题</span>Under a voice-activated command, you say an address. 在声控命令下，你说出一个 地址。</div>          <div class="fam"><span class="lbl">族</span>addressee n. 收件人 / address v. 称呼，演讲</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">giant</span>
+          <span class="ipa">/&#x27;dzaiənt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巨大的；特大的；伟大的 n. 巨人；大公 司；伟人</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>like a giant map</div>          <div class="mnem"><span class="lbl">记</span>Giant 是捷安特的英文，捷安特 自行车想做这个行业的“巨人”啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：捷安特(Giant)想做成行业里的巨人 → 巨大的；巨人</div>          <div class="zt"><span class="lbl">真题</span>He is the CEO of a giant company. 他是 一家大公司的首席执行官。</div>          <div class="fam"><span class="lbl">族</span>gigantic adj. 巨大的 / giant n. 大公司，伟人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">gigantic</span>
+          <span class="ipa">/d3ai&#x27;gæntık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巨大的，巨人般的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a gigantic man with a vast voice</div>          <div class="mnem"><span class="lbl">记</span>这个单词很像 giant(巨大的)， 你不需要会写，认识就可以。</div>          <div class="root"><span class="lbl">根</span>giant(巨人) + ic(…的) → 巨人般的 → 巨大的</div>          <div class="zt"><span class="lbl">真题</span>Curiosity is one of the tools humans have found to accomplish that gigantic task. 好奇心 是人类发现的完成那一艰巨任务的工具之一。</div>          <div class="fam"><span class="lbl">族</span>giant n. 巨人 / gigantically adv. 巨大地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">immense</span>
+          <span class="ipa">/i&#x27;mens/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">极大的，巨大的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The damage was immense</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以记忆为：我(i)十 闷死(mense)。重庆就像一个“巨大的”火炉，都 把我闷“死”了。</div>          <div class="root"><span class="lbl">根</span>im(不) + mens(量) + e → 大到没法量 → 极大的</div>          <div class="zt"><span class="lbl">真题</span>That is a sign of its immense potential. 这是其巨大潜力的标志。</div>          <div class="fam"><span class="lbl">族</span>immensely adv. 极大地 / immensity n. 巨大</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">tremendous</span>
+          <span class="ipa">/trə&#x27;mendəs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巨大的，极大的；极好的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>too much for any tremendous fortune</div>          <div class="mnem"><span class="lbl">记</span>m想象成“门”；去掉m后，该 单词前面部分就是 tree(树)。长到门两边的树 都(dou)死(s)了，这是“极大的，巨大的”恐怖场景。</div>          <div class="root"><span class="lbl">根</span>trem(发抖) + endous → 大到让人发抖 → 极大的</div>          <div class="zt"><span class="lbl">真题</span>One of our species&#x27;key characteristics is 223 第九单元 tremendous linguistic and cognitive diversity. 我们物种(人类)的一个重要特征是庞大的语言 和认知多样性。(2021)</div>          <div class="fam"><span class="lbl">族</span>tremendously adv. 极其 / tremble v. 发抖</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">vast</span>
+          <span class="ipa">/væst/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巨大的，广大的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a vast voice</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似：哇，“死（很)” 大！→如此巨大→巨大的，广大的。</div>          <div class="root"><span class="lbl">根</span>谐音联想：哇「死大」(vast) → 广大的</div>          <div class="zt"><span class="lbl">真题</span>And although their memories are vast, they are still likely to suffer from false memories.尽管他们的记忆很丰富，但他们仍然 有可能遭受错误记忆的折磨。(2017)</div>          <div class="fam"><span class="lbl">族</span>vastly adv. 大大地 / vastness n. 广阔</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">normal</span>
+          <span class="ipa">/&#x27;nə:rml/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">典型的；正常的；一般的 n. 常态；通常 标准</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She kept the tone normal</div>          <div class="mnem"><span class="lbl">记</span>norm 标准，normal 就是“标准 的，正常的”。</div>          <div class="root"><span class="lbl">根</span>norm(标准) + al(…的) → 合标准的 → 正常的</div>          <div class="zt"><span class="lbl">真题</span>Such tasks can get our brains thinking flexibly, beyond our normal comfort zone. 这 样的任务可以让我们的大脑灵活思考，超越我 们通常的舒适区。(2022)</div>          <div class="fam"><span class="lbl">族</span>norm n. 标准 / normally adv. 通常</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">abnormal</span>
+          <span class="ipa">/æb&#x27;nə:rml/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">不正常的；反常的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Only one thing was abnormal</div>          <div class="root"><span class="lbl">根</span>ab(离开) + normal(正常的) → 偏离了正常的 → 反常的</div>          <div class="zt"><span class="lbl">真题</span>Like evil, we often view heroism as only a possibility for outliers for people who are abnormal.就像邪恶一样，我们常常认为英雄主 义只可能出现在那些异常的人身上。(2022)</div>          <div class="fam"><span class="lbl">族</span>abnormally adv. 反常地 / normality n. 正常</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">enormous</span>
+          <span class="ipa">/r&#x27;no:rməs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">巨大的；庞大的；极大的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an enormous sum</div>          <div class="mnem"><span class="lbl">记</span>e(exit出口）表示往外；norm 规范，基准。enormous，超出规范的，超出基准 的→巨大的；庞大的。</div>          <div class="root"><span class="lbl">根</span>e(出) + norm(标准) + ous → 超出标准的 → 庞大的</div>          <div class="zt"><span class="lbl">真题</span>There&#x27;s no question that self-driving vehicles could be an enormous benefit. 毫无疑 问，自动驾驶汽车可能会带来巨大的利益。</div>          <div class="fam"><span class="lbl">族</span>enormously adv. 极其 / enormity n. 巨大</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">precise</span>
+          <span class="ipa">/pri&#x27;sais/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">准确的；确切的；(强调时间或方式等)就， 恰好</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the page precise and concise</div>          <div class="mnem"><span class="lbl">记</span>pre(提前，前面)十cise(发音类 似“三思”)→提前三思，三思而后行，才能做出 “准确的”选择。</div>          <div class="root"><span class="lbl">根</span>pre(前) + cise(切) → 提前切得干净利落 → 准确的</div>          <div class="zt"><span class="lbl">真题</span>Instead of using words for precise quantities, these people rely exclusively on terms similar to “a few”or “some”. 这些人不 使用精确的数量来表示，他们完全依赖于“少 数”或“一些”之类的术语。(2021)</div>          <div class="fam"><span class="lbl">族</span>precision n. 精确 / precisely adv. 精确地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">concise</span>
+          <span class="ipa">/kən&#x27;sais/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">简明的;简洁的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>precise and concise, in simple words</div>          <div class="mnem"><span class="lbl">记</span>cise的发音类似“杀死”；con 表 示“所有的，完全的”。把所有害虫都杀死，这样 粗暴的做法，确实很“简洁”。</div>          <div class="root"><span class="lbl">根</span>con(完全) + cise(切) → 把废话全切掉 → 简洁的</div>          <div class="zt"><span class="lbl">真题</span>The new secretary has written a remarkably concise report within a few hundred words but with all the important details included. 新秘书写了一份几百字以内的 报告，非常简明，而且把所有重要的细节都包括 在内。</div>          <div class="fam"><span class="lbl">族</span>concisely adv. 简洁地 / concision n. 简洁</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">simple</span>
+          <span class="ipa">/&#x27;sımpl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">简单的；朴素的；(表示强调)纯粹的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>in simple words</div>          <div class="root"><span class="lbl">根</span>sim(一) + ple(折) → 只折一层 → 简单的</div>          <div class="zt"><span class="lbl">真题</span>Some traditions are simple, like the red eggs that get baked into Greek Easter breads. 有些传统很简单，比如将红鸡蛋烤成希腊复活 节面包。(2017)</div>          <div class="fam"><span class="lbl">族</span>simply adv. 简单地 / simplify v. 简化</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">subtle</span>
+          <span class="ipa">/&#x27;s^tl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">微妙的;敏锐的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cut every subtle hint of blame</div>          <div class="root"><span class="lbl">根</span>sub(下面) + tle → 藏在表面下面不易看出 → 微妙的</div>          <div class="zt"><span class="lbl">真题</span>The tests are designed to detect subtle changes in mental function. 这些测试旨在检测 大脑功能的细微变化。(2016)</div>          <div class="fam"><span class="lbl">族</span>subtly adv. 微妙地 / subtlety n. 微妙</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">extreme</span>
+          <span class="ipa">/ık&#x27;stri:m/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">极度的；严重的；极端的；尽头的 η. 极端不同的感情(或境况、行为方式等)；完全 相反的事物</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the weather was extreme</div>          <div class="root"><span class="lbl">根</span>extrem(最外) + e → 走到最外的一端 → 极端的</div>          <div class="zt"><span class="lbl">真题</span>There are more extremes in the weather. 天气有更多极端的情况。</div>          <div class="fam"><span class="lbl">族</span>extremely adv. 极其 / extremity n. 极端</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">utmost</span>
+          <span class="ipa">/&#x27;Λtməust/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">最大的；极度的 n. 最大量;最大限度</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with the utmost care</div>          <div class="root"><span class="lbl">根</span>ut(出) + most(最) → 最靠外、最尽头的 → 最大的，极度的</div>          <div class="zt"><span class="lbl">真题</span>White Star Line had the utmost comfort passengers could enjoy in mind when it purchased the three ships. 白星航运公司在购买这三艘船 时，考虑到了乘客能享受到的最大舒适度。(2018)</div>          <div class="fam"><span class="lbl">族</span>utter adj. 完全的 / utmost n. 最大限度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">utter</span>
+          <span class="ipa">/&#x27;Λtər/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">完全的；十足的；彻底的 v.出声；说；讲</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The wall was an utter mess</div>          <div class="root"><span class="lbl">根</span>谐音联想：完全「啊」(utter) 地喊出来 → 完全的；出声</div>          <div class="zt"><span class="lbl">真题</span>Falling into a routine can turn a person into an utter bore. 墨守成规会让人变得无聊 透顶。</div>          <div class="fam"><span class="lbl">族</span>utterly adv. 完全地 / utterance n. 话语</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">sheer</span>
+          <span class="ipa">/∫ır/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">完全的；陡峭的 adv. 垂直地；陡峭地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The sheer weight of water</div>          <div class="mnem"><span class="lbl">记</span>she她；er表示人的后缀。那 就是她是一个“完全的，十足的”的人啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：她(she)做事很纯粹、不掺别的 → 完全的；陡峭的</div>          <div class="zt"><span class="lbl">真题</span>The sheer number of hours we pass watching TV dwarfs the time we spend on anything else. 我们花在看电视上的时间远远超 simplify /&#x27;simplıfai/ v. 使简化 过了我们花在其他事情上的时间。(2015) (224</div>          <div class="fam"><span class="lbl">族</span>sheerly adv. 完全地 / sheer adj. 纯粹的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">absolute</span>
+          <span class="ipa">/&#x27;æbsəluit/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">完全的；绝对的；确凿的；独裁的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>there was no absolute doubt</div>          <div class="mnem"><span class="lbl">记</span>一再地（ab）+如此（so）+晚 (lute 想成 late)，那就是完全晚了啊！→完全 的；绝对的</div>          <div class="root"><span class="lbl">根</span>ab(离开) + solut(松开) + e → 松开、不受限制 → 绝对的</div>          <div class="zt"><span class="lbl">真题</span>Value is almost never absolute. 价值几乎 永远都不是绝对的。(2020)</div>          <div class="fam"><span class="lbl">族</span>absolutely adv. 绝对地 / absolution n. 赦免</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">possibility</span>
+          <span class="ipa">/pa:sə&#x27;bıləti/</span>
+          <span class="pos">n.</span>
+          <span class="cn">可能；可能性</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a real possibility that the owner would refuse to pay</div>          <div class="root"><span class="lbl">根</span>poss(能) + ibility(名词后缀) → 能发生的情况 → 可能性</div>          <div class="zt"><span class="lbl">真题</span>The study did not examine the possibility of deep psychological significance to the mistake. 这项研究并没有考察这一错误可能产 生的深层心理影响。(2019)</div>          <div class="fam"><span class="lbl">族</span>possible adj. 可能的 / possibly adv. 可能地</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 9 · Day 59</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

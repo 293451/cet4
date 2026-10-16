@@ -1,0 +1,588 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 69 · The Green Lane Market</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 69 · 12/20 · Unit 10 第 2041-2062 词</div>
+  <h1>The Green Lane Market<span class="cn">绿巷小店</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-69.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4608"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="384">Green</span> <span class="w target" data-s="427" data-e="640" title="">Lane</span> <span class="w" data-s="683" data-e="939">Market</span> <span class="w" data-s="981" data-e="1152">opened</span> <span class="w" data-s="1195" data-e="1451">in</span> <span class="w" data-s="1493" data-e="1621">1998</span> <span class="w" data-s="2261" data-e="2603">at</span> <span class="w" data-s="2816" data-e="2901">the</span> <span class="w" data-s="2944" data-e="3029">end</span> <span class="w" data-s="3072" data-e="3243">of</span> <span class="w" data-s="3285" data-e="3371">a</span> <span class="w" data-s="3413" data-e="3669">narrow</span> <span class="w target" data-s="3712" data-e="3883" title="">lane</span> <span class="w" data-s="3925" data-e="4181">behind</span> <span class="w" data-s="4224" data-e="4437">the</span> <span class="w" data-s="4480" data-e="4608">station.</span></p><p class="zh">绿巷小店 1998 年开张，就在车站后面一条窄巷子的尽头。</p></div>
+<div class="pair" data-s0="4907" data-s1="9344"><p class="en"><span class="w" data-s="4907" data-e="5461">My</span> <span class="w" data-s="5504" data-e="5803">aunt</span> <span class="w" data-s="5845" data-e="5931">ran</span> <span class="w" data-s="5973" data-e="6144">it</span> <span class="w" data-s="6187" data-e="6272">for</span> <span class="w" data-s="6315" data-e="6400">twenty</span> <span class="w" data-s="6443" data-e="6699">years</span> <span class="w" data-s="6741" data-e="7040">with</span> <span class="w" data-s="7083" data-e="7168">her</span> <span class="w" data-s="7211" data-e="7381">sister,</span> <span class="w" data-s="7637" data-e="7851">and</span> <span class="w" data-s="7979" data-e="8235">both</span> <span class="w" data-s="8277" data-e="8448">of</span> <span class="w" data-s="8491" data-e="8576">them</span> <span class="w" data-s="8619" data-e="8789">were</span> <span class="w target" data-s="8832" data-e="9344" title="惯用左手的;左撇子的">left-handed.</span></p><p class="zh">我姑姑和她的妹妹一起经营了二十年，她们俩都是左撇子。</p></div>
+<div class="pair" data-s0="9600" data-s1="14165"><p class="en"><span class="w" data-s="9600" data-e="9728">She</span> <span class="w" data-s="9771" data-e="9899">could</span> <span class="w" data-s="9941" data-e="10027">open</span> <span class="w" data-s="10069" data-e="10197">a</span> <span class="w" data-s="10240" data-e="10368">tin,</span> <span class="w" data-s="10539" data-e="11136">weigh</span> <span class="w" data-s="11179" data-e="11435">rice</span> <span class="w" data-s="11477" data-e="11733">and</span> <span class="w" data-s="11989" data-e="12117">write</span> <span class="w" data-s="12160" data-e="12245">a</span> <span class="w target" data-s="12288" data-e="12373" title="">bill</span> <span class="w" data-s="12416" data-e="12544">with</span> <span class="w" data-s="12587" data-e="12715">one</span> <span class="w" data-s="12757" data-e="12885">hand</span> <span class="w" data-s="12928" data-e="13227">while</span> <span class="w" data-s="13269" data-e="13397">she</span> <span class="w" data-s="13440" data-e="13525">talked</span> <span class="w" data-s="13568" data-e="13696">to</span> <span class="w" data-s="13739" data-e="13824">a</span> <span class="w" data-s="13867" data-e="14165">customer.</span></p><p class="zh">她能一只手开罐头、称米、写账单，同时还能跟顾客说话。</p></div>
+<div class="pair" data-s0="14980" data-s1="21466"><p class="en"><span class="w target" data-s="14980" data-e="15492" title="预先;事先">Beforehand,</span> <span class="w" data-s="15706" data-e="15834">she</span> <span class="w" data-s="16004" data-e="16175">always</span> <span class="w" data-s="16218" data-e="16474">got</span> <span class="w target" data-s="16516" data-e="16644" title="准备好的；已完成的；方便使用的 adv.已做完；已完成">ready</span> <span class="w" data-s="16687" data-e="16858">the</span> <span class="w" data-s="16900" data-e="16986">night</span> <span class="w" data-s="17028" data-e="17242">before:</span> <span class="w" data-s="17540" data-e="18180">she</span> <span class="w" data-s="18223" data-e="18522">counted</span> <span class="w" data-s="18564" data-e="18650">the</span> <span class="w" data-s="18692" data-e="18778">change,</span> <span class="w" data-s="19076" data-e="19631">cleaned</span> <span class="w" data-s="19674" data-e="19802">every</span> <span class="w target" data-s="19844" data-e="20314" title="(教堂、戏院、火车等座位间或超级市场货架 间的)走道，过道">aisle</span> <span class="w" data-s="20356" data-e="20527">and</span> <span class="w" data-s="20612" data-e="20996">checked</span> <span class="w" data-s="21039" data-e="21082">the</span> <span class="w" data-s="21124" data-e="21466">shelves.</span></p><p class="zh">事先，她总在头天晚上就准备好：数好零钱、擦净每一条过道、检查货架。</p></div>
+<div class="pair" data-s0="21722" data-s1="26074"><p class="en"><span class="w" data-s="21722" data-e="21892">She</span> <span class="w" data-s="21935" data-e="22106">could</span> <span class="w" data-s="22148" data-e="22234">not</span> <span class="w target" data-s="22276" data-e="22831" title="理解；领悟；懂">comprehend</span> <span class="w" data-s="22874" data-e="23087">why</span> <span class="w" data-s="23130" data-e="23300">people</span> <span class="w" data-s="23343" data-e="23770">drove</span> <span class="w" data-s="23812" data-e="23898">to</span> <span class="w" data-s="23940" data-e="24026">the</span> <span class="w" data-s="24068" data-e="24154">new</span> <span class="w target" data-s="24196" data-e="24623" title="所谓的">so-called</span> <span class="w" data-s="24666" data-e="25007">super</span> <span class="w" data-s="25050" data-e="25306">store</span> <span class="w" data-s="25348" data-e="25647">on</span> <span class="w" data-s="25690" data-e="25732">the</span> <span class="w" data-s="25775" data-e="25860">ring</span> <span class="w" data-s="25903" data-e="26074">road.</span></p><p class="zh">她无法理解，为什么人们要开车去环路那家所谓的超级大卖场。</p></div>
+<div class="pair" data-s0="26971" data-s1="30512"><p class="en"><span class="w" data-s="26971" data-e="27099">She</span> <span class="w" data-s="27141" data-e="27312">never</span> <span class="w" data-s="27355" data-e="27568">tried</span> <span class="w" data-s="27611" data-e="27781">to</span> <span class="w target" data-s="27824" data-e="28165" title="使满意；使满足;满足(要求、需要等)">satisfy</span> <span class="w" data-s="28208" data-e="28464">everyone,</span> <span class="w" data-s="28805" data-e="29019">and</span> <span class="w" data-s="29360" data-e="29531">she</span> <span class="w" data-s="29573" data-e="29701">never</span> <span class="w" data-s="29744" data-e="29957">answered</span> <span class="w" data-s="30000" data-e="30213">a</span> <span class="w target" data-s="30256" data-e="30512" title="">critic.</span></p><p class="zh">她从没想过要让每个人都满意，也从不去回应批评她的人。</p></div>
+<div class="pair" data-s0="30640" data-s1="35291"><p class="en"><span class="w target" data-s="30640" data-e="31792" title="批评；批判；评论">Criticism,</span> <span class="w" data-s="32005" data-e="32048">she</span> <span class="w" data-s="32091" data-e="32261">said,</span> <span class="w" data-s="32475" data-e="32560">is</span> <span class="w" data-s="32816" data-e="32987">free</span> <span class="w" data-s="33029" data-e="33371">advice,</span> <span class="w" data-s="33669" data-e="33925">and</span> <span class="w" data-s="34053" data-e="34267">you</span> <span class="w" data-s="34309" data-e="34480">do</span> <span class="w" data-s="34523" data-e="34608">not</span> <span class="w" data-s="34651" data-e="34779">have</span> <span class="w" data-s="34821" data-e="34992">to</span> <span class="w" data-s="35035" data-e="35120">take</span> <span class="w" data-s="35163" data-e="35291">it.</span></p><p class="zh">她说，批评是免费的建议，但你不一定非得接受。</p></div>
+<div class="pair" data-s0="35547" data-s1="38021"><p class="en"><span class="w" data-s="35547" data-e="35632">The</span> <span class="w target" data-s="35675" data-e="35760" title="前者 adj. 以前的；(两者中)前者的">former</span> <span class="w" data-s="35803" data-e="36229">manager</span> <span class="w" data-s="36272" data-e="36400">of</span> <span class="w" data-s="36443" data-e="36485">the</span> <span class="w" data-s="36528" data-e="36699">chain</span> <span class="w" data-s="36741" data-e="36912">came</span> <span class="w" data-s="36955" data-e="37083">to</span> <span class="w" data-s="37125" data-e="37211">see</span> <span class="w" data-s="37253" data-e="37381">the</span> <span class="w" data-s="37424" data-e="37467">shop</span> <span class="w" data-s="37509" data-e="37765">one</span> <span class="w" data-s="37808" data-e="38021">afternoon.</span></p><p class="zh">那家连锁店的前任经理有天下午来看这间店。</p></div>
+<div class="pair" data-s0="38363" data-s1="43269"><p class="en"><span class="w" data-s="38363" data-e="38704">He</span> <span class="w" data-s="38875" data-e="39216">said</span> <span class="w" data-s="39259" data-e="39344">his</span> <span class="w" data-s="39387" data-e="39557">company</span> <span class="w" data-s="39600" data-e="39813">made</span> <span class="w" data-s="39856" data-e="39984">a</span> <span class="w target" data-s="40027" data-e="40197" title="">billion</span> <span class="w" data-s="40240" data-e="40581">a</span> <span class="w" data-s="40624" data-e="40667">year</span> <span class="w" data-s="40709" data-e="41008">and</span> <span class="w" data-s="41051" data-e="41477">that</span> <span class="w" data-s="41520" data-e="41605">the</span> <span class="w" data-s="41648" data-e="41691">town</span> <span class="w" data-s="41733" data-e="41989">could</span> <span class="w" data-s="42032" data-e="42160">not</span> <span class="w" data-s="42203" data-e="42501">support</span> <span class="w" data-s="42544" data-e="42800">two</span> <span class="w" data-s="42843" data-e="43269">shops.</span></p><p class="zh">他说他的公司一年赚十亿，而这个镇养不起两家店。</p></div>
+<div class="pair" data-s0="44044" data-s1="47372"><p class="en"><span class="w" data-s="44044" data-e="44300">Only</span> <span class="w" data-s="44343" data-e="44471">one</span> <span class="w" data-s="44514" data-e="44642">of</span> <span class="w" data-s="44684" data-e="44770">us</span> <span class="w" data-s="44812" data-e="44940">can</span> <span class="w" data-s="44983" data-e="45154">stay,</span> <span class="w" data-s="45410" data-e="45495">he</span> <span class="w" data-s="45538" data-e="45666">said,</span> <span class="w" data-s="45922" data-e="46050">and</span> <span class="w" data-s="46391" data-e="46562">the</span> <span class="w" data-s="46604" data-e="46690">choice</span> <span class="w" data-s="46732" data-e="46988">is</span> <span class="w target" data-s="47031" data-e="47372" title="决定性的；极其重要的，关键的；严重的，危 急的；批判性的">critical.</span></p><p class="zh">他说，我们俩只能留下一个，而怎么选至关重要。</p></div>
+<div class="pair" data-s0="47586" data-s1="50828"><p class="en"><span class="w target" data-s="47586" data-e="48610" title="后来，随后">Later</span> <span class="w" data-s="48652" data-e="48823">he</span> <span class="w" data-s="48866" data-e="49164">offered</span> <span class="w" data-s="49207" data-e="49292">to</span> <span class="w" data-s="49335" data-e="49420">buy</span> <span class="w" data-s="49463" data-e="49634">her</span> <span class="w" data-s="49676" data-e="49804">out;</span> <span class="w" data-s="50060" data-e="50402">she</span> <span class="w" data-s="50444" data-e="50572">said</span> <span class="w" data-s="50615" data-e="50828">no.</span></p><p class="zh">后来他提出把她买下来，她说了不。</p></div>
+<div class="pair" data-s0="51042" data-s1="55991"><p class="en"><span class="w target" data-s="51042" data-e="52023" title="当时，同时">Meanwhile,</span> <span class="w" data-s="52322" data-e="52364">the</span> <span class="w" data-s="52407" data-e="52535">small</span> <span class="w" data-s="52578" data-e="52834">shop</span> <span class="w" data-s="52876" data-e="53260">stayed</span> <span class="w" data-s="53303" data-e="53431">open,</span> <span class="w target" data-s="53644" data-e="54327" title="然而，但是，尽管">whereas</span> <span class="w" data-s="54370" data-e="54498">the</span> <span class="w" data-s="54540" data-e="54711">super</span> <span class="w" data-s="54754" data-e="54967">store</span> <span class="w" data-s="55010" data-e="55266">closed</span> <span class="w" data-s="55308" data-e="55607">within</span> <span class="w" data-s="55650" data-e="55863">a</span> <span class="w" data-s="55906" data-e="55991">year.</span></p><p class="zh">与此同时，小店照常开着，而那家大卖场不到一年就关了门。</p></div>
+<div class="pair" data-s0="56635" data-s1="60048"><p class="en"><span class="w target" data-s="56635" data-e="56720" title="因此；由此;从而">There</span> <span class="w" data-s="56763" data-e="56891">was</span> <span class="w" data-s="56933" data-e="57019">no</span> <span class="w" data-s="57061" data-e="57232">other</span> <span class="w" data-s="57275" data-e="57445">reason</span> <span class="w" data-s="57488" data-e="57659">for</span> <span class="w" data-s="57701" data-e="57829">this,</span> <span class="w" data-s="57957" data-e="58213">and</span> <span class="w" data-s="58299" data-e="58555">it</span> <span class="w" data-s="58597" data-e="58683">did</span> <span class="w" data-s="58725" data-e="58853">not</span> <span class="w target" data-s="58896" data-e="59024" title="表示……的意思；本意是，原意为；意味 adj.吝啬的；自私的；卑鄙的，不善良的">mean</span> <span class="w" data-s="59067" data-e="59237">that</span> <span class="w" data-s="59280" data-e="59365">my</span> <span class="w" data-s="59408" data-e="59579">aunt</span> <span class="w" data-s="59621" data-e="59707">was</span> <span class="w" data-s="59749" data-e="60048">clever.</span></p><p class="zh">这没有别的原因，也并不意味着我姑姑有多聪明。</p></div>
+<div class="pair" data-s0="60176" data-s1="63035"><p class="en"><span class="w" data-s="60176" data-e="60773">Lower</span> <span class="w" data-s="60816" data-e="61115">prices</span> <span class="w" data-s="61157" data-e="61371">were</span> <span class="w" data-s="61413" data-e="61541">only</span> <span class="w" data-s="61584" data-e="61797">a</span> <span class="w target" data-s="61840" data-e="61925" title="">means,</span> <span class="w" data-s="62181" data-e="62608">never</span> <span class="w" data-s="62651" data-e="62821">the</span> <span class="w" data-s="62864" data-e="63035">aim.</span></p><p class="zh">低价只是一种手段，从来不是目的。</p></div>
+<div class="pair" data-s0="63205" data-s1="66960"><p class="en"><span class="w" data-s="63205" data-e="63760">She</span> <span class="w" data-s="63803" data-e="64016">knew</span> <span class="w" data-s="64059" data-e="64144">the</span> <span class="w" data-s="64187" data-e="64229">name</span> <span class="w" data-s="64272" data-e="64443">of</span> <span class="w" data-s="64485" data-e="64613">every</span> <span class="w" data-s="64656" data-e="65125">customer,</span> <span class="w target" data-s="65253" data-e="65765" title="因此；由此;从而">thereby</span> <span class="w" data-s="65808" data-e="66021">turning</span> <span class="w" data-s="66064" data-e="66533">strangers</span> <span class="w" data-s="66576" data-e="66747">into</span> <span class="w" data-s="66789" data-e="66960">friends.</span></p><p class="zh">她叫得出每个顾客的名字，从而把陌生人变成了朋友。</p></div>
+<div class="pair" data-s0="67741" data-s1="71026"><p class="en"><span class="w target" data-s="67741" data-e="68125" title="此外；而且">Moreover,</span> <span class="w" data-s="68338" data-e="68509">she</span> <span class="w" data-s="68850" data-e="69021">knew</span> <span class="w" data-s="69064" data-e="69277">exactly</span> <span class="w" data-s="69320" data-e="69704">what</span> <span class="w" data-s="69746" data-e="69874">to</span> <span class="w" data-s="69917" data-e="70002">do</span> <span class="w" data-s="70045" data-e="70216">when</span> <span class="w" data-s="70258" data-e="70472">something</span> <span class="w" data-s="70514" data-e="70770">went</span> <span class="w" data-s="70813" data-e="71026">wrong.</span></p><p class="zh">而且，一旦出了什么问题，她很清楚该怎么办。</p></div>
+<div class="pair" data-s0="71282" data-s1="73458"><p class="en"><span class="w target" data-s="71282" data-e="72221" title="此外；而且;再者">Furthermore,</span> <span class="w" data-s="72349" data-e="72562">she</span> <span class="w" data-s="72818" data-e="73202">laughed</span> <span class="w" data-s="73245" data-e="73288">a</span> <span class="w" data-s="73330" data-e="73458">lot.</span></p><p class="zh">再说，她还特别爱笑。</p></div>
+<div class="pair" data-s0="73629" data-s1="76744"><p class="en"><span class="w" data-s="73629" data-e="74354">Nobody</span> <span class="w target" data-s="74397" data-e="74482" title="其他地；别地；否则，要不然 adj. 其他的，另外的">else</span> <span class="w" data-s="74525" data-e="74696">wrote</span> <span class="w" data-s="74738" data-e="74952">about</span> <span class="w" data-s="74994" data-e="75165">her,</span> <span class="w" data-s="75293" data-e="75506">and</span> <span class="w" data-s="75634" data-e="75933">nobody</span> <span class="w" data-s="75976" data-e="76189">put</span> <span class="w" data-s="76232" data-e="76360">her</span> <span class="w" data-s="76402" data-e="76530">in</span> <span class="w" data-s="76573" data-e="76616">a</span> <span class="w" data-s="76658" data-e="76744">chart.</span></p><p class="zh">没有别人写过她，也没人把她做进什么图表里。</p></div>
+<div class="pair" data-s0="77128" data-s1="81522"><p class="en"><span class="w" data-s="77128" data-e="77256">But</span> <span class="w" data-s="77298" data-e="77426">the</span> <span class="w" data-s="77469" data-e="77554">town</span> <span class="w" data-s="77597" data-e="77981">remembers</span> <span class="w" data-s="78024" data-e="78237">the</span> <span class="w target" data-s="78280" data-e="78536" title="">lane,</span> <span class="w" data-s="78749" data-e="78962">the</span> <span class="w target" data-s="79304" data-e="79645" title="(教堂、戏院、火车等座位间或超级市场货架 间的)走道，过道">aisle</span> <span class="w" data-s="79688" data-e="79901">and</span> <span class="w" data-s="80200" data-e="80370">the</span> <span class="w" data-s="80413" data-e="80498">woman</span> <span class="w" data-s="80541" data-e="80754">with</span> <span class="w" data-s="80797" data-e="80925">the</span> <span class="w" data-s="80968" data-e="81010">quick</span> <span class="w target" data-s="81053" data-e="81309" title="惯用左手的;左撇子的">left</span> <span class="w" data-s="81352" data-e="81522">hand.</span></p><p class="zh">但全镇人记得那条巷子、那条过道，还有那个左手很快的女人。</p></div></div>
+
+<h2>今日单词 · 22</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">aisle</span>
+          <span class="ipa">/arl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(教堂、戏院、火车等座位间或超级市场货架 间的)走道，过道</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>cleaned every aisle and checked the shelves</div>          <div class="mnem"><span class="lbl">记</span>考试的学生，很多都拿着小板 凳，坐在过道里，一个挨着一个。这个单词发音 类似“挨着的”，在哪儿挨着？“过道”里。</div>          <div class="root"><span class="lbl">根</span>谐音联想：挨着的 → 在过道里一个挨着一个</div>          <div class="zt"><span class="lbl">真题</span>There are no formulas written on the insides of hands or students looking across the aisle, or whispering answers to their classmates. 没有写在手心的公式，没有学生望着过道对面， 也没有学生轻声回答同学的问题。(2022) (256)</div>          <div class="fam"><span class="lbl">族</span>aisle seat 靠过道的座位</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">lane</span>
+          <span class="ipa">/lein/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>at the end of a narrow lane behind the station</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：拉(la)呢(ne)。 在哪里拉？在我们农村的“小路”上，牛拉着 车啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：拉呢 → 牛在乡间小路上拉着车</div>          <div class="zt"><span class="lbl">真题</span>The highways have wide lanes and shoulders. 高速公路有宽阔的车道和路肩。</div>          <div class="fam"><span class="lbl">族</span>laneway n. 小巷 / fast lane 快车道</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">critic</span>
+          <span class="ipa">/&#x27;krıtık/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she never answered a critic</div>          <div class="mnem"><span class="lbl">记</span>超人(cr)爱(i)什么他(t)？→ 批评他→批评家，评论家。</div>          <div class="root"><span class="lbl">根</span>crit(判断) + ic(人) → 做判断的人 → 批评家</div>          <div class="zt"><span class="lbl">真题</span>Some critics say it is a luxury and shouldn&#x27;t be free to families able to pay. —些 批评者表示，它是一种奢侈品，不应该免费提供 给有能力支付的家庭。(2016)</div>          <div class="fam"><span class="lbl">族</span>critical adj. 批判性的 / criticize v. 批评</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">criticism</span>
+          <span class="ipa">/&#x27;krıtısizəm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">批评；批判；评论</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Criticism, she said, is free advice</div>          <div class="root"><span class="lbl">根</span>critic(批评家) + ism(名词后缀) → 批评这件事</div>          <div class="zt"><span class="lbl">真题</span>It has drawn a lot of criticism from overseas. 它招致了海外的大量批评。(2015)</div>          <div class="fam"><span class="lbl">族</span>criticize v. 批评 / critic n. 批评家</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">critical</span>
+          <span class="ipa">/&#x27;krıtıkl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">决定性的；极其重要的，关键的；严重的，危 急的；批判性的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the choice is critical</div>          <div class="root"><span class="lbl">根</span>crit(判断) + ical(…的) → 需要判断的 → 关键的</div>          <div class="zt"><span class="lbl">真题</span>It is likely to be a critical turning point in one&#x27;s life. 它可能是一个人一生中的关键转折 点。(2017)</div>          <div class="fam"><span class="lbl">族</span>critically adv. 关键地 / crisis n. 危机</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">comprehend</span>
+          <span class="ipa">/ika:mprı&#x27;hend/</span>
+          <span class="pos">v.</span>
+          <span class="cn">理解；领悟；懂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She could not comprehend why people drove to the new so-called super store</div>          <div class="root"><span class="lbl">根</span>com(完全) + prehend(抓住) → 完全抓住 → 理解</div>          <div class="zt"><span class="lbl">真题</span>Reading and comprehending longer books and chapters takes practice. 阅读和理解较长的 书和章节需要练习。</div>          <div class="fam"><span class="lbl">族</span>comprehension n. 理解力 / comprehensive adj. 全面的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">billion</span>
+          <span class="ipa">/&#x27;brljən/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his company made a billion a year</div>          <div class="root"><span class="lbl">根</span>bi(二) + llion(百万) → 百万的平方 → 十亿</div>          <div class="zt"><span class="lbl">真题</span>Textbooks represent an 11 billion dollar industry，up from $8 billion in 2014. 教科书 行业价值110亿美元，高于2014年的80亿美 元。(2019)</div>          <div class="fam"><span class="lbl">族</span>million n. 百万 / trillion n. 万亿</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">satisfy</span>
+          <span class="ipa">/&#x27;sætisfai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使满意；使满足;满足(要求、需要等)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She never tried to satisfy everyone</div>          <div class="root"><span class="lbl">根</span>satis(足够) + fy(使…) → 使足够 → 使满意</div>          <div class="zt"><span class="lbl">真题</span>The office maintained a well-stocked kitchen that would satisfy my every snack desire. 办公室里有一个储备充足的厨房，可以 满足我对零食的每一种渴望。(2022)</div>          <div class="fam"><span class="lbl">族</span>satisfaction n. 满意 / satisfied adj. 满意的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">ready</span>
+          <span class="ipa">/&#x27;redi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">准备好的；已完成的；方便使用的 adv.已做完；已完成</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she always got ready the night before</div>          <div class="root"><span class="lbl">根</span>靠搭配记：be ready for 为…做好准备 / get ready 准备好</div>          <div class="zt"><span class="lbl">真题</span>You can take the frozen fruit out the night before and have it ready the next morning. 你可以在前一天晚上把冷冻水果拿出 来，第二天早上把它准备好。</div>          <div class="fam"><span class="lbl">族</span>readily adv. 乐意地 / readiness n. 准备就绪</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">left-handed</span>
+          <span class="ipa">/ileft&#x27;hændıd/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">惯用左手的;左撇子的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>both of them were left-handed</div>          <div class="root"><span class="lbl">根</span>left(左) + handed(有…手的) → 惯用左手的</div>          <div class="zt"><span class="lbl">真题</span>It has not done enough to help left- handed children. 它在帮助左撇子儿童方面做 得还不够。</div>          <div class="fam"><span class="lbl">族</span>right-handed adj. 惯用右手的 / handedness n. 用手习惯</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">beforehand</span>
+          <span class="ipa">/bi&#x27;fə:rhænd/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">预先;事先</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Beforehand, she always got ready the night before</div>          <div class="root"><span class="lbl">根</span>before(在…之前) + hand(手) → 提前拿到手 → 事先</div>          <div class="zt"><span class="lbl">真题</span>People often fail to programme their routines beforehand. 人们常常没有事先安排好 他们的日常工作。</div>          <div class="fam"><span class="lbl">族</span>in advance 提前 / ahead adv. 在前面</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">former</span>
+          <span class="ipa">/&#x27;fə:rmər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">前者 adj. 以前的；(两者中)前者的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The former manager of the chain</div>          <div class="root"><span class="lbl">根</span>form(最早) + er(比较级) → 更在前面那个 → 前者</div>          <div class="zt"><span class="lbl">真题</span>The former is a key risk factor for conditions such as heart disease, cancer and many more. 前者是心脏病、癌症等疾病的关键 风险因素。(2017)</div>          <div class="fam"><span class="lbl">族</span>formerly adv. 以前 / the latter n. 后者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">later</span>
+          <span class="ipa">/&#x27;leitər/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">后来，随后</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Later he offered to buy her out</div>          <div class="root"><span class="lbl">根</span>late(晚) + er(比较级) → 更晚 → 后来</div>          <div class="zt"><span class="lbl">真题</span>Later, people tried to lift a building off its foundation. 后来，人们试图把一座建筑物从 地基上拆除。</div>          <div class="fam"><span class="lbl">族</span>latest adj. 最新的 / the latter n. 后者</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">so-called</span>
+          <span class="ipa">/isəu &#x27;kə:ld/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">所谓的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the new so-called super store on the ring road</div>          <div class="root"><span class="lbl">根</span>so(如此) + called(被称做) → 这样被叫的 → 所谓的</div>          <div class="zt"><span class="lbl">真题</span>A new batch of young women—members of the so-called millennial(千禧的) generation—has been entering the workforce for the past decade. 过去10年，一批新的年轻女性——所 谓的千禧一代——开始进入劳动力市场。 (2018)</div>          <div class="fam"><span class="lbl">族</span>call v. 称呼 / name v. 命名</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">mean</span>
+          <span class="ipa">/mi:n/</span>
+          <span class="pos">v.</span>
+          <span class="cn">表示……的意思；本意是，原意为；意味 adj.吝啬的；自私的；卑鄙的，不善良的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>it did not mean that my aunt was clever</div>          <div class="mnem"><span class="lbl">记</span>我(me)一个(an)人去逛街，“意 味着”我今天没人陪啊。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：mean to do 打算做 / mean a lot to sb. 对某人很重要</div>          <div class="zt"><span class="lbl">真题</span>Just because they can&#x27;t sing opera or ride a bicycle doesn&#x27;t mean that animals don&#x27;t have culture.就因为它们不会唱戏、不会骑自行车， 并不意味着动物就没有文化。(2019)</div>          <div class="fam"><span class="lbl">族</span>meaning n. 意思 / meaningful adj. 有意义的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">means</span>
+          <span class="ipa">/mi:nz/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Lower prices were only a means</div>          <div class="root"><span class="lbl">根</span>mean(意味) + s → 用来达到目的的那个东西 → 方式</div>          <div class="zt"><span class="lbl">真题</span>However, if it does not, there are various means the consumers may use to gain satisfaction.然而，如果不是这样，消费者可以 使用各种方式来获得满足。</div>          <div class="fam"><span class="lbl">族</span>by all means 当然可以 / by no means 绝不</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">meanwhile</span>
+          <span class="ipa">/&#x27;mi:nwaıl/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">当时，同时</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Meanwhile, the small shop stayed open</div>          <div class="root"><span class="lbl">根</span>mean(中间的) + while(一段时间) → 在这段时间里 → 同时</div>          <div class="zt"><span class="lbl">真题</span>Meanwhile, it is also the most practiced art form in the world. 同时，它也是世界上练得 最多的艺术形式。(2016)</div>          <div class="fam"><span class="lbl">族</span>meantime n. 其间 / while conj. 当…的时候</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">whereas</span>
+          <span class="ipa">/wer&#x27;æz/</span>
+          <span class="pos">conj.</span>
+          <span class="cn">然而，但是，尽管</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>whereas the super store closed within a year</div>          <div class="root"><span class="lbl">根</span>where(哪里) + as(如同) → 两边一比 → 然而</div>          <div class="zt"><span class="lbl">真题</span>Inside a rat&#x27;s nose are up to 1, 000 different types of olfactory receptors(嗅觉感受 器), whereas humans only have 100 to 200 types. 在老鼠的鼻子里有多达 1000 种不同类 型的嗅觉感受器，而人类只有100到200种 类型。</div>          <div class="fam"><span class="lbl">族</span>while conj. 然而 / though conj. 虽然</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">else</span>
+          <span class="ipa">/els/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">其他地；别地；否则，要不然 adj. 其他的，另外的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody else wrote about her</div>          <div class="root"><span class="lbl">根</span>靠搭配记：someone else 别人 / or else 否则</div>          <div class="zt"><span class="lbl">真题</span>How can you quantify a person&#x27;s boredom level and compare it with someone else&#x27;s?你如 何量化一个人的无聊程度，并与其他人的无聊 程度进行比较？</div>          <div class="fam"><span class="lbl">族</span>elsewhere adv. 在别处 / other adj. 其他的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">thereby</span>
+          <span class="ipa">/ðer&#x27;bai/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">因此；由此;从而</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>thereby turning strangers into friends</div>          <div class="root"><span class="lbl">根</span>there(那) + by(通过) → 通过那件事 → 因此</div>          <div class="zt"><span class="lbl">真题</span>This research may be biased, however, as ill health often makes older people more dependent and thereby increases contact with family members.然而，这项研究可能存在偏 见，因为健康状况不佳往往会使老年人更加依 赖他人，从而增加与家人的接触。(2016)</div>          <div class="fam"><span class="lbl">族</span>therefore adv. 因此 / whereby adv. 凭借</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">moreover</span>
+          <span class="ipa">/mə:r&#x27;əuvər/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">此外；而且</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Moreover, she knew exactly what to do when something went wrong</div>          <div class="root"><span class="lbl">根</span>more(更多) + over(在上面) → 在此之上再说一点 → 此外</div>          <div class="zt"><span class="lbl">真题</span>Moreover, schools should be more than simple institutions of traditional learning. 此 外，学校不应该是简单的传统学习机构。 (2022)</div>          <div class="fam"><span class="lbl">族</span>furthermore adv. 此外 / besides adv. 而且</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">furthermore</span>
+          <span class="ipa">/ifə:rðər&#x27;mə:r/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">此外；而且;再者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Furthermore, she laughed a lot</div>          <div class="mnem"><span class="lbl">记</span>进一步的(further)，更多(more) 一些→此外，而且。 258 晓艳英语系列图书 就这样过英语四级(精讲) 就这样过英语四级(真题+模拟) 就这样过英语六级(真题+模拟) 大学英语四级翻译与写作 大学英语六级翻译与写作 大学英语六级阅读这点事儿 大学英语四级听力这点事儿 大学英语六级听力这点事儿 思就是：以后不需要单独背单词了。我来讲，你来听，让我们在 欢声笑语中记住四级单词。切记不要自己看这本书，一定要领 取课程并听我讲，这样效果会好得多。 晓艳四级视频号 读者反馈平台 找错误 就这样过英语六级(精讲) 出点子 有好礼 英语六级你还在背单词吗 学路漫漫 丞为星光~ 大学英语四级阅读这点事儿 晓艳有话说 首先，这本书的名字叫《英语四级你还在背单词吗》，其意 ISBN 978-7-5771-1258-9 晓艳四级公众号 787577112589 定价：69.80元</div>          <div class="root"><span class="lbl">根</span>further(更远) + more(更多) → 再往远处多说一点 → 此外</div>          <div class="zt"><span class="lbl">真题</span>Furthermore, listening can really benefit yourself.此外，倾听真的对你自己有益。</div>          <div class="fam"><span class="lbl">族</span>further adv. 进一步 / moreover adv. 此外</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 69</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

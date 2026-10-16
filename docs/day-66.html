@@ -1,0 +1,698 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 66 · The Night the Ferry Lost Power</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 66 · 12/17 · Unit 10 第 1951-1980 词</div>
+  <h1>The Night the Ferry Lost Power<span class="cn">渡轮失去动力的那一夜</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-66.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="2560"><p class="en"><span class="w" data-s="43" data-e="128">The</span> <span class="w" data-s="171" data-e="427">ferry</span> <span class="w" data-s="469" data-e="683">Green</span> <span class="w" data-s="725" data-e="853">Bay</span> <span class="w" data-s="896" data-e="1067">leaves</span> <span class="w" data-s="1109" data-e="1323">the</span> <span class="w" data-s="1365" data-e="1621">harbour</span> <span class="w" data-s="1664" data-e="1792">at</span> <span class="w" data-s="1835" data-e="1920">ten</span> <span class="w" data-s="1963" data-e="2304">every</span> <span class="w" data-s="2347" data-e="2560">night.</span></p><p class="zh">渡轮「绿湾号」每晚十点驶离港口。</p></div>
+<div class="pair" data-s0="2773" data-s1="6613"><p class="en"><span class="w" data-s="2773" data-e="3285">Its</span> <span class="w target" data-s="3328" data-e="3541" title="">crew</span> <span class="w" data-s="3584" data-e="3669">is</span> <span class="w" data-s="3712" data-e="3883">small:</span> <span class="w" data-s="4181" data-e="4437">a</span> <span class="w" data-s="4480" data-e="4821">captain,</span> <span class="w" data-s="4992" data-e="5120">an</span> <span class="w" data-s="5205" data-e="5589">engineer,</span> <span class="w" data-s="5760" data-e="5973">four</span> <span class="w" data-s="6144" data-e="6613">sailors.</span></p><p class="zh">船上的船员不多：一名船长、一名轮机长，四个水手。</p></div>
+<div class="pair" data-s0="6827" data-s1="10624"><p class="en"><span class="w" data-s="6827" data-e="6955">The</span> <span class="w" data-s="6997" data-e="7424">captain&#x27;s</span> <span class="w target" data-s="7467" data-e="7765" title="同事，同僚">colleague</span> <span class="w" data-s="7808" data-e="7979">and</span> <span class="w" data-s="8021" data-e="8064">the</span> <span class="w target" data-s="8107" data-e="8192" title="全体员工">staff</span> <span class="w" data-s="8235" data-e="8491">in</span> <span class="w" data-s="8533" data-e="8576">the</span> <span class="w" data-s="8619" data-e="8747">office</span> <span class="w" data-s="8789" data-e="9003">on</span> <span class="w" data-s="9045" data-e="9259">shore</span> <span class="w" data-s="9301" data-e="9557">keep</span> <span class="w" data-s="9600" data-e="9728">the</span> <span class="w" data-s="9771" data-e="10027">radio</span> <span class="w" data-s="10069" data-e="10240">on</span> <span class="w" data-s="10283" data-e="10453">all</span> <span class="w" data-s="10496" data-e="10624">night.</span></p><p class="zh">船长的同事和岸上办公室的员工整夜不关无线电。</p></div>
+<div class="pair" data-s0="10837" data-s1="13440"><p class="en"><span class="w" data-s="10837" data-e="11008">That</span> <span class="w" data-s="11392" data-e="11605">night</span> <span class="w" data-s="11648" data-e="11861">an</span> <span class="w" data-s="11904" data-e="12032">old</span> <span class="w target" data-s="12075" data-e="12245" title="">fellow</span> <span class="w" data-s="12288" data-e="12544">with</span> <span class="w" data-s="12587" data-e="12629">a</span> <span class="w" data-s="12672" data-e="12757">dog</span> <span class="w" data-s="12800" data-e="13099">came</span> <span class="w" data-s="13141" data-e="13440">aboard.</span></p><p class="zh">那天夜里，一位带着狗的老头上船了。</p></div>
+<div class="pair" data-s0="13611" data-s1="16213"><p class="en"><span class="w" data-s="13611" data-e="13995">His</span> <span class="w target" data-s="14037" data-e="14251" title="东西，物品v. 塞进，填进，装满">stuff</span> <span class="w" data-s="14293" data-e="14635">slid</span> <span class="w" data-s="14677" data-e="14805">across</span> <span class="w" data-s="14848" data-e="15019">the</span> <span class="w" data-s="15061" data-e="15275">deck</span> <span class="w" data-s="15317" data-e="15445">when</span> <span class="w" data-s="15488" data-e="15616">the</span> <span class="w" data-s="15659" data-e="15701">sea</span> <span class="w" data-s="15744" data-e="15957">turned</span> <span class="w" data-s="16000" data-e="16213">rough.</span></p><p class="zh">海面转糟时，他的行李在甲板上滑来滑去。</p></div>
+<div class="pair" data-s0="17163" data-s1="20619"><p class="en"><span class="w" data-s="17163" data-e="17248">At</span> <span class="w" data-s="17291" data-e="17632">midnight</span> <span class="w" data-s="17675" data-e="17931">the</span> <span class="w" data-s="18144" data-e="18358">engine</span> <span class="w" data-s="18400" data-e="18571">made</span> <span class="w" data-s="18614" data-e="18742">a</span> <span class="w" data-s="18784" data-e="18870">sound</span> <span class="w" data-s="18912" data-e="19211">that</span> <span class="w target" data-s="19254" data-e="19766" title="类似于；看起来像；显得像；像">resembled</span> <span class="w" data-s="19808" data-e="19851">a</span> <span class="w" data-s="19894" data-e="20150">hammer</span> <span class="w" data-s="20192" data-e="20320">on</span> <span class="w" data-s="20363" data-e="20619">metal.</span></p><p class="zh">午夜时分，发动机发出了一种像锤子敲在金属上的声音。</p></div>
+<div class="pair" data-s0="20747" data-s1="23008"><p class="en"><span class="w" data-s="20747" data-e="21003">One</span> <span class="w" data-s="21259" data-e="21643">loose</span> <span class="w target" data-s="21686" data-e="21942" title="螺丝，螺丝钉 v. 用螺丝固定,拧紧；(~up)毁 掉，搞砸">screw</span> <span class="w" data-s="21984" data-e="22155">had</span> <span class="w" data-s="22198" data-e="22539">fallen</span> <span class="w" data-s="22582" data-e="22624">out</span> <span class="w" data-s="22667" data-e="22752">of</span> <span class="w" data-s="22795" data-e="22838">the</span> <span class="w" data-s="22880" data-e="23008">pump.</span></p><p class="zh">一颗松动的螺丝从水泵上掉了下来。</p></div>
+<div class="pair" data-s0="23222" data-s1="25952"><p class="en"><span class="w" data-s="23222" data-e="23691">In</span> <span class="w" data-s="23734" data-e="23862">his</span> <span class="w target" data-s="23904" data-e="24203" title="匆忙，急忙；赶紧；催促">haste</span> <span class="w" data-s="24246" data-e="24587">the</span> <span class="w" data-s="24715" data-e="25099">engineer</span> <span class="w" data-s="25142" data-e="25483">grabbed</span> <span class="w" data-s="25526" data-e="25568">the</span> <span class="w" data-s="25611" data-e="25696">wrong</span> <span class="w" data-s="25739" data-e="25952">tool.</span></p><p class="zh">轮机长一着急，抓错了工具。</p></div>
+<div class="pair" data-s0="26539" data-s1="29440"><p class="en"><span class="w" data-s="26539" data-e="26624">He</span> <span class="w" data-s="26667" data-e="26795">had</span> <span class="w" data-s="26837" data-e="26965">always</span> <span class="w target" data-s="27008" data-e="27477" title="鄙视，轻视">despised</span> <span class="w" data-s="27520" data-e="27733">that</span> <span class="w" data-s="27776" data-e="27989">pump</span> <span class="w" data-s="28032" data-e="28331">and</span> <span class="w" data-s="28544" data-e="28757">looked</span> <span class="w" data-s="28800" data-e="28928">at</span> <span class="w" data-s="28971" data-e="29056">it</span> <span class="w" data-s="29099" data-e="29141">with</span> <span class="w target" data-s="29184" data-e="29440" title="">contempt.</span></p><p class="zh">他一直看不上那台水泵，此刻更是带着蔑视盯着它。</p></div>
+<div class="pair" data-s0="29696" data-s1="32469"><p class="en"><span class="w" data-s="29696" data-e="30037">The</span> <span class="w" data-s="30208" data-e="30549">captain</span> <span class="w target" data-s="30592" data-e="30891" title="主张，强烈要求；催促；鼓励">urged</span> <span class="w" data-s="30933" data-e="31019">the</span> <span class="w" data-s="31061" data-e="31445">passengers</span> <span class="w" data-s="31488" data-e="31659">to</span> <span class="w" data-s="31701" data-e="31829">stay</span> <span class="w" data-s="31872" data-e="32043">in</span> <span class="w" data-s="32085" data-e="32128">their</span> <span class="w" data-s="32171" data-e="32469">seats.</span></p><p class="zh">船长催所有乘客坐回自己的座位。</p></div>
+<div class="pair" data-s0="32597" data-s1="36864"><p class="en"><span class="w" data-s="32597" data-e="33109">With</span> <span class="w" data-s="33152" data-e="33323">great</span> <span class="w target" data-s="33365" data-e="33749" title="小心，谨慎v.警告，劝……小心">caution</span> <span class="w" data-s="33792" data-e="34005">he</span> <span class="w" data-s="34048" data-e="34176">turned</span> <span class="w" data-s="34219" data-e="34475">toward</span> <span class="w" data-s="34517" data-e="34645">the</span> <span class="w" data-s="34688" data-e="34901">nearest</span> <span class="w" data-s="34944" data-e="35243">island,</span> <span class="w target" data-s="35413" data-e="35883" title="知道;发觉;意识到">aware</span> <span class="w" data-s="35925" data-e="36139">that</span> <span class="w" data-s="36181" data-e="36267">the</span> <span class="w" data-s="36309" data-e="36437">wind</span> <span class="w" data-s="36480" data-e="36651">would</span> <span class="w" data-s="36693" data-e="36864">rise.</span></p><p class="zh">他万分谨慎地把船头转向最近的岛，同时意识到一点以后风会变大。</p></div>
+<div class="pair" data-s0="37598" data-s1="39902"><p class="en"><span class="w" data-s="37598" data-e="37684">He</span> <span class="w" data-s="37726" data-e="37812">had</span> <span class="w" data-s="37854" data-e="37940">taken</span> <span class="w" data-s="37982" data-e="38153">one</span> <span class="w target" data-s="38196" data-e="38622" title="预防措施；防备">precaution:</span> <span class="w" data-s="38836" data-e="39305">the</span> <span class="w" data-s="39348" data-e="39561">tanks</span> <span class="w" data-s="39604" data-e="39732">were</span> <span class="w" data-s="39774" data-e="39902">full.</span></p><p class="zh">他提前做过一项预防措施：油箱是满的。</p></div>
+<div class="pair" data-s0="40116" data-s1="42846"><p class="en"><span class="w" data-s="40116" data-e="40414">On</span> <span class="w" data-s="40628" data-e="40926">deck</span> <span class="w" data-s="40969" data-e="41097">the</span> <span class="w target" data-s="41140" data-e="41310" title="">crew</span> <span class="w" data-s="41353" data-e="41566">stayed</span> <span class="w target" data-s="41609" data-e="41822" title="警觉的;警惕的;(~to)意识到;注意到 v. 向……报警；使警觉 n.警戒；戒备；警惕；警报">alert</span> <span class="w" data-s="41865" data-e="41993">and</span> <span class="w target" data-s="42036" data-e="42206" title="意识到的;有意的">conscious</span> <span class="w" data-s="42249" data-e="42590">of</span> <span class="w" data-s="42633" data-e="42676">the</span> <span class="w" data-s="42718" data-e="42846">cold.</span></p><p class="zh">甲板上，船员们保持警觉，也清楚地感到寒冷。</p></div>
+<div class="pair" data-s0="43145" data-s1="46302"><p class="en"><span class="w" data-s="43145" data-e="43572">Then</span> <span class="w" data-s="43614" data-e="43785">the</span> <span class="w" data-s="43828" data-e="43913">lights</span> <span class="w" data-s="43956" data-e="44126">went</span> <span class="w" data-s="44169" data-e="44297">out</span> <span class="w" data-s="44340" data-e="44510">and</span> <span class="w" data-s="44553" data-e="44894">the</span> <span class="w" data-s="44937" data-e="45321">passengers</span> <span class="w" data-s="45364" data-e="45534">felt</span> <span class="w" data-s="45577" data-e="45790">real</span> <span class="w target" data-s="45833" data-e="46302" title="恐惧，恐怖行动">terror.</span></p><p class="zh">接着灯灭了，乘客们感到了真正的恐惧。</p></div>
+<div class="pair" data-s0="46601" data-s1="49417"><p class="en"><span class="w" data-s="46601" data-e="46686">A</span> <span class="w" data-s="46729" data-e="46814">little</span> <span class="w" data-s="46857" data-e="47028">girl</span> <span class="w" data-s="47070" data-e="47284">was</span> <span class="w target" data-s="47326" data-e="47838" title="使恐怖，使惊吓；恐吓，吓唬；威胁">terrified</span> <span class="w" data-s="47881" data-e="48009">by</span> <span class="w" data-s="48052" data-e="48137">the</span> <span class="w" data-s="48180" data-e="48265">black</span> <span class="w" data-s="48308" data-e="48521">water</span> <span class="w" data-s="48564" data-e="48862">and</span> <span class="w" data-s="48905" data-e="48990">turned</span> <span class="w target" data-s="49033" data-e="49417" title="苍白的；浅的,淡的 v. 变苍白；变淡">pale.</span></p><p class="zh">一个小女孩被漆黑的海水吓坏了，脸色变得苍白。</p></div>
+<div class="pair" data-s0="49630" data-s1="51892"><p class="en"><span class="w" data-s="49630" data-e="49886">Her</span> <span class="w" data-s="50057" data-e="50228">mother</span> <span class="w" data-s="50270" data-e="50441">held</span> <span class="w" data-s="50484" data-e="50612">her</span> <span class="w" data-s="50654" data-e="50953">tighter</span> <span class="w" data-s="50996" data-e="51124">and</span> <span class="w" data-s="51166" data-e="51380">stared</span> <span class="w" data-s="51422" data-e="51550">in</span> <span class="w target" data-s="51593" data-e="51892" title="震惊;恐惧；恐怖故事 racist /&#x27;reisist/ n. 种族主义者">horror.</span></p><p class="zh">她母亲把她搂得更紧，惊恐地盯着海面。</p></div>
+<div class="pair" data-s0="52062" data-s1="53342"><p class="en"><span class="w" data-s="52062" data-e="52276">It</span> <span class="w" data-s="52318" data-e="52617">was</span> <span class="w" data-s="52660" data-e="52745">a</span> <span class="w target" data-s="52788" data-e="53129" title="可怕的，令人畏惧的">dreadful</span> <span class="w" data-s="53172" data-e="53342">night.</span></p><p class="zh">那是个可怕的夜晚。</p></div>
+<div class="pair" data-s0="54079" data-s1="57833"><p class="en"><span class="w" data-s="54079" data-e="54207">The</span> <span class="w" data-s="54249" data-e="54377">old</span> <span class="w target" data-s="54420" data-e="54591" title="">fellow</span> <span class="w" data-s="54633" data-e="54975">wanted</span> <span class="w" data-s="55017" data-e="55273">to</span> <span class="w target" data-s="55316" data-e="55572" title="">rebel,</span> <span class="w" data-s="55785" data-e="55956">but</span> <span class="w" data-s="56340" data-e="56468">his</span> <span class="w target" data-s="56511" data-e="56937" title="良知，良心">conscience</span> <span class="w" data-s="56980" data-e="57151">held</span> <span class="w" data-s="57193" data-e="57321">him</span> <span class="w" data-s="57364" data-e="57449">in</span> <span class="w" data-s="57492" data-e="57535">his</span> <span class="w" data-s="57577" data-e="57833">seat.</span></p><p class="zh">那位老头想要反抗，但良心把他按在了座位上。</p></div>
+<div class="pair" data-s0="57961" data-s1="62185"><p class="en"><span class="w" data-s="57961" data-e="58559">The</span> <span class="w" data-s="58601" data-e="58729">warm</span> <span class="w" data-s="58772" data-e="59241">cabin</span> <span class="w target" data-s="59284" data-e="59583" title="诱惑，利诱">tempted</span> <span class="w" data-s="59625" data-e="59753">the</span> <span class="w" data-s="59796" data-e="60095">sleepy</span> <span class="w" data-s="60137" data-e="60607">passengers,</span> <span class="w" data-s="60820" data-e="61332">yet</span> <span class="w" data-s="61375" data-e="61631">nobody</span> <span class="w" data-s="61673" data-e="62185">slept.</span></p><p class="zh">温暖的船舱诱惑着困倦的乘客，可谁也没睡。</p></div>
+<div class="pair" data-s0="62399" data-s1="66409"><p class="en"><span class="w" data-s="62399" data-e="62484">A</span> <span class="w" data-s="62527" data-e="62783">warning</span> <span class="w" data-s="62825" data-e="62953">on</span> <span class="w" data-s="62996" data-e="63124">the</span> <span class="w" data-s="63167" data-e="63508">engine-room</span> <span class="w" data-s="63551" data-e="63764">door</span> <span class="w" data-s="63807" data-e="64148">read</span> <span class="w target" data-s="64191" data-e="64617" title="">paim,</span> <span class="w" data-s="64831" data-e="65129">where</span> <span class="w" data-s="65215" data-e="65343">the</span> <span class="w" data-s="65385" data-e="65599">painter</span> <span class="w" data-s="65641" data-e="65769">had</span> <span class="w" data-s="65812" data-e="65940">meant</span> <span class="w" data-s="65983" data-e="66409">palm.</span></p><p class="zh">轮机舱的门上有一行手写的警告，写的是 paim，写字的人本想写 palm。</p></div>
+<div class="pair" data-s0="66623" data-s1="69823"><p class="en"><span class="w" data-s="66623" data-e="67007">The</span> <span class="w" data-s="67220" data-e="67561">engineer</span> <span class="w" data-s="67604" data-e="67775">made</span> <span class="w" data-s="67817" data-e="67988">one</span> <span class="w" data-s="68031" data-e="68201">last</span> <span class="w target" data-s="68244" data-e="68500" title="尝试，企图n. 试图，努力">attempt,</span> <span class="w" data-s="68841" data-e="69097">but</span> <span class="w" data-s="69225" data-e="69353">it</span> <span class="w" data-s="69396" data-e="69439">was</span> <span class="w" data-s="69481" data-e="69567">in</span> <span class="w target" data-s="69609" data-e="69823" title="徒劳的，无结果的；虚荣的">vain.</span></p><p class="zh">轮机长做了最后一次尝试，但徒劳无功。</p></div>
+<div class="pair" data-s0="70769" data-s1="74908"><p class="en"><span class="w" data-s="70769" data-e="70897">Then</span> <span class="w" data-s="70940" data-e="71111">the</span> <span class="w" data-s="71153" data-e="71452">captain</span> <span class="w" data-s="71495" data-e="71623">found</span> <span class="w" data-s="71665" data-e="71879">a</span> <span class="w" data-s="71921" data-e="72007">red</span> <span class="w target" data-s="72049" data-e="72519" title="三角形">triangle</span> <span class="w" data-s="72561" data-e="72732">on</span> <span class="w" data-s="72775" data-e="72860">the</span> <span class="w" data-s="72903" data-e="73073">map,</span> <span class="w" data-s="73287" data-e="73799">marking</span> <span class="w" data-s="73841" data-e="73927">a</span> <span class="w" data-s="73969" data-e="74140">small</span> <span class="w" data-s="74183" data-e="74524">calm</span> <span class="w" data-s="74567" data-e="74908">bay.</span></p><p class="zh">这时船长在地图上找到一个红色的三角形，那是一个小小的平静海湾。</p></div>
+<div class="pair" data-s0="75164" data-s1="78023"><p class="en"><span class="w" data-s="75164" data-e="75847">By</span> <span class="w" data-s="75889" data-e="76060">three</span> <span class="w" data-s="76103" data-e="76359">o&#x27;clock</span> <span class="w" data-s="76401" data-e="76743">both</span> <span class="w" data-s="76785" data-e="77169">engines</span> <span class="w" data-s="77212" data-e="77425">worked</span> <span class="w" data-s="77468" data-e="77639">in</span> <span class="w target" data-s="77681" data-e="78023" title="调和；协调；和谐">harmony.</span></p><p class="zh">到三点钟，两台发动机协调地一起运转起来。</p></div>
+<div class="pair" data-s0="78193" data-s1="81265"><p class="en"><span class="w" data-s="78193" data-e="78620">The</span> <span class="w target" data-s="78791" data-e="79132" title="憎恶，憎恨，仇恨">hatred</span> <span class="w" data-s="79175" data-e="79303">on</span> <span class="w" data-s="79345" data-e="79431">the</span> <span class="w" data-s="79473" data-e="79559">young</span> <span class="w" data-s="79601" data-e="80071">sailor&#x27;s</span> <span class="w" data-s="80113" data-e="80199">face</span> <span class="w" data-s="80241" data-e="80583">turned</span> <span class="w" data-s="80625" data-e="80881">into</span> <span class="w" data-s="80924" data-e="81052">a</span> <span class="w" data-s="81095" data-e="81265">smile.</span></p><p class="zh">年轻水手脸上的憎恨慢慢变成了笑容。</p></div>
+<div class="pair" data-s0="81735" data-s1="84295"><p class="en"><span class="w" data-s="81735" data-e="81905">In</span> <span class="w" data-s="81948" data-e="82033">the</span> <span class="w" data-s="82076" data-e="82161">morning</span> <span class="w" data-s="82204" data-e="82460">the</span> <span class="w target" data-s="82503" data-e="82631" title="全体员工">staff</span> <span class="w" data-s="82673" data-e="82887">on</span> <span class="w" data-s="82929" data-e="83185">shore</span> <span class="w" data-s="83228" data-e="83569">counted</span> <span class="w" data-s="83612" data-e="83825">everyone</span> <span class="w" data-s="83868" data-e="84295">twice.</span></p><p class="zh">早上，岸上的员工把人数点了两遍。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">rebel</span>
+          <span class="ipa">/rı&#x27;bel, &#x27;rebl/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old fellow wanted to rebel</div>          <div class="root"><span class="lbl">根</span>re(再) + bel(战争) → 又打起来 → 反叛</div>          <div class="zt"><span class="lbl">真题</span>The more horrible the school circumstances, the more important pleasure is to achieving any educational success. 学校环境越糟糕，获得任何 教育成功的快乐就越重要。</div>          <div class="fam"><span class="lbl">族</span>rebellion n. 叛乱 / rebellious adj. 反叛的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">terror</span>
+          <span class="ipa">/&#x27;terər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">恐惧，恐怖行动</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the passengers felt real terror</div>          <div class="mnem"><span class="lbl">记</span>这个单词发音类似“太弱”。一 个国家政府太软弱，恐怖分子就很猖狂，开展 “恐怖行动”。</div>          <div class="root"><span class="lbl">根</span>terr(怕) + or(名词后缀) → 害怕这种情绪</div>          <div class="zt"><span class="lbl">真题</span>Italy signed an accord with UNESCO to protect cultural heritage from natural disasters and terror groups. 意大利与联合国教科文组织 签署了一项协议，旨在保护文化遗产免受自然 灾害和恐怖组织侵害。(2018)</div>          <div class="fam"><span class="lbl">族</span>terrorist n. 恐怖分子 / terrible adj. 可怕的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">terrify</span>
+          <span class="ipa">/&#x27;terifai/</span>
+          <span class="pos">v.</span>
+          <span class="cn">使恐怖，使惊吓；恐吓，吓唬；威胁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A little girl was terrified by the black water</div>          <div class="mnem"><span class="lbl">记</span>动词后缀ify(使……)；词根 terr(怕，恐吓)。连在一起就是：使……害怕→ 恐吓，威胁。</div>          <div class="root"><span class="lbl">根</span>terr(怕) + ify(使…) → 使……害怕</div>          <div class="zt"><span class="lbl">真题</span>They could sometimes terrify adults. 它 们有时会吓到成年人。(2017)</div>          <div class="fam"><span class="lbl">族</span>terror n. 恐惧 / terrified adj. 被吓到的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">horror</span>
+          <span class="ipa">/&#x27;ho:rər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">震惊;恐惧；恐怖故事 racist /&#x27;reisist/ n. 种族主义者</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>stared in horror</div>          <div class="root"><span class="lbl">根</span>horr(发抖) + or → 吓得发抖 → 恐惧</div>          <div class="zt"><span class="lbl">真题</span>You may have heard some of the fashion</div>          <div class="fam"><span class="lbl">族</span>horrible adj. 可怕的 / horrify v. 使恐惧</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">dreadful</span>
+          <span class="ipa">/&#x27;dredfl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">可怕的，令人畏惧的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It was a dreadful night</div>          <div class="mnem"><span class="lbl">记</span>前部分发音类似“拽的”。你要 好好学习，有人总拽你的后腿，这种行为是很 “可怕的”。</div>          <div class="root"><span class="lbl">根</span>dread(害怕) + ful(充满…的) → 满是害怕的</div>          <div class="fam"><span class="lbl">族</span>dread n. 惧怕 / dreadfully adv. 可怕地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">pale</span>
+          <span class="ipa">/perl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">苍白的；浅的,淡的 v. 变苍白；变淡</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and turned pale</div>          <div class="mnem"><span class="lbl">记</span>单词可拆分为：怕(pa)了(le)。 看着伙伴摔倒了，脸色逐渐“苍白”，你害怕了， 赶紧打急救电话。</div>          <div class="root"><span class="lbl">根</span>谐音联想：怕(pa)了(le) → 一怕脸就发白</div>          <div class="zt"><span class="lbl">真题</span>He was pale and disfigured and looked sick to death. 他脸色苍白，憔悴不堪，看上去病 入膏育。</div>          <div class="fam"><span class="lbl">族</span>paleness n. 苍白 / dark adj. 深色的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">paim</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A warning on the engine-room door read paim</div>          <div class="root"><span class="lbl">根</span>书里印作 paim，实为 palm(手掌) → 手心</div>          <div class="fam"><span class="lbl">族</span>palm n. 手掌；棕榈树 / palmist n. 看手相的人</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">caution</span>
+          <span class="ipa">/&#x27;kə:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">小心，谨慎v.警告，劝……小心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>With great caution he turned toward the nearest island</div>          <div class="mnem"><span class="lbl">记</span>发音像“靠心”，为什么要靠心， 因为要“谨慎”，处处“小心”一些！</div>          <div class="root"><span class="lbl">根</span>caut(小心) + ion(名词后缀) → 小心这件事</div>          <div class="zt"><span class="lbl">真题</span>With caution, many relational methods (247) 第十单元 to improve teams and organisations can be borrowed from other fields. 需要注意的是，许 多改善团队和组织的相关方法可以从其他领域 借鉴。(2023)</div>          <div class="fam"><span class="lbl">族</span>cautious adj. 谨慎的 / cautiously adv. 谨慎地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">precaution</span>
+          <span class="ipa">/pr&#x27;kə:∫n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">预防措施；防备</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had taken one precaution</div>          <div class="mnem"><span class="lbl">记</span>提前（pre)小心(caution)，那就 需要“预防措施”。</div>          <div class="root"><span class="lbl">根</span>pre(提前) + caution(小心) → 提前小心 → 预防措施</div>          <div class="zt"><span class="lbl">真题</span>I hope all the precautions against air pollution will be seriously considered here. 我 希望在这里能认真考虑所有抵御空气污染的预 防措施。</div>          <div class="fam"><span class="lbl">族</span>caution n. 小心 / precautionary adj. 预防的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">aware</span>
+          <span class="ipa">/ə&#x27;weə(r)/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">知道;发觉;意识到</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>aware that the wind would rise</div>          <div class="mnem"><span class="lbl">记</span>一场（a）战争（war）中的阿姨 (re)，“意识到”和平的生活有多重要。</div>          <div class="root"><span class="lbl">根</span>a(加强) + ware(小心) → 心里有数 → 意识到</div>          <div class="zt"><span class="lbl">真题</span>They are less aware of the yalue of their money. 他们很少意识到钱的价值。(2020)</div>          <div class="fam"><span class="lbl">族</span>awareness n. 意识 / unaware adj. 没察觉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">alert</span>
+          <span class="ipa">/ə&#x27;l3:rt/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">警觉的;警惕的;(~to)意识到;注意到 v. 向……报警；使警觉 n.警戒；戒备；警惕；警报</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On deck the crew stayed alert</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“讹了他”。所 谓一朝遭蛇咬，十年怕井绳。讹了他一次，他肯 定会很“警觉”了。</div>          <div class="root"><span class="lbl">根</span>谐音联想：讹了他 → 被讹过一次就格外警觉</div>          <div class="zt"><span class="lbl">真题</span>We are able to issue alerts about the latest threats they should be aware of. 我们能够 就他们应该知道的最新威胁发出警报。(2022)</div>          <div class="fam"><span class="lbl">族</span>alertness n. 警觉 / alarm n. 警报</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">conscience</span>
+          <span class="ipa">/&#x27;ka:n∫əns/</span>
+          <span class="pos">n.</span>
+          <span class="cn">良知，良心</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>his conscience held him in his seat</div>          <div class="root"><span class="lbl">根</span>con(共同) + sci(知道) + ence → 心里知道对错 → 良心</div>          <div class="fam"><span class="lbl">族</span>conscious adj. 有意识的 / conscientious adj. 凭良心的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">conscious</span>
+          <span class="ipa">/&#x27;ka:n∫əs/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">意识到的;有意的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>and conscious of the cold</div>          <div class="mnem"><span class="lbl">记</span>所有的(con)事情，心里(sci发 音类似“心”)都明白的(ous形容词后缀)→有意 识的。</div>          <div class="root"><span class="lbl">根</span>con(共同) + sci(知道) + ous(…的) → 心里知道的</div>          <div class="zt"><span class="lbl">真题</span>This environmentally conscious product will save millions of liters of water a year. 这种 具有环保意识的产品每年将节省数百万升水。 (2023)</div>          <div class="fam"><span class="lbl">族</span>consciousness n. 意识 / unconsciously adv. 无意识地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">screw</span>
+          <span class="ipa">/skru:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">螺丝，螺丝钉 v. 用螺丝固定,拧紧；(~up)毁 掉，搞砸</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>One loose screw had fallen out of the pump</div>          <div class="mnem"><span class="lbl">记</span>发音类似“四个儒(生)”。四个儒 生团结起来，“拧紧”成一条绳，也能干大事情。</div>          <div class="root"><span class="lbl">根</span>谐音联想：四个儒(生)拧成一股绳 → 螺丝；拧紧</div>          <div class="zt"><span class="lbl">真题</span>They can screw us up and set us back. 他 们会把我们搞砸，拖我们后腿。(2021)</div>          <div class="fam"><span class="lbl">族</span>screwdriver n. 螺丝刀 / unscrew v. 拧开</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">crew</span>
+          <span class="ipa">/kru:/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Its crew is small</div>          <div class="root"><span class="lbl">根</span>靠搭配记：the ship&#x27;s crew 全体船员 / crew member 船员</div>          <div class="zt"><span class="lbl">真题</span>The harm radiation has done to the Apollo crew members remains unknown. 辐射 对阿波罗号全体宇航员造成的伤害目前尚不 清楚。</div>          <div class="fam"><span class="lbl">族</span>crewman n. 船员 / staff n. 全体员工</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">colleague</span>
+          <span class="ipa">/&#x27;ka:li:g/</span>
+          <span class="pos">n.</span>
+          <span class="cn">同事，同僚</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The captain&#x27;s colleague</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分特别像college (大学)，在同一个大学里的人→同事，同僚。</div>          <div class="root"><span class="lbl">根</span>col(共同) + league(联盟) → 同一个联盟里的人</div>          <div class="zt"><span class="lbl">真题</span>Recognizing when a friend or colleague feels sad, angry or surprised is key to getting along with others. 意识到朋友或同事何时感到悲伤、愤 怒或惊讶是与他人相处的关键。(2022)</div>          <div class="fam"><span class="lbl">族</span>league n. 联盟 / fellow worker 同事</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">fellow</span>
+          <span class="ipa">/&#x27;feləu/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an old fellow with a dog came aboard</div>          <div class="mnem"><span class="lbl">记</span>可以结合follow（跟随）这个单 词来记忆，e鹅，鹅一直跟随着这个家伙。有鹅 跟随的就是“家伙”。</div>          <div class="root"><span class="lbl">根</span>靠 follow(跟随) 记：一直跟着你的那个家伙</div>          <div class="zt"><span class="lbl">真题</span>Our fellow students have just come out</div>          <div class="fam"><span class="lbl">族</span>fellowship n. 交情 / fellow student 同学</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">staff</span>
+          <span class="ipa">/stæf/</span>
+          <span class="pos">n.</span>
+          <span class="cn">全体员工</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the staff in the office on shore</div>          <div class="mnem"><span class="lbl">记</span>区别stuff(东西，物品），“员工” 在单位少说话，多做事，所以字母是a，和u比起 来是闭嘴的。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：the office staff 办公室全体员工</div>          <div class="zt"><span class="lbl">真题</span>The letter is in fairly good condition, in spite of being out of the care of trained museum staff for so long. 这封信虽然长期没有 受到训练有素的博物馆员工的维护，但状况相 当好。(2018)</div>          <div class="fam"><span class="lbl">族</span>staffed adj. 配了人员的 / crew n. 船员们</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">stuff</span>
+          <span class="ipa">/st^f/</span>
+          <span class="pos">n.</span>
+          <span class="cn">东西，物品v. 塞进，填进，装满</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>His stuff slid across the deck</div>          <div class="mnem"><span class="lbl">记</span>既然要“塞进，填进”，得张嘴 啊。所以中间的字母是u，不是a。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：all that stuff 那些东西 / stuff a bag 把包装满</div>          <div class="zt"><span class="lbl">真题</span>If you want the good stuff, the quality, you have to see it for yourself. 如果你想要好的 东西、高质量的东西，你必须自己去看。(2023)</div>          <div class="fam"><span class="lbl">族</span>stuffy adj. 闷的 / stuffing n. 填料</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">tempt</span>
+          <span class="ipa">/tempt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">诱惑，利诱</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The warm cabin tempted the sleepy passengers</div>          <div class="mnem"><span class="lbl">记</span>tempt(尝试）+ ation（名词后 缀)→想尝试一下→诱惑。</div>          <div class="root"><span class="lbl">根</span>tempt(试) → 让你忍不住想试一下 → 诱惑</div>          <div class="zt"><span class="lbl">真题</span>Prevention.com recommends napping on the couch instead of in bed, so you&#x27;re less tempted to snooze for too long. Prevention.com 网站建议在沙发上而不是在床上打盹，这样你 就不会睡太久。</div>          <div class="fam"><span class="lbl">族</span>temptation n. 诱惑 / tempting adj. 诱人的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">attempt</span>
+          <span class="ipa">/ə&#x27;tempt/</span>
+          <span class="pos">v.</span>
+          <span class="cn">尝试，企图n. 试图，努力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>made one last attempt</div>          <div class="mnem"><span class="lbl">记</span>一再地（at表示强调）诱惑 (tempt)，那就是在“企图，努力”诱惑他。</div>          <div class="root"><span class="lbl">根</span>at(一再) + tempt(试) → 一再地试 → 尝试</div>          <div class="zt"><span class="lbl">真题</span>They abandoned the attempt to roast (248) coffee beans in space. 他们放弃了在太空中烤 咖啡豆的尝试。</div>          <div class="fam"><span class="lbl">族</span>attempted adj. 未遂的 / try v. 尝试</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">contempt</span>
+          <span class="ipa">/kən&#x27;tempt/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>looked at it with contempt</div>          <div class="mnem"><span class="lbl">记</span>con(所有人)十 tempt(诱惑)→ 所有人都“藐视”利诱别人的人。</div>          <div class="root"><span class="lbl">根</span>con(共同) + tempt(轻视) → 谁都看不上 → 蔑视</div>          <div class="zt"><span class="lbl">真题</span>They see a benefit to successfully veiling their contempt for you. 他们认为成功地掩饰他 们对你的蔑视是有好处的。(2016)</div>          <div class="fam"><span class="lbl">族</span>contemptuous adj. 轻蔑的 / despise v. 鄙视</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">despise</span>
+          <span class="ipa">/dı&#x27;spaiz/</span>
+          <span class="pos">v.</span>
+          <span class="cn">鄙视，轻视</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>He had always despised that pump</div>          <div class="mnem"><span class="lbl">记</span>de(向下)十spise(看)→向下看 →鄙视。</div>          <div class="root"><span class="lbl">根</span>de(向下) + spise(看) → 往下看 → 鄙视</div>          <div class="fam"><span class="lbl">族</span>despised adj. 遭人鄙弃的 / contempt n. 蔑视</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">triangle</span>
+          <span class="ipa">/&#x27;traiængl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">三角形</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a red triangle on the map</div>          <div class="mnem"><span class="lbl">记</span>angle n. 角，角度(angel 天使的 另一面就是魔鬼，只是角度不同而已)；tricycle 三轮车，tri表示三，那这个单词就是“三角形”。</div>          <div class="root"><span class="lbl">根</span>tri(三) + angle(角) → 三个角 → 三角形</div>          <div class="fam"><span class="lbl">族</span>angle n. 角 / triangular adj. 三角形的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">urge</span>
+          <span class="ipa">/3:rd3/</span>
+          <span class="pos">v.</span>
+          <span class="cn">主张，强烈要求；催促；鼓励</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The captain urged the passengers</div>          <div class="mnem"><span class="lbl">记</span>该单词发音很像“我急”。我非 常着急，所以“催促”大家快点做事。</div>          <div class="root"><span class="lbl">根</span>谐音联想：我急(urge) → 一急就催人</div>          <div class="zt"><span class="lbl">真题</span>It urged tourists to leave Tunisia immediately.它敦促游客立即离开突尼斯。 (2016)</div>          <div class="fam"><span class="lbl">族</span>urgent adj. 紧急的 / urgency n. 紧迫</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">haste</span>
+          <span class="ipa">/heist/</span>
+          <span class="pos">n.</span>
+          <span class="cn">匆忙，急忙；赶紧；催促</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>In his haste the engineer grabbed the wrong tool</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“恨死他”。那 就“赶紧，急忙”离开他吧。</div>          <div class="root"><span class="lbl">根</span>谐音联想：恨死他 → 赶紧走开 → 匆忙</div>          <div class="zt"><span class="lbl">真题</span>The middle-aged person can see death in the distance, but moves with a “measured haste&quot; to get big new things done while there is still time. 中年人可以看到远处的死亡，但在 还有时间的时候，他们会“有分寸地仓促行事” 完成新的大事。(2017)</div>          <div class="fam"><span class="lbl">族</span>hasty adj. 匆忙的 / hasten v. 赶快</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">hatred</span>
+          <span class="ipa">/&#x27;heitrıd/</span>
+          <span class="pos">n.</span>
+          <span class="cn">憎恶，憎恨，仇恨</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The hatred on the young sailor&#x27;s face</div>          <div class="mnem"><span class="lbl">记</span>这个单词的动词我们很熟悉： hate(恨)，hatred 是它的名词。</div>          <div class="root"><span class="lbl">根</span>hate(恨) + red → 恨这种情绪 → 憎恨</div>          <div class="fam"><span class="lbl">族</span>hate v. 恨 / hateful adj. 可恨的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">harmony</span>
+          <span class="ipa">/&#x27;ha:rməni/</span>
+          <span class="pos">n.</span>
+          <span class="cn">调和；协调；和谐</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>both engines worked in harmony</div>          <div class="root"><span class="lbl">根</span>harm(连接) + ony → 接到一起 → 和谐</div>          <div class="zt"><span class="lbl">真题</span>They are built in harmony with the environment. 它们是以与环境协调的方式建造的。</div>          <div class="fam"><span class="lbl">族</span>harmonious adj. 和谐的 / harmonic adj. 和声的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">vain</span>
+          <span class="ipa">/vein/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">徒劳的，无结果的；虚荣的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>but it was in vain</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“问”。你问也 白问，没有答案，一切都是“徒劳的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：问(vein)了也白问 → 徒劳的</div>          <div class="zt"><span class="lbl">真题</span>They pressed criminal charges in vain. 他 们提出了刑事指控，但没有成功。 例 The point of a style upgrade isn&#x27;t to become more vain or to spend more time fussing over what to wear. 款式升级的意义不 是要变得更虚荣，或者花更多的时间纠结于穿 什么。</div>          <div class="fam"><span class="lbl">族</span>vainly adv. 徒然地 / vanity n. 虚荣</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">resemble</span>
+          <span class="ipa">/ri&#x27;zembl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">类似于；看起来像；显得像；像</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a sound that resembled a hammer on metal</div>          <div class="mnem"><span class="lbl">记</span>re(重复的)十sem(sem 读音很 像same，同样的)→重复同样的，千篇一律→ 像；看起来像。</div>          <div class="root"><span class="lbl">根</span>re(再) + sem(相同) + ble → 看着是同一个 → 像</div>          <div class="zt"><span class="lbl">真题</span>It resembles fragments of science fiction. 它类似于科幻小说的片段。</div>          <div class="fam"><span class="lbl">族</span>resemblance n. 相似 / assemble v. 聚集</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 66</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

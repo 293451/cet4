@@ -218,6 +218,17 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
             k = 0
             first = last = None
             q = p
+            # 容错预算：允许 MiniMax 的文本和原文有**一格**出入（多一个或少一个字符）。
+            #
+            # 为什么需要：MiniMax 偶尔会把它自己的字幕拼错 ——
+            # 实测 Day 68 把 `cigarettes` 拼成 `cigaretes`（漏了一个 t）。
+            # 这是**它的数据有误**，不是我的逻辑问题；但严格比对会让整个词丢高亮，
+            # 代价太大（用户听到那个词时页面上没有对应高亮）。
+            #
+            # ⚠️ 预算只有 1 格，且**只在严格匹配失败时才用** ——
+            #    放松太多会重蹈 #18 的覆辙（跨词误配，一个词配到 38 字符外）。
+            #    多出的匹配也**必须落在词边界**，避免把长词的前缀误当成整词。
+            budget = 1
             while q < len(stream) and k < len(core):
                 c = stream[q]
                 if c in "'’":
@@ -226,6 +237,23 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
                     # —— 它和空格不同，不构成词边界。
                     q += 1
                     continue
+                if c == "-":
+                    # 连字符：MiniMax 同样当独立条目，且**只出现在复合词内部**
+                    #   left-handed   -> ['left', '-', 'hand', 'ed']
+                    #   hand-painted  -> ['hand', '-', 'pain', 'ted']
+                    #   engine-room   -> ['engine', '-', 'room']
+                    # 原文的 core 里没有它（'lefthanded'），跳过不比对。
+                    #
+                    # ⚠️ 但它**是否算词边界要看位置**：
+                    #   夹在两个字母之间 = 复合词连接符，不断词；
+                    #   在词尾（后面是空格/标点）= 真正的边界，必须停。
+                    #   不区分的话，`well - known` 这种会把两个词连成一个。
+                    # 实测：Day 26/66/69 三天因此各丢一个复合词。
+                    nx = stream[q + 1] if q + 1 < len(stream) else ""
+                    if _is_word_char(nx) or nx in "'’":
+                        q += 1
+                        continue
+                    break
                 if not _is_word_char(c):
                     # 空格或其他标点 —— 这是词边界，不能再往后读
                     break
@@ -235,11 +263,33 @@ def merge_syllables(syllables: list, text: str) -> list[dict]:
                     last = q
                     k += 1
                     q += 1
-                else:
-                    break
-            if k == len(core) and first is not None:
-                match = (first, last, q)
+                    continue
+                # ── 走到这里 = 字符对不上，考虑是不是 MiniMax 的拼写差一格 ──
+                if budget > 0:
+                    # 情况 A：流里**多**了一个字符（cigarettes → cigaretes 缺字符，
+                    # 反过来 cigarets → cigarettes 就是多字符）。跳过流里的这个字符。
+                    if q + 1 < len(stream) and stream[q + 1].lower() == core[k] \
+                            and _is_word_char(stream[q + 1]):
+                        budget -= 1
+                        q += 1
+                        continue
+                    # 情况 B：流里**少**了一个字符（流是 cigaretes，原文 core 还剩一个 t）。
+                    # 跳过 core 里的这个字符 —— 注意 q 不动（该字符流里没有）。
+                    if k + 1 < len(core) and c.lower() == core[k + 1]:
+                        budget -= 1
+                        k += 1
+                        if first is None:
+                            first = q
+                        last = q
+                        continue
                 break
+            if k == len(core) and first is not None:
+                # 匹配完必须落在词边界上 —— 否则可能是把长词的前缀误当成整词。
+                # 严格匹配不加这个约束（保持原行为），只有用过容错预算时才要求。
+                at_boundary = q >= len(stream) or not _is_word_char(stream[q])
+                if budget == 1 or at_boundary:
+                    match = (first, last, q)
+                    break
 
         if match:
             first, last, q = match

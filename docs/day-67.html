@@ -1,0 +1,695 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 67 · The Bird Hospital on Wild Island</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 67 · 12/18 · Unit 10 第 1981-2010 词</div>
+  <h1>The Bird Hospital on Wild Island<span class="cn">野生岛上的鸟医院</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-67.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="3925"><p class="en"><span class="w target" data-s="43" data-e="299" title="野生的 n. 偏远地区；野生状态">Wild</span> <span class="w" data-s="341" data-e="683">Island</span> <span class="w" data-s="725" data-e="896">lies</span> <span class="w" data-s="939" data-e="1195">far</span> <span class="w target" data-s="1237" data-e="1792" title="海外的 adv. 在海外">overseas,</span> <span class="w" data-s="2091" data-e="2304">two</span> <span class="w" data-s="2475" data-e="2645">hundred</span> <span class="w" data-s="2688" data-e="3243">kilometres</span> <span class="w" data-s="3285" data-e="3413">from</span> <span class="w" data-s="3456" data-e="3584">the</span> <span class="w" data-s="3627" data-e="3925">mainland.</span></p><p class="zh">野生岛远在海外，离大陆两百公里。</p></div>
+<div class="pair" data-s0="4181" data-s1="9429"><p class="en"><span class="w" data-s="4181" data-e="4395">A</span> <span class="w target" data-s="4693" data-e="5333" title="联邦制的">federal</span> <span class="w" data-s="5376" data-e="5717">agency</span> <span class="w target" data-s="5760" data-e="6229" title="统治；控制；支配">governs</span> <span class="w" data-s="6272" data-e="6357">the</span> <span class="w" data-s="6400" data-e="6699">island;</span> <span class="w" data-s="6912" data-e="7467">the</span> <span class="w target" data-s="7509" data-e="7893" title="">Ministry</span> <span class="w" data-s="7936" data-e="8064">of</span> <span class="w" data-s="8107" data-e="8149">the</span> <span class="w" data-s="8192" data-e="8576">Environment</span> <span class="w" data-s="8619" data-e="8917">pays</span> <span class="w" data-s="8960" data-e="9045">for</span> <span class="w" data-s="9088" data-e="9173">the</span> <span class="w" data-s="9216" data-e="9429">hospital.</span></p><p class="zh">一个联邦机构管理这座岛；鸟医院的经费由环境部出。</p></div>
+<div class="pair" data-s0="10081" data-s1="12982"><p class="en"><span class="w" data-s="10081" data-e="10166">The</span> <span class="w" data-s="10209" data-e="10465">hospital</span> <span class="w" data-s="10507" data-e="10806">is</span> <span class="w" data-s="10849" data-e="11062">a</span> <span class="w target" data-s="11105" data-e="11190" title="宽阔的;广泛的；普遍的">broad</span> <span class="w" data-s="11233" data-e="11659">wooden</span> <span class="w" data-s="11702" data-e="11787">building</span> <span class="w" data-s="11830" data-e="12171">with</span> <span class="w" data-s="12214" data-e="12299">a</span> <span class="w target" data-s="12342" data-e="12427" title="木板；董事会，委员会，部门；伙食 v.上(船、 飞机等）">board</span> <span class="w" data-s="12470" data-e="12641">by</span> <span class="w" data-s="12683" data-e="12769">the</span> <span class="w" data-s="12811" data-e="12982">gate.</span></p><p class="zh">医院是一栋宽阔的木屋，门口立着一块牌子。</p></div>
+<div class="pair" data-s0="13153" data-s1="17590"><p class="en"><span class="w" data-s="13153" data-e="13707">Every</span> <span class="w" data-s="13750" data-e="14006">spring</span> <span class="w" data-s="14049" data-e="14774">volunteers</span> <span class="w target" data-s="14817" data-e="15243" title="集合，聚集；组装">assemble</span> <span class="w" data-s="15286" data-e="15414">from</span> <span class="w" data-s="15457" data-e="15585">all</span> <span class="w target" data-s="15627" data-e="15755" title="海外的 adv. 在海外">over</span> <span class="w" data-s="15798" data-e="15883">the</span> <span class="w" data-s="15926" data-e="16054">country</span> <span class="w" data-s="16097" data-e="16438">and</span> <span class="w" data-s="16481" data-e="16822">come</span> <span class="w target" data-s="16865" data-e="17121" title="&amp;prep. 在(船、飞机、火车等)上；上(船、飞 机、火车等）">aboard</span> <span class="w" data-s="17163" data-e="17291">at</span> <span class="w" data-s="17334" data-e="17377">the</span> <span class="w" data-s="17419" data-e="17590">coast.</span></p><p class="zh">每年春天，全国各地的志愿者聚到一起，在岸边登上渡船。</p></div>
+<div class="pair" data-s0="18157" data-s1="22552"><p class="en"><span class="w" data-s="18157" data-e="18242">A</span> <span class="w target" data-s="18285" data-e="18541" title="专家咨询组；(广播、电视上的)讨论小组；嵌 板，控制板">panel</span> <span class="w" data-s="18584" data-e="18669">of</span> <span class="w" data-s="18712" data-e="19053">experts</span> <span class="w" data-s="19096" data-e="19437">visits</span> <span class="w" data-s="19480" data-e="19778">twice</span> <span class="w" data-s="19821" data-e="19906">a</span> <span class="w" data-s="19949" data-e="20034">year;</span> <span class="w" data-s="20333" data-e="20760">an</span> <span class="w target" data-s="20802" data-e="21357" title="管理的，行政的">administrative</span> <span class="w" data-s="21400" data-e="21613">staff</span> <span class="w" data-s="21656" data-e="22125">keeps</span> <span class="w" data-s="22168" data-e="22210">the</span> <span class="w" data-s="22253" data-e="22552">records.</span></p><p class="zh">一个专家组每年来访两次；一名行政人员管着所有记录。</p></div>
+<div class="pair" data-s0="22722" data-s1="26989"><p class="en"><span class="w" data-s="22722" data-e="23320">Dr.</span> <span class="w" data-s="23490" data-e="23704">Shen,</span> <span class="w" data-s="23874" data-e="24002">the</span> <span class="w" data-s="24045" data-e="24216">vet,</span> <span class="w" data-s="24386" data-e="24514">has</span> <span class="w" data-s="24770" data-e="24941">worked</span> <span class="w" data-s="24984" data-e="25197">here</span> <span class="w" data-s="25240" data-e="25538">thirty</span> <span class="w" data-s="25581" data-e="25709">years</span> <span class="w" data-s="25752" data-e="26178">and</span> <span class="w target" data-s="26221" data-e="26733" title="引领，带路；导致;过(生活)">leads</span> <span class="w" data-s="26776" data-e="26861">the</span> <span class="w" data-s="26904" data-e="26989">team.</span></p><p class="zh">兽医沈医生在这里工作了三十年，是这个团队的头儿。</p></div>
+<div class="pair" data-s0="27655" data-s1="30641"><p class="en"><span class="w" data-s="27655" data-e="27783">She</span> <span class="w" data-s="27825" data-e="28167">studied</span> <span class="w target" data-s="28209" data-e="28465" title="到国外，在国外">abroad</span> <span class="w" data-s="28508" data-e="28764">for</span> <span class="w" data-s="28807" data-e="28935">three</span> <span class="w" data-s="28977" data-e="29191">years</span> <span class="w" data-s="29233" data-e="29575">before</span> <span class="w" data-s="29617" data-e="30001">returning</span> <span class="w" data-s="30044" data-e="30215">to</span> <span class="w" data-s="30257" data-e="30385">the</span> <span class="w" data-s="30428" data-e="30641">island.</span></p><p class="zh">她曾在国外学习三年，之后才回到岛上。</p></div>
+<div class="pair" data-s0="30855" data-s1="35121"><p class="en"><span class="w" data-s="30855" data-e="31409">She</span> <span class="w" data-s="31452" data-e="31623">has</span> <span class="w" data-s="31665" data-e="31751">a</span> <span class="w" data-s="31793" data-e="31879">dry</span> <span class="w target" data-s="31921" data-e="32177" title="风趣；机智，理解力">wit</span> <span class="w" data-s="32220" data-e="32433">and</span> <span class="w" data-s="32476" data-e="32817">a</span> <span class="w target" data-s="32860" data-e="32945" title="明智的，高明的">wise,</span> <span class="w target" data-s="33244" data-e="33756" title="心智健全的，明智的，清醒的">sane</span> <span class="w" data-s="33799" data-e="33969">way</span> <span class="w" data-s="34012" data-e="34268">with</span> <span class="w" data-s="34311" data-e="34695">frightened</span> <span class="w" data-s="34737" data-e="35121">visitors.</span></p><p class="zh">她说话风趣，面对受惊的来客时既明智又清醒。</p></div>
+<div class="pair" data-s0="35292" data-s1="39431"><p class="en"><span class="w" data-s="35292" data-e="35889">She</span> <span class="w target" data-s="35932" data-e="36444" title="管理，治理；执行，实施">administers</span> <span class="w" data-s="36487" data-e="36615">the</span> <span class="w" data-s="36657" data-e="36956">medicine</span> <span class="w" data-s="36999" data-e="37169">herself</span> <span class="w" data-s="37212" data-e="37681">and</span> <span class="w" data-s="37724" data-e="38193">keeps</span> <span class="w" data-s="38236" data-e="38279">a</span> <span class="w target" data-s="38321" data-e="38577" title="很长的;漫长的;冗长的">lengthy</span> <span class="w" data-s="38620" data-e="38791">record</span> <span class="w" data-s="38833" data-e="39089">of</span> <span class="w" data-s="39132" data-e="39217">every</span> <span class="w" data-s="39260" data-e="39431">case.</span></p><p class="zh">她亲手给鸟喂药，还为每一个病例写下冗长的记录。</p></div>
+<div class="pair" data-s0="40247" data-s1="42338"><p class="en"><span class="w" data-s="40247" data-e="40375">The</span> <span class="w" data-s="40418" data-e="40546">first</span> <span class="w target" data-s="40588" data-e="40930" title="征兆；特征；(医)症状">symptom</span> <span class="w" data-s="40972" data-e="41100">is</span> <span class="w" data-s="41143" data-e="41271">usually</span> <span class="w" data-s="41314" data-e="41570">a</span> <span class="w" data-s="41612" data-e="41655">wrong</span> <span class="w" data-s="41698" data-e="41911">turn</span> <span class="w" data-s="41954" data-e="42082">in</span> <span class="w" data-s="42124" data-e="42338">flight.</span></p><p class="zh">最初的症状通常是飞行时转错了方向。</p></div>
+<div class="pair" data-s0="42508" data-s1="46476"><p class="en"><span class="w" data-s="42508" data-e="43063">At</span> <span class="w" data-s="43106" data-e="43532">dusk</span> <span class="w" data-s="43575" data-e="43831">the</span> <span class="w" data-s="43874" data-e="44087">gulls</span> <span class="w" data-s="44130" data-e="44343">circle</span> <span class="w target" data-s="44386" data-e="44898" title="顺时针方向(地) adj. 顺时针方向(的)">clockwise</span> <span class="w" data-s="44940" data-e="45196">around</span> <span class="w" data-s="45239" data-e="45452">the</span> <span class="w" data-s="45495" data-e="45794">lighthouse</span> <span class="w" data-s="45836" data-e="46050">before</span> <span class="w" data-s="46092" data-e="46306">they</span> <span class="w" data-s="46348" data-e="46476">land.</span></p><p class="zh">黄昏时，海鸥会绕着灯塔顺时针盘旋，然后才落下。</p></div>
+<div class="pair" data-s0="46775" data-s1="50188"><p class="en"><span class="w" data-s="46775" data-e="47287">A</span> <span class="w" data-s="47330" data-e="47500">weak</span> <span class="w" data-s="47543" data-e="47756">bird</span> <span class="w" data-s="47799" data-e="48055">is</span> <span class="w" data-s="48098" data-e="48226">often</span> <span class="w" data-s="48268" data-e="48482">a</span> <span class="w target" data-s="48524" data-e="48823" title="符号，记号；标志，象征 v.象征，代表">symbol</span> <span class="w" data-s="48866" data-e="48908">of</span> <span class="w" data-s="48951" data-e="49122">something</span> <span class="w" data-s="49164" data-e="49420">wrong</span> <span class="w" data-s="49463" data-e="49676">in</span> <span class="w" data-s="49719" data-e="49762">the</span> <span class="w" data-s="49804" data-e="49932">sea</span> <span class="w" data-s="49975" data-e="50188">itself.</span></p><p class="zh">一只虚弱的鸟，往往是大海本身出了问题的标志。</p></div>
+<div class="pair" data-s0="50615" data-s1="53687"><p class="en"><span class="w" data-s="50615" data-e="50786">The</span> <span class="w" data-s="50828" data-e="50956">old</span> <span class="w" data-s="50999" data-e="51426">lighthouse</span> <span class="w target" data-s="51468" data-e="52108" title="">symbolizes</span> <span class="w" data-s="52151" data-e="52236">the</span> <span class="w" data-s="52279" data-e="52578">island</span> <span class="w" data-s="52620" data-e="52834">better</span> <span class="w" data-s="52876" data-e="53090">than</span> <span class="w" data-s="53132" data-e="53346">anything</span> <span class="w" data-s="53388" data-e="53687">else.</span></p><p class="zh">这座老灯塔，比岛上任何东西都更能象征这座岛。</p></div>
+<div class="pair" data-s0="54727" data-s1="59676"><p class="en"><span class="w" data-s="54727" data-e="54812">The</span> <span class="w" data-s="54855" data-e="54983">staff</span> <span class="w" data-s="55025" data-e="55281">treat</span> <span class="w" data-s="55324" data-e="55580">every</span> <span class="w" data-s="55623" data-e="55879">bird</span> <span class="w" data-s="55921" data-e="56135">with</span> <span class="w target" data-s="56177" data-e="56476" title="仁慈，宽恕；幸运，恩惠">mercy</span> <span class="w" data-s="56519" data-e="56817">and</span> <span class="w" data-s="57031" data-e="57159">feel</span> <span class="w target" data-s="57201" data-e="57713" title="同情；赞同；支持">sympathy</span> <span class="w" data-s="57756" data-e="57841">for</span> <span class="w" data-s="57884" data-e="57969">the</span> <span class="w" data-s="58012" data-e="58396">fishermen</span> <span class="w" data-s="58439" data-e="58567">whose</span> <span class="w" data-s="58609" data-e="58823">nets</span> <span class="w" data-s="58865" data-e="59036">cause</span> <span class="w" data-s="59079" data-e="59292">the</span> <span class="w" data-s="59335" data-e="59676">injuries.</span></p><p class="zh">员工们对每一只鸟都心怀仁慈，也真心同情那些渔网伤了鸟的渔民。</p></div>
+<div class="pair" data-s0="59847" data-s1="64711"><p class="en"><span class="w" data-s="59847" data-e="60657">Their</span> <span class="w" data-s="60700" data-e="60828">work</span> <span class="w" data-s="60871" data-e="61041">is</span> <span class="w" data-s="61084" data-e="61212">not</span> <span class="w" data-s="61255" data-e="61383">a</span> <span class="w target" data-s="61425" data-e="61767" title="">symphony,</span> <span class="w" data-s="61852" data-e="62065">but</span> <span class="w" data-s="62321" data-e="62449">on</span> <span class="w" data-s="62492" data-e="62663">quiet</span> <span class="w" data-s="62705" data-e="63175">mornings</span> <span class="w" data-s="63217" data-e="63345">the</span> <span class="w" data-s="63388" data-e="63601">birds</span> <span class="w" data-s="63644" data-e="63772">make</span> <span class="w" data-s="63815" data-e="63985">something</span> <span class="w" data-s="64028" data-e="64284">close</span> <span class="w" data-s="64327" data-e="64540">to</span> <span class="w" data-s="64583" data-e="64711">one.</span></p><p class="zh">他们的工作不是交响乐；但在安静的早晨，鸟叫出来的东西很像一首。</p></div>
+<div class="pair" data-s0="65276" data-s1="67793"><p class="en"><span class="w" data-s="65276" data-e="65361">In</span> <span class="w" data-s="65404" data-e="65574">warm</span> <span class="w" data-s="65617" data-e="65873">years</span> <span class="w" data-s="65916" data-e="66257">the</span> <span class="w" data-s="66300" data-e="66428">season</span> <span class="w target" data-s="66470" data-e="67068" title="延长，加长">lengthens</span> <span class="w" data-s="67110" data-e="67196">by</span> <span class="w" data-s="67238" data-e="67366">a</span> <span class="w" data-s="67409" data-e="67452">week</span> <span class="w" data-s="67494" data-e="67622">or</span> <span class="w" data-s="67665" data-e="67793">two.</span></p><p class="zh">暖年里，这个季节会延长一两个星期。</p></div>
+<div class="pair" data-s0="68006" data-s1="71078"><p class="en"><span class="w" data-s="68006" data-e="68177">A</span> <span class="w" data-s="68604" data-e="68774">deep</span> <span class="w target" data-s="68817" data-e="69030" title="">breath</span> <span class="w" data-s="69073" data-e="69286">here</span> <span class="w" data-s="69329" data-e="69585">is</span> <span class="w" data-s="69628" data-e="69798">enough</span> <span class="w" data-s="69841" data-e="70012">to</span> <span class="w" data-s="70054" data-e="70097">fill</span> <span class="w" data-s="70140" data-e="70310">your</span> <span class="w" data-s="70353" data-e="70524">chest</span> <span class="w" data-s="70566" data-e="70737">with</span> <span class="w" data-s="70780" data-e="71078">salt.</span></p><p class="zh">在这里深吸一口气，胸口就全是咸味。</p></div>
+<div class="pair" data-s0="71249" data-s1="75174"><p class="en"><span class="w" data-s="71249" data-e="71846">The</span> <span class="w" data-s="71889" data-e="72358">volunteers</span> <span class="w" data-s="72401" data-e="72572">are</span> <span class="w target" data-s="72614" data-e="72828" title="同样的，相同的">alike</span> <span class="w" data-s="72870" data-e="72998">in</span> <span class="w" data-s="73041" data-e="73169">one</span> <span class="w" data-s="73212" data-e="73382">way:</span> <span class="w" data-s="73638" data-e="74193">none</span> <span class="w" data-s="74236" data-e="74406">of</span> <span class="w" data-s="74449" data-e="74492">them</span> <span class="w" data-s="74534" data-e="74705">can</span> <span class="w" data-s="74748" data-e="74918">sit</span> <span class="w" data-s="74961" data-e="75174">still.</span></p><p class="zh">志愿者们有一点是相同的：谁也没法安安静静坐着。</p></div>
+<div class="pair" data-s0="75516" data-s1="78332"><p class="en"><span class="w target" data-s="75516" data-e="75900" title="相似的，相像的 adv.相似地，相同地">Likewise,</span> <span class="w" data-s="76113" data-e="76369">the</span> <span class="w" data-s="76582" data-e="76838">birds</span> <span class="w" data-s="76881" data-e="77052">return</span> <span class="w" data-s="77094" data-e="77265">to</span> <span class="w" data-s="77308" data-e="77350">the</span> <span class="w" data-s="77393" data-e="77478">same</span> <span class="w" data-s="77521" data-e="77777">nest</span> <span class="w" data-s="77820" data-e="77990">every</span> <span class="w" data-s="78076" data-e="78332">year.</span></p><p class="zh">同样地，这些鸟每年都回到同一个巢。</p></div>
+<div class="pair" data-s0="78588" data-s1="80849"><p class="en"><span class="w" data-s="78588" data-e="78758">The</span> <span class="w" data-s="79142" data-e="79270">state</span> <span class="w" data-s="79313" data-e="79526">plans</span> <span class="w" data-s="79569" data-e="79740">to</span> <span class="w target" data-s="79782" data-e="80081" title="加宽;(使)变宽;扩大">widen</span> <span class="w" data-s="80124" data-e="80166">the</span> <span class="w" data-s="80209" data-e="80294">channel</span> <span class="w" data-s="80337" data-e="80636">next</span> <span class="w" data-s="80678" data-e="80849">year.</span></p><p class="zh">政府计划明年把航道加宽。</p></div>
+<div class="pair" data-s0="81619" data-s1="86483"><p class="en"><span class="w" data-s="81619" data-e="81704">A</span> <span class="w" data-s="81747" data-e="81875">young</span> <span class="w" data-s="81917" data-e="82301">visitor</span> <span class="w" data-s="82344" data-e="82557">wrote</span> <span class="w" data-s="82600" data-e="82728">in</span> <span class="w" data-s="82771" data-e="82813">the</span> <span class="w" data-s="82856" data-e="82984">book:</span> <span class="w" data-s="83325" data-e="84136">&quot;Cold,</span> <span class="w" data-s="84392" data-e="84776">wet,</span> <span class="w" data-s="84989" data-e="85075">and</span> <span class="w" data-s="85117" data-e="85373">the</span> <span class="w" data-s="85416" data-e="85587">best</span> <span class="w" data-s="85629" data-e="85885">week</span> <span class="w" data-s="85928" data-e="86099">of</span> <span class="w" data-s="86141" data-e="86269">my</span> <span class="w" data-s="86312" data-e="86483">life.&quot;</span></p><p class="zh">一位年轻访客在门口的册子上写道：“又冷又湿，却是我这辈子最好的一周。”</p></div>
+<div class="pair" data-s0="86909" data-s1="89725"><p class="en"><span class="w" data-s="86909" data-e="87677">Those</span> <span class="w" data-s="87720" data-e="87848">words</span> <span class="w" data-s="87891" data-e="88275">led</span> <span class="w" data-s="88317" data-e="88573">other</span> <span class="w" data-s="88616" data-e="88915">students</span> <span class="w" data-s="88957" data-e="89213">to</span> <span class="w" data-s="89256" data-e="89384">the</span> <span class="w" data-s="89427" data-e="89725">island.</span></p><p class="zh">这些话把更多学生引到了岛上。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">assemble</span>
+          <span class="ipa">/ə&#x27;sembl/</span>
+          <span class="pos">v.</span>
+          <span class="cn">集合，聚集；组装</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>volunteers assemble from all over the country</div>          <div class="mnem"><span class="lbl">记</span>as（一再地，表强·调）十 sem (sem 读音很像 same，同样的)→一再地相似。 “物以类聚，人以群分”，相似的都在一起啊，所 以本单词的意思是“聚集，集合”。</div>          <div class="root"><span class="lbl">根</span>as(一再) + sembl(相同) → 相似的聚到一起 → 集合</div>          <div class="zt"><span class="lbl">真题</span>It assembles super-intelligent robots. 它 组装超级智能机器人。(2016)</div>          <div class="fam"><span class="lbl">族</span>assembly n. 集会 / resemble v. 像</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">sympathy</span>
+          <span class="ipa">/&#x27;simpə0i/</span>
+          <span class="pos">n.</span>
+          <span class="cn">同情；赞同；支持</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>feel sympathy for the fishermen</div>          <div class="mnem"><span class="lbl">记</span>走同样（sym 发音类似 same， 同样的)路(path)的人→同道中人最能同情对 方。不考四级的人永远无法体会考四级人的 痛，只有有过同样经历的人才能彼此“同情”。 大家都好几天没吃饭了，苦啊！</div>          <div class="root"><span class="lbl">根</span>sym(共同) + path(感受) + y → 同样的感受 → 同情</div>          <div class="zt"><span class="lbl">真题</span>They expressed optimism, calmness and sympathy even when these were not the emotions that they were actually feeling. 他们 表现出乐观、冷静和同情，即使这些并不是他们 真正感受到的情绪。(2021)</div>          <div class="fam"><span class="lbl">族</span>sympathetic adj. 同情的 / sympathize v. 同情</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">mercy</span>
+          <span class="ipa">/&#x27;m3:si/</span>
+          <span class="pos">n.</span>
+          <span class="cn">仁慈，宽恕；幸运，恩惠</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>treat every bird with mercy</div>          <div class="mnem"><span class="lbl">记</span>我(me)哭了(把 rcy 想成 cry)。 “仁慈”的人特别容易被感动，哭得一塌糊涂。</div>          <div class="root"><span class="lbl">根</span>谐音联想：我(me)哭了(cry) → 心一软 → 仁慈</div>          <div class="fam"><span class="lbl">族</span>merciful adj. 仁慈的 / merciless adj. 无情的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">symphony</span>
+          <span class="ipa">/&#x27;sımfəni/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Their work is not a symphony</div>          <div class="mnem"><span class="lbl">记</span>sym(sym 读音很像 same，同样 的)+phon(声音)→同样的声音→交响乐。</div>          <div class="root"><span class="lbl">根</span>sym(共同) + phon(声音) + y → 一起响 → 交响乐</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s the first performance of the States Symphony Orchestra in our city, so suit and tie is a must. 它是国家交响乐团在我们这个城市 的首次演出，所以穿西装打领带是必不可少的。</div>          <div class="fam"><span class="lbl">族</span>symphonic adj. 交响乐的 / phone n. 声音</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">symptom</span>
+          <span class="ipa">/&#x27;simptəm/</span>
+          <span class="pos">n.</span>
+          <span class="cn">征兆；特征；(医)症状</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The first symptom is usually a wrong turn in flight</div>          <div class="mnem"><span class="lbl">记</span>同样的（sym = same）阿童木 (tom 想成 atom)，估计“特征”都是一样的啊。</div>          <div class="root"><span class="lbl">根</span>sym(共同) + ptom(落下) → 一起掉下来的表现 → 症状</div>          <div class="zt"><span class="lbl">真题</span>Many women say their physicians sometimes don&#x27;t even recognize the symptoms. 许多女性表示，她们的医生有时甚至无法识别 这些症状。(2021)</div>          <div class="fam"><span class="lbl">族</span>symptomatic adj. 有症状的 / sign n. 迹象</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">symbol</span>
+          <span class="ipa">/&#x27;simbl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">符号，记号；标志，象征 v.象征，代表</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a symbol of something wrong in the sea itself</div>          <div class="mnem"><span class="lbl">记</span>sym 发音类似“same（同样 的)”;bol发音类似“ball(球)”。当你在书上标 记重点时，你用同样的圈(球也是圆的)做“记 号”。</div>          <div class="root"><span class="lbl">根</span>sym(共同) + bol(投) → 大家共同认可的东西 → 象征</div>          <div class="zt"><span class="lbl">真题</span>It symbolizes India&#x27;s advancement in high-tech.它象征着印度在高科技方面的进步。 (2022)</div>          <div class="fam"><span class="lbl">族</span>symbolic adj. 象征的 / symbolize v. 象征</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">symbolize</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The old lighthouse symbolizes the island</div>          <div class="root"><span class="lbl">根</span>symbol(象征) + ize(动词后缀) → 作为象征</div>          <div class="fam"><span class="lbl">族</span>symbol n. 象征 / symbolic adj. 象征性的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">wise</span>
+          <span class="ipa">/waiz/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">明智的，高明的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a wise, sane way with frightened visitors</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“外资”。他好 “明智”，会赚外资。</div>          <div class="root"><span class="lbl">根</span>谐音联想：外资 → 会赚外资的人很明智</div>          <div class="zt"><span class="lbl">真题</span>She doesn&#x27;t think it wise to pay before attending any class. 她认为在上任何课前付钱 是不明智的。(2022)</div>          <div class="fam"><span class="lbl">族</span>wisdom n. 智慧 / wisely adv. 明智地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">sane</span>
+          <span class="ipa">/sein/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">心智健全的，明智的，清醒的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She has a dry wit and a wise, sane way</div>          <div class="mnem"><span class="lbl">记</span>sane发音类似“神”。能做神的 人一定是“明智的，心智健全的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：神(sane) → 像神一样清醒</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s the safe, sane thing to do, right? 它 是安全、理智的做法，对吧？</div>          <div class="fam"><span class="lbl">族</span>sanity n. 心智健全 / insane adj. 精神失常的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">wit</span>
+          <span class="ipa">/wit/</span>
+          <span class="pos">n.</span>
+          <span class="cn">风趣；机智，理解力</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She has a dry wit</div>          <div class="mnem"><span class="lbl">记</span>wisdom智慧，明智；wit 和它意 思相近。</div>          <div class="root"><span class="lbl">根</span>和 wisdom(智慧) 同源 → 反应快，会说话</div>          <div class="zt"><span class="lbl">真题</span>Controlled drinking helps people keep their wits as they age. 有节制的饮酒有助于人 们在年老时保持头脑清醒。</div>          <div class="fam"><span class="lbl">族</span>witty adj. 机智的 / wisdom n. 智慧</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">likewise</span>
+          <span class="ipa">/&#x27;laıkwaiz/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">相似的，相像的 adv.相似地，相同地</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Likewise, the birds return to the same nest</div>          <div class="root"><span class="lbl">根</span>like(相同) + wise(方式) → 用相同的方式 → 同样地</div>          <div class="zt"><span class="lbl">真题</span>Likewise, I don&#x27;t hear people in the academy saying. 同样地，我也没有听到学院里 的人说过。</div>          <div class="fam"><span class="lbl">族</span>like prep. 像 / otherwise adv. 否则</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">alike</span>
+          <span class="ipa">/ə&#x27;lark/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">同样的，相同的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The volunteers are alike in one way</div>          <div class="root"><span class="lbl">根</span>a(加强) + like(像) → 彼此相像</div>          <div class="zt"><span class="lbl">真题</span>All amenities made accessible to the rich 外”。 (251) 第十单元 and the poor alike. 所有的便利设施是富人和穷 人都能享受的。(2023)</div>          <div class="fam"><span class="lbl">族</span>like prep. 像 / unlike prep. 不像</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">clockwise</span>
+          <span class="ipa">/&#x27;kla:kwaiz/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">顺时针方向(地) adj. 顺时针方向(的)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the gulls circle clockwise around the lighthouse</div>          <div class="mnem"><span class="lbl">记</span>wise的含义是“聪明的，智慧 的”。一个钟表是聪明的，只能顺时针方向来 走，否则会被认为是坏的而丢掉！后缀wise表 副词，“方向，方式，状态”，clock时钟+wise方 向，方式，状态→顺时针地。other另外的+ wise方向，方式，状态→否则。</div>          <div class="root"><span class="lbl">根</span>clock(钟) + wise(方向) → 按钟表走的方向</div>          <div class="fam"><span class="lbl">族</span>clock n. 钟 / counterclockwise adv. 逆时针地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">broad</span>
+          <span class="ipa">/brə:d/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">宽阔的;广泛的；普遍的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a broad wooden building</div>          <div class="mnem"><span class="lbl">记</span>road路；b 想象成汉语中的 “不”。那该单词就想象成“路不”，很多人总觉 得，在中国，人生和职场的路不够宽，所以选择 了出国，认为国外什么都是好的，所以该单词就 是“宽阔的”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：road(路)前面加 b → 和路一样宽</div>          <div class="zt"><span class="lbl">真题</span>Later, I developed a broader theory of what separates the two general classes of learners—helpless versus mastery-oriented.后 来，我提出了一个更广泛的理论来区分这两类 常见的学习者——无助型和掌控型。(2016)</div>          <div class="fam"><span class="lbl">族</span>broaden v. 拓宽 / broadly adv. 大体上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">breath</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A deep breath here is enough to fill your chest with salt</div>          <div class="root"><span class="lbl">根</span>breathe 是动词「呼吸」，breath 是名词「一口气」</div>          <div class="fam"><span class="lbl">族</span>breathe v. 呼吸 / breathless adj. 喘不上气的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">abroad</span>
+          <span class="ipa">/ə&#x27;bro:d/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">到国外，在国外</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She studied abroad for three years</div>          <div class="mnem"><span class="lbl">记</span>broad 宽的；a 加强语义。根据 语义联想，“路很宽很宽很宽……”，宽到了“国</div>          <div class="root"><span class="lbl">根</span>a(加强) + broad(宽) → 路宽到国外去了 → 在国外</div>          <div class="zt"><span class="lbl">真题</span>She is abroad on business. 她在国外出 差。(2016)</div>          <div class="fam"><span class="lbl">族</span>broad adj. 宽阔的 / overseas adv. 在海外</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">overseas</span>
+          <span class="ipa">/əuvər&#x27;si:z/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">海外的 adv. 在海外</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Wild Island lies far overseas</div>          <div class="root"><span class="lbl">根</span>over(越过) + seas(海) → 越过大海的 → 海外的</div>          <div class="zt"><span class="lbl">真题</span>Overseas assignments are becoming increasingly important to advancement within executive ranks. 海外任务对高管人员的晋升越 来越重要。</div>          <div class="fam"><span class="lbl">族</span>oversea adj. 海外的 / abroad adv. 在国外</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">board</span>
+          <span class="ipa">/bo:d/</span>
+          <span class="pos">n.</span>
+          <span class="cn">木板；董事会，委员会，部门；伙食 v.上(船、 飞机等）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>with a board by the gate</div>          <div class="mnem"><span class="lbl">记</span>这个单词可以结合我们熟悉的 blackboard(黑板)来记忆，black 黑，board 就是 “板”了。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：blackboard 黑板 / on board 在船上</div>          <div class="zt"><span class="lbl">真题</span>Some employees found the board motivating. 一些员工认为董事会具有激励作用。(2016) 例 She pays $100 a week board and lodging. 她每周支付100美元的食宿费。</div>          <div class="fam"><span class="lbl">族</span>boarder n. 寄宿生 / aboard adv. 在船上</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">aboard</span>
+          <span class="ipa">/ə&#x27;bo:rd/</span>
+          <span class="pos">adv.</span>
+          <span class="cn">&amp;prep. 在(船、飞机、火车等)上；上(船、飞 机、火车等）</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>come aboard at the coast</div>          <div class="root"><span class="lbl">根</span>a(加强) + board(木板、甲板) → 上了甲板 → 在船上</div>          <div class="fam"><span class="lbl">族</span>board n. 木板 / abroad adv. 在国外</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">panel</span>
+          <span class="ipa">/&#x27;pænl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">专家咨询组；(广播、电视上的)讨论小组；嵌 板，控制板</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A panel of experts visits twice a year</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“拍喽”。这件 事能拍板的人→专家咨询组。</div>          <div class="root"><span class="lbl">根</span>pan(平) + el → 一块平板 → 嵌板；能拍板的一组人</div>          <div class="zt"><span class="lbl">真题</span>They agreed to cover the entire building in solar panels. 他们同意用太阳能电池板覆盖 整座建筑。(2018) 例 To do this, the team used data from the British Household Panel Survey compiled by the University of Essex. 为了做到这一点，研究 小组使用了埃塞克斯大学汇编的英国家庭小组 调查的数据。</div>          <div class="fam"><span class="lbl">族</span>panelist n. 讨论组成员 / committee n. 委员会</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">widen</span>
+          <span class="ipa">/&#x27;waidn/</span>
+          <span class="pos">v.</span>
+          <span class="cn">加宽;(使)变宽;扩大</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>The state plans to widen the channel</div>          <div class="mnem"><span class="lbl">记</span>wide宽的；en使……。那就是 “使变宽，加宽”。</div>          <div class="root"><span class="lbl">根</span>wide(宽) + en(使…) → 使变宽</div>          <div class="zt"><span class="lbl">真题</span>It further widens the gap between the old and the young. 它进一步扩大了老年人和年轻 人之间的差距。(2016)</div>          <div class="fam"><span class="lbl">族</span>wide adj. 宽的 / width n. 宽度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">wild</span>
+          <span class="ipa">/waıld/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">野生的 n. 偏远地区；野生状态</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Wild Island lies far overseas</div>          <div class="root"><span class="lbl">根</span>谐音联想：外(w)而野 → 没人管的地方 → 野生的</div>          <div class="zt"><span class="lbl">真题</span>Climate change has little effect on the lives of wild ducks. 气候变化对野鸭的生活几 乎没有影响。</div>          <div class="fam"><span class="lbl">族</span>wildlife n. 野生动物 / wildly adv. 疯狂地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">lengthen</span>
+          <span class="ipa">/&#x27;lenkθən/</span>
+          <span class="pos">v.</span>
+          <span class="cn">延长，加长</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the season lengthens by a week or two</div>          <div class="mnem"><span class="lbl">记</span>ab(离开)+board(板子、甲板)</div>          <div class="root"><span class="lbl">根</span>length(长度) + en(使…) → 使变长</div>          <div class="zt"><span class="lbl">真题</span>Working at an advanced age lengthens people&#x27;s life. 高龄工作可以延长人的寿命。</div>          <div class="fam"><span class="lbl">族</span>length n. 长度 / lengthy adj. 漫长的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">lengthy</span>
+          <span class="ipa">/&#x27;lenkθi/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">很长的;漫长的;冗长的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>keeps a lengthy record of every case</div>          <div class="root"><span class="lbl">根</span>length(长度) + y → 长长的</div>          <div class="zt"><span class="lbl">真题</span>The lengthy process is partly because older workers are more likely to have been laid off. 这个漫长的过程在一定程度上是因为年长 的工人更有可能被解雇。</div>          <div class="fam"><span class="lbl">族</span>length n. 长度 / lengthen v. 加长</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">federal</span>
+          <span class="ipa">/&#x27;fedərəl/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">联邦制的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A federal agency governs the island</div>          <div class="root"><span class="lbl">根</span>feder(联盟) + al(…的) → 各州联起来的 → 联邦的</div>          <div class="zt"><span class="lbl">真题</span>I think we&#x27;re unique as a federal agency. 我认为我们作为联邦机构是独一无二的。 (2019)</div>          <div class="fam"><span class="lbl">族</span>federation n. 联邦 / federalism n. 联邦制</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">govern</span>
+          <span class="ipa">/&#x27;gavərn/</span>
+          <span class="pos">v.</span>
+          <span class="cn">统治；控制；支配</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>A federal agency governs the island</div>          <div class="mnem"><span class="lbl">记</span>government不就是“统治”国 家的机构吗？那就是“政府”。</div>          <div class="root"><span class="lbl">根</span>和 government(政府) 同源 → 政府做的事 → 统治</div>          <div class="zt"><span class="lbl">真题</span>Human lives are governed by the desire to experience joy. 人类的生活被体验快乐的欲 望所支配。(2015)</div>          <div class="fam"><span class="lbl">族</span>government n. 政府 / governor n. 州长</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">administer</span>
+          <span class="ipa">/əd&#x27;ministər/</span>
+          <span class="pos">v.</span>
+          <span class="cn">管理，治理；执行，实施</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She administers the medicine herself</div>          <div class="mnem"><span class="lbl">记</span>minister 大臣，部长，其中 mini 表示“小”；er后缀，表示人。连在一起就可以记 忆为：小人。古代一般谁会称自己为小人？平 民百姓不会，他们是草民。称小人的都是那些 在皇帝身边的人，他们一般都是说：“小人参见 皇上。”→大臣，部长。那 administer就是一再 地(ad表示强调)做大臣，他们是帮皇帝“管理” 国家的人。</div>          <div class="root"><span class="lbl">根</span>ad(一再) + minister(大臣) → 像大臣一样管事 → 管理</div>          <div class="zt"><span class="lbl">真题</span>And on a survey administered by the district, students wrote things like, &quot;I hate going to school”.在该学区进行的一项调查中， 学生们写下了这样的内容：“我讨厌上学”。 (2018)</div>          <div class="fam"><span class="lbl">族</span>administration n. 管理 / administrative adj. 行政的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">administrative</span>
+          <span class="ipa">/əd&#x27;ministrətiv/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">管理的，行政的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>an administrative staff keeps the records</div>          <div class="root"><span class="lbl">根</span>administer(管理) + ative(…的) → 管理方面的</div>          <div class="zt"><span class="lbl">真题</span>They may lose faith in their administrative abilities. 他们可能会对自己的管理能力失去信 心。(2023)</div>          <div class="fam"><span class="lbl">族</span>administer v. 管理 / administration n. 管理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">ministry</span>
+          <span class="ipa">/&#x27;ministri/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the Ministry of the Environment pays for the hospital</div>          <div class="root"><span class="lbl">根</span>minister(部长) + y → 部长管的地方 → 部</div>          <div class="zt"><span class="lbl">真题</span>The Ministry of Transport maintains that speed limits reduce accidents. 交通部认为 限速可以减少交通事故。 第十单元</div>          <div class="fam"><span class="lbl">族</span>minister n. 部长 / administer v. 治理</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">lead</span>
+          <span class="ipa">/li:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">引领，带路；导致;过(生活)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>has worked here thirty years and leads the team</div>          <div class="root"><span class="lbl">根</span>靠搭配记：lead the team 带队 / lead to 导致</div>          <div class="zt"><span class="lbl">真题</span>It often leads to innovations in other related fields. 它往往会导致其他相关领域的创 新。(2016)</div>          <div class="fam"><span class="lbl">族</span>leader n. 领导者 / leadership n. 领导</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 67</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>

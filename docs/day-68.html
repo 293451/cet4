@@ -1,0 +1,694 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Day 68 · The Kettle by the Wayside</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --line:#e8e4dc; --ink:#23201c; --dim:#8a8279;
+  --accent:#d97706; --hi:#fde68a; --hi-ink:#78350f;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1816; --card:#232020; --line:#3a3532; --ink:#ece7e0;
+           --dim:#9a9188; --accent:#f59e0b; --hi:#78350f; --hi-ink:#fef3c7; }
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:60px;
+}
+.wrap { max-width:720px; margin:0 auto; padding:16px; }
+header { padding:8px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.kicker { color:var(--dim); font-size:13px; letter-spacing:.5px; }
+h1 { font-size:22px; margin:6px 0 4px; font-weight:650; }
+h1 .cn { font-size:15px; color:var(--dim); font-weight:400; display:block; margin-top:2px; }
+
+.player {
+  position:sticky; top:0; z-index:20; background:var(--card);
+  border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  margin-bottom:18px; box-shadow:0 2px 12px rgba(0,0,0,.05);
+}
+.row { display:flex; align-items:center; gap:12px; }
+#play {
+  width:46px; height:46px; flex:0 0 46px; border:none; border-radius:50%;
+  background:var(--accent); color:#fff; font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+#play:active { transform:scale(.94); }
+.bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+#fill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+.time { font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-width:78px; text-align:right; }
+.speeds { display:flex; gap:6px; margin-top:10px; }
+.speeds button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.speeds button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
+/* ── 显示模式切换 ─────────────────────────── */
+.modes { display:flex; gap:6px; margin-top:8px; }
+.modes button {
+  flex:1; padding:7px 0; border:1px solid var(--line); background:transparent;
+  color:var(--dim); border-radius:9px; font-size:13px; cursor:pointer;
+}
+.modes button.on { background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:600; }
+
+/* ── 逐句对照 ─────────────────────────────── */
+.article { font-size:19px; line-height:2; letter-spacing:.1px; }
+.pair { padding:8px 10px; margin:0 -10px 4px; border-radius:9px; transition:background .15s; }
+.pair.now { background:var(--hi); }
+.pair.now .zh { color:var(--hi-ink); opacity:.95; }
+.pair .en { margin:0; }
+.pair .zh {
+  margin:5px 0 0; color:var(--dim); font-size:14.5px; line-height:1.75;
+}
+
+/* 模式：只看英文 / 只看中文 / 双语对照 */
+body.mode-en .pair .zh { display:none; }
+body.mode-zh .pair .en { display:none; }
+body.mode-zh .article { font-size:17px; }
+
+.w { transition:background .08s; border-radius:4px; padding:1px 0; cursor:pointer; }
+.w.target { color:var(--accent); font-weight:600; }
+.w.on { background:var(--accent); color:#fff; font-weight:600; }
+.pair.now .w.on { background:var(--accent); color:#fff; }
+
+h2 { font-size:15px; color:var(--dim); margin:28px 0 10px; font-weight:600;
+      letter-spacing:.5px; text-transform:uppercase; }
+.card { border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card); }
+.card summary {
+  list-style:none; padding:11px 13px; cursor:pointer; display:flex;
+  flex-wrap:wrap; align-items:baseline; gap:8px; font-size:15px;
+}
+.card summary::-webkit-details-marker { display:none; }
+.idx { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+.card .word { font-weight:650; font-size:16px; }
+.card .ipa { color:var(--dim); font-size:12.5px; font-family:ui-monospace,monospace; }
+.card .pos { color:var(--dim); font-size:12px; font-style:italic; }
+.card .cn { color:var(--ink); opacity:.85; }
+.card .body { padding:0 13px 13px; font-size:14px; line-height:1.85; border-top:1px solid var(--line); padding-top:11px; }
+.lbl { display:inline-block; min-width:38px; color:var(--dim); font-size:12px; }
+.sent { margin-bottom:6px; }
+.root { margin-bottom:6px; }
+.colloc { color:var(--accent); font-size:13.5px; margin-bottom:4px; }
+.fam { color:var(--dim); font-size:13.5px; }
+
+/* 刘晓燕的记忆法 —— 卡片里最该被看到的一块 */
+.mnem {
+  margin-bottom:7px; padding:8px 10px; border-radius:8px;
+  background:color-mix(in srgb, var(--accent) 9%, transparent);
+  font-size:14px; line-height:1.75;
+}
+/* 真题例句 */
+.zt {
+  margin-bottom:6px; padding-left:9px; border-left:2px solid var(--line);
+  color:var(--dim); font-size:13.5px; line-height:1.7;
+}
+.body .lbl { font-size:11.5px; }
+footer { margin-top:28px; padding-top:16px; border-top:1px solid var(--line);
+          color:var(--dim); font-size:12.5px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Day 68 · 12/19 · Unit 10 第 2011-2040 词</div>
+  <h1>The Kettle by the Wayside<span class="cn">路边的水壶</span></h1>
+</header>
+
+<div class="player">
+  <div class="row">
+    <button id="play" aria-label="播放">▶</button>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="time"><span id="cur">0:00</span> / <span id="dur">0:00</span></div>
+  </div>
+  <div class="speeds">
+    <button class="on">正常语速</button>
+    <button>慢速 0.75x</button>
+  </div>
+  <div class="modes">
+    <button data-mode="both" class="on">双语</button>
+    <button data-mode="en">只看英文</button>
+    <button data-mode="zh">只看中文</button>
+  </div>
+</div>
+
+<audio id="au" preload="metadata" src="audio/day-68.mp3"></audio>
+
+<h2>课文</h2>
+<div class="article" id="article"><div class="pair" data-s0="43" data-s1="4309"><p class="en"><span class="w" data-s="43" data-e="341">Forty</span> <span class="w" data-s="384" data-e="512">years</span> <span class="w" data-s="555" data-e="811">ago,</span> <span class="w" data-s="1024" data-e="1664">Nora&#x27;s</span> <span class="w" data-s="1707" data-e="1792">father</span> <span class="w target" data-s="1835" data-e="2304" title="(用砖石)铺(地)">paved</span> <span class="w" data-s="2347" data-e="2475">the</span> <span class="w" data-s="2517" data-e="2603">last</span> <span class="w target" data-s="2645" data-e="3243" title="千米;公里">kilometer</span> <span class="w" data-s="3285" data-e="3371">of</span> <span class="w" data-s="3413" data-e="3456">the</span> <span class="w" data-s="3499" data-e="3755">mountain</span> <span class="w" data-s="3797" data-e="3925">road</span> <span class="w" data-s="3968" data-e="4309">himself.</span></p><p class="zh">四十年前，诺拉的爸爸一个人把这条山路的最后一千米铺成了路。</p></div>
+<div class="pair" data-s0="4651" data-s1="10453"><p class="en"><span class="w" data-s="4651" data-e="5376">At</span> <span class="w" data-s="5419" data-e="5589">the</span> <span class="w target" data-s="5632" data-e="5931" title="路边；路旁">wayside,</span> <span class="w" data-s="6229" data-e="6400">where</span> <span class="w" data-s="6571" data-e="6699">the</span> <span class="w" data-s="6741" data-e="6827">road</span> <span class="w" data-s="6869" data-e="7125">turns,</span> <span class="w" data-s="7424" data-e="7680">he</span> <span class="w" data-s="7893" data-e="8192">built</span> <span class="w" data-s="8235" data-e="8405">a</span> <span class="w" data-s="8448" data-e="8619">small</span> <span class="w" data-s="8661" data-e="9045">tea</span> <span class="w" data-s="9088" data-e="9216">house</span> <span class="w" data-s="9259" data-e="9643">with</span> <span class="w" data-s="9771" data-e="9899">a</span> <span class="w" data-s="9941" data-e="10069">tin</span> <span class="w" data-s="10112" data-e="10453">roof.</span></p><p class="zh">在路边那个拐弯的地方，他盖了一间铁皮顶的小茶馆。</p></div>
+<div class="pair" data-s0="11056" data-s1="15621"><p class="en"><span class="w" data-s="11056" data-e="11141">When</span> <span class="w" data-s="11184" data-e="11269">he</span> <span class="w" data-s="11312" data-e="11440">died,</span> <span class="w" data-s="11739" data-e="12421">Nora</span> <span class="w" data-s="12464" data-e="12592">took</span> <span class="w" data-s="12635" data-e="12763">over</span> <span class="w" data-s="12805" data-e="12933">the</span> <span class="w" data-s="12976" data-e="13147">tea</span> <span class="w" data-s="13189" data-e="13275">house,</span> <span class="w" data-s="13573" data-e="14043">although</span> <span class="w" data-s="14085" data-e="14299">she</span> <span class="w" data-s="14341" data-e="14469">had</span> <span class="w" data-s="14512" data-e="14640">no</span> <span class="w" data-s="14683" data-e="14853">training</span> <span class="w" data-s="14896" data-e="15195">in</span> <span class="w target" data-s="15237" data-e="15621" title="领导能力；领导阶层">leadership.</span></p><p class="zh">他去世后，诺拉接手了茶馆，尽管她从没受过任何领导力的训练。</p></div>
+<div class="pair" data-s0="15835" data-s1="19589"><p class="en"><span class="w" data-s="15835" data-e="16304">All</span> <span class="w" data-s="16389" data-e="16603">she</span> <span class="w" data-s="16645" data-e="16773">had</span> <span class="w" data-s="16816" data-e="17072">was</span> <span class="w" data-s="17115" data-e="17285">her</span> <span class="w" data-s="17328" data-e="17669">father&#x27;s</span> <span class="w" data-s="17712" data-e="18011">notebook,</span> <span class="w" data-s="18181" data-e="18437">which</span> <span class="w" data-s="18608" data-e="18779">she</span> <span class="w" data-s="18821" data-e="18992">used</span> <span class="w" data-s="19035" data-e="19205">as</span> <span class="w" data-s="19248" data-e="19333">a</span> <span class="w target" data-s="19376" data-e="19589" title="指南；手册；导游；向导；指导者；指引者 . 给某人领路(或导游);指引">guide.</span></p><p class="zh">她手上只有爸爸的一本旧笔记，她把它当成自己的指南。</p></div>
+<div class="pair" data-s0="19845" data-s1="26117"><p class="en"><span class="w" data-s="19845" data-e="20187">Inside</span> <span class="w" data-s="20229" data-e="20528">were</span> <span class="w" data-s="20571" data-e="20699">his</span> <span class="w target" data-s="20741" data-e="21083" title="指导方针；指导原则；行动纲领；准则；参考">guidelines:</span> <span class="w" data-s="21381" data-e="22192">boil</span> <span class="w" data-s="22235" data-e="22363">the</span> <span class="w" data-s="22405" data-e="22491">water,</span> <span class="w" data-s="22704" data-e="23216">wipe</span> <span class="w" data-s="23259" data-e="23344">the</span> <span class="w" data-s="23387" data-e="23600">cups,</span> <span class="w" data-s="23771" data-e="23984">and</span> <span class="w" data-s="24112" data-e="24325">never</span> <span class="w" data-s="24368" data-e="24581">sit</span> <span class="w" data-s="24624" data-e="24795">down</span> <span class="w" data-s="24837" data-e="25179">before</span> <span class="w" data-s="25221" data-e="25392">the</span> <span class="w" data-s="25435" data-e="25520">last</span> <span class="w" data-s="25563" data-e="25776">guest</span> <span class="w" data-s="25819" data-e="26117">leaves.</span></p><p class="zh">里面是他写下的准则：把水烧开，把杯子擦干净，最后一位客人走之前绝不坐下。</p></div>
+<div class="pair" data-s0="27115" data-s1="29163"><p class="en"><span class="w" data-s="27115" data-e="27200">Her</span> <span class="w" data-s="27243" data-e="27541">uncle</span> <span class="w" data-s="27584" data-e="27712">tried</span> <span class="w" data-s="27755" data-e="27925">to</span> <span class="w target" data-s="27968" data-e="28224" title="误导；引入歧途；使误信">mislead</span> <span class="w" data-s="28267" data-e="28437">her</span> <span class="w" data-s="28480" data-e="28651">from</span> <span class="w" data-s="28693" data-e="28779">the</span> <span class="w" data-s="28821" data-e="28907">first</span> <span class="w" data-s="28949" data-e="29163">week.</span></p><p class="zh">她叔叔从第一周起就想把她带偏。</p></div>
+<div class="pair" data-s0="29888" data-s1="31595"><p class="en"><span class="w" data-s="29888" data-e="30315">&quot;Sell</span> <span class="w target" data-s="30357" data-e="30699" title="烈性酒；含酒精饮料">liquor</span> <span class="w" data-s="30741" data-e="30827">and</span> <span class="w target" data-s="30869" data-e="31040" title="">beer,&quot;</span> <span class="w" data-s="31381" data-e="31424">he</span> <span class="w" data-s="31467" data-e="31595">said.</span></p><p class="zh">“卖烈性酒和啤酒，”他说。</p></div>
+<div class="pair" data-s0="32533" data-s1="35819"><p class="en"><span class="w" data-s="32533" data-e="32704">&quot;Add</span> <span class="w target" data-s="32747" data-e="33259" title="酒精，乙醇；酒">alcohol</span> <span class="w" data-s="33301" data-e="33515">and</span> <span class="w target" data-s="33557" data-e="34155" title="香烟，纸烟，卷烟">cigarettes,</span> <span class="w" data-s="34240" data-e="34411">and</span> <span class="w" data-s="34539" data-e="34667">the</span> <span class="w" data-s="34709" data-e="35008">tourists</span> <span class="w" data-s="35051" data-e="35221">will</span> <span class="w" data-s="35264" data-e="35435">stay</span> <span class="w" data-s="35477" data-e="35648">all</span> <span class="w" data-s="35691" data-e="35819">night.&quot;</span></p><p class="zh">“再加点酒精和香烟，游客就会待一整晚。”</p></div>
+<div class="pair" data-s0="36245" data-s1="40939"><p class="en"><span class="w" data-s="36245" data-e="36715">Some</span> <span class="w" data-s="36757" data-e="37141">neighbours</span> <span class="w" data-s="37184" data-e="37739">misunderstood</span> <span class="w" data-s="37781" data-e="37867">her</span> <span class="w" data-s="37909" data-e="38336">refusal,</span> <span class="w" data-s="38464" data-e="38635">and</span> <span class="w" data-s="38848" data-e="39104">their</span> <span class="w target" data-s="39147" data-e="39659" title="误解；误会">misunderstanding</span> <span class="w" data-s="39701" data-e="40043">hurt</span> <span class="w" data-s="40085" data-e="40256">her</span> <span class="w" data-s="40299" data-e="40469">more</span> <span class="w" data-s="40512" data-e="40683">than</span> <span class="w" data-s="40725" data-e="40811">the</span> <span class="w" data-s="40853" data-e="40939">money.</span></p><p class="zh">有些邻居误解了她的拒绝，而这份误解比钱更让她难受。</p></div>
+<div class="pair" data-s0="41843" data-s1="46622"><p class="en"><span class="w" data-s="41843" data-e="41971">Then</span> <span class="w" data-s="42014" data-e="42099">a</span> <span class="w" data-s="42142" data-e="42441">storm</span> <span class="w" data-s="42483" data-e="42611">came</span> <span class="w" data-s="42654" data-e="42910">and</span> <span class="w" data-s="42953" data-e="43465">the</span> <span class="w" data-s="43507" data-e="43593">tin</span> <span class="w" data-s="43635" data-e="43934">roof</span> <span class="w" data-s="43977" data-e="44105">fell</span> <span class="w" data-s="44147" data-e="44318">in,</span> <span class="w" data-s="44531" data-e="44702">a</span> <span class="w" data-s="44915" data-e="45043">real</span> <span class="w target" data-s="45086" data-e="45683" title="厄运；不幸；不幸的事故(或情况、事件)">misfortune</span> <span class="w" data-s="45726" data-e="45897">for</span> <span class="w" data-s="45939" data-e="46067">a</span> <span class="w" data-s="46110" data-e="46153">woman</span> <span class="w" data-s="46195" data-e="46323">of</span> <span class="w" data-s="46366" data-e="46622">thirty.</span></p><p class="zh">后来一场暴风雨掀翻了铁皮屋顶，对一个三十岁的女人来说，这是真正的不幸。</p></div>
+<div class="pair" data-s0="46793" data-s1="52041"><p class="en"><span class="w" data-s="46793" data-e="47347">For</span> <span class="w" data-s="47390" data-e="47561">a</span> <span class="w" data-s="47603" data-e="47646">whole</span> <span class="w" data-s="47689" data-e="47945">month,</span> <span class="w" data-s="48201" data-e="48542">only</span> <span class="w" data-s="48585" data-e="48755">a</span> <span class="w target" data-s="48798" data-e="49097" title="">kettle,</span> <span class="w" data-s="49182" data-e="49395">a</span> <span class="w target" data-s="49481" data-e="49822" title="">basin</span> <span class="w" data-s="49865" data-e="50078">and</span> <span class="w" data-s="50121" data-e="50462">a</span> <span class="w" data-s="50505" data-e="50547">sheet</span> <span class="w" data-s="50590" data-e="50761">of</span> <span class="w target" data-s="50803" data-e="51102" title="尼龙；(女用)尼龙长袜，尼龙连裤袜 (254)">nylon</span> <span class="w" data-s="51145" data-e="51401">kept</span> <span class="w" data-s="51443" data-e="51571">the</span> <span class="w" data-s="51614" data-e="51699">place</span> <span class="w" data-s="51742" data-e="52041">alive.</span></p><p class="zh">整整一个月，只有一只水壶、一个盆和一块尼龙布撑着这个店。</p></div>
+<div class="pair" data-s0="52425" data-s1="55369"><p class="en"><span class="w" data-s="52425" data-e="52766">Nora</span> <span class="w" data-s="52809" data-e="52937">did</span> <span class="w" data-s="52979" data-e="53107">not</span> <span class="w" data-s="53150" data-e="53321">give</span> <span class="w" data-s="53363" data-e="53491">up;</span> <span class="w" data-s="53747" data-e="54003">she</span> <span class="w" data-s="54174" data-e="54345">began</span> <span class="w" data-s="54387" data-e="54601">to</span> <span class="w target" data-s="54643" data-e="54771" title="措施；方法；(一定的)量，程度；标准 v. 测量;度量">measure</span> <span class="w" data-s="54814" data-e="55070">things</span> <span class="w" data-s="55113" data-e="55369">instead.</span></p><p class="zh">诺拉没有放弃，她转而开始测量。</p></div>
+<div class="pair" data-s0="56527" data-s1="60751"><p class="en"><span class="w" data-s="56527" data-e="56655">She</span> <span class="w" data-s="56697" data-e="56868">wrote</span> <span class="w" data-s="56911" data-e="57081">down</span> <span class="w" data-s="57124" data-e="57252">the</span> <span class="w" data-s="57295" data-e="57593">temperature</span> <span class="w" data-s="57636" data-e="57764">of</span> <span class="w" data-s="57807" data-e="57849">the</span> <span class="w" data-s="57892" data-e="57977">water</span> <span class="w" data-s="58020" data-e="58233">in</span> <span class="w target" data-s="58276" data-e="58532" title="程度，度，度数；(大学)学位">degrees</span> <span class="w" data-s="58575" data-e="58873">and</span> <span class="w" data-s="59001" data-e="59215">drew</span> <span class="w" data-s="59257" data-e="59343">a</span> <span class="w target" data-s="59385" data-e="59428" title="图，图表；海图">chart</span> <span class="w" data-s="59471" data-e="59684">on</span> <span class="w" data-s="59727" data-e="59769">the</span> <span class="w" data-s="59812" data-e="59897">back</span> <span class="w" data-s="59940" data-e="60068">of</span> <span class="w" data-s="60111" data-e="60153">an</span> <span class="w" data-s="60196" data-e="60281">old</span> <span class="w" data-s="60324" data-e="60751">calendar.</span></p><p class="zh">她把水温记成多少度，还在旧日历的背面画了一张图表。</p></div>
+<div class="pair" data-s0="60921" data-s1="63311"><p class="en"><span class="w" data-s="60921" data-e="61391">She</span> <span class="w target" data-s="61476" data-e="61817" title="措施；方法；(一定的)量，程度；标准 v. 测量;度量">measured</span> <span class="w" data-s="61860" data-e="61945">the</span> <span class="w" data-s="61988" data-e="62287">clouds</span> <span class="w" data-s="62329" data-e="62372">in</span> <span class="w target" data-s="62415" data-e="62841" title="">centimeters</span> <span class="w" data-s="62884" data-e="63055">every</span> <span class="w" data-s="63097" data-e="63311">morning.</span></p><p class="zh">她每天早上用厘米量云。</p></div>
+<div class="pair" data-s0="63567" data-s1="65529"><p class="en"><span class="w" data-s="63567" data-e="64121">She</span> <span class="w" data-s="64164" data-e="64335">put</span> <span class="w" data-s="64377" data-e="64505">her</span> <span class="w" data-s="64548" data-e="64719">teas</span> <span class="w" data-s="64761" data-e="64932">on</span> <span class="w" data-s="64975" data-e="65060">a</span> <span class="w" data-s="65103" data-e="65316">kitchen</span> <span class="w target" data-s="65359" data-e="65529" title="规模；范围；等级；刻度；秤">scale.</span></p><p class="zh">她把茶叶放上厨房的秤。</p></div>
+<div class="pair" data-s0="66182" data-s1="68998"><p class="en"><span class="w" data-s="66182" data-e="66310">Then</span> <span class="w" data-s="66352" data-e="66523">she</span> <span class="w target" data-s="66566" data-e="66864" title="把……分等级；名列">ranked</span> <span class="w" data-s="66907" data-e="66950">them</span> <span class="w" data-s="66992" data-e="67120">from</span> <span class="w" data-s="67163" data-e="67291">one</span> <span class="w" data-s="67334" data-e="67462">to</span> <span class="w" data-s="67504" data-e="67590">ten</span> <span class="w" data-s="67632" data-e="67931">and</span> <span class="w" data-s="68102" data-e="68272">wrote</span> <span class="w" data-s="68315" data-e="68443">the</span> <span class="w" data-s="68486" data-e="68571">list</span> <span class="w" data-s="68614" data-e="68784">on</span> <span class="w" data-s="68827" data-e="68870">the</span> <span class="w" data-s="68912" data-e="68998">wall.</span></p><p class="zh">然后她把它们从一到十分出等级，把单子写在墙上。</p></div>
+<div class="pair" data-s0="69211" data-s1="72027"><p class="en"><span class="w" data-s="69211" data-e="69766">On</span> <span class="w target" data-s="69808" data-e="70064" title="平均的，正常的，普通的 n. 平均数；平均 水平">average,</span> <span class="w" data-s="70320" data-e="70619">only</span> <span class="w" data-s="70662" data-e="70918">three</span> <span class="w" data-s="70960" data-e="71259">cars</span> <span class="w" data-s="71302" data-e="71558">stopped</span> <span class="w" data-s="71600" data-e="71814">each</span> <span class="w" data-s="71856" data-e="72027">day.</span></p><p class="zh">平均每天只有三辆车停下来。</p></div>
+<div class="pair" data-s0="72240" data-s1="77275"><p class="en"><span class="w" data-s="72240" data-e="72795">But</span> <span class="w" data-s="72838" data-e="73136">tea</span> <span class="w" data-s="73179" data-e="73350">with</span> <span class="w" data-s="73392" data-e="73478">a</span> <span class="w target" data-s="73520" data-e="73904" title="磁的，有磁性的；有吸引力的，有魅力的">magnetic</span> <span class="w" data-s="73947" data-e="74160">smell</span> <span class="w" data-s="74203" data-e="74502">and</span> <span class="w" data-s="74587" data-e="74672">a</span> <span class="w" data-s="74715" data-e="74843">warm</span> <span class="w" data-s="74886" data-e="75184">welcome</span> <span class="w" data-s="75227" data-e="75526">became</span> <span class="w target" data-s="75696" data-e="76166" title="常见的；通常的;共有的 n. 公共用地；公 共食堂">common,</span> <span class="w" data-s="76379" data-e="76592">then</span> <span class="w target" data-s="76720" data-e="77275" title="平凡的，普通的 n. 常见的事">commonplace.</span></p><p class="zh">可是带着磁性香气的茶，加上一声温暖的问候，渐渐变得常见，再变得平凡。</p></div>
+<div class="pair" data-s0="77616" data-s1="81798"><p class="en"><span class="w" data-s="77616" data-e="77787">Old</span> <span class="w" data-s="77830" data-e="78299">customers</span> <span class="w" data-s="78342" data-e="78512">called</span> <span class="w" data-s="78555" data-e="78726">her</span> <span class="w" data-s="78768" data-e="78982">tea</span> <span class="w" data-s="79024" data-e="79152">a</span> <span class="w target" data-s="79195" data-e="79494" title="神迹；奇迹">miracle</span> <span class="w" data-s="79536" data-e="79707">and</span> <span class="w" data-s="79750" data-e="80219">said</span> <span class="w" data-s="80262" data-e="80432">she</span> <span class="w" data-s="80475" data-e="80603">worked</span> <span class="w target" data-s="80646" data-e="80859" title="魔法，魔术 adj. 魔术的，有魔力的">magic</span> <span class="w" data-s="80902" data-e="81200">with</span> <span class="w" data-s="81243" data-e="81371">leaves</span> <span class="w" data-s="81414" data-e="81627">and</span> <span class="w" data-s="81670" data-e="81798">water.</span></p><p class="zh">老主顾说她的茶是奇迹，说她用叶子和水变魔法。</p></div>
+<div class="pair" data-s0="82771" data-s1="85416"><p class="en"><span class="w" data-s="82771" data-e="83069">Nora</span> <span class="w" data-s="83112" data-e="83283">only</span> <span class="w" data-s="83325" data-e="83667">laughed:</span> <span class="w" data-s="83880" data-e="84563">&quot;It</span> <span class="w" data-s="84605" data-e="84733">is</span> <span class="w" data-s="84776" data-e="84904">just</span> <span class="w" data-s="84947" data-e="85075">a</span> <span class="w target" data-s="85117" data-e="85416" title="(除水以外的)饮料">beverage.&quot;</span></p><p class="zh">诺拉只是笑：“不过是一杯饮料罢了。”</p></div>
+<div class="pair" data-s0="85843" data-s1="88189"><p class="en"><span class="w" data-s="85843" data-e="86483">Nobody</span> <span class="w" data-s="86525" data-e="86653">mentioned</span> <span class="w" data-s="86696" data-e="86909">the</span> <span class="w target" data-s="86952" data-e="87123" title="醉的；陶醉的">drunk</span> <span class="w" data-s="87165" data-e="87251">men</span> <span class="w" data-s="87293" data-e="87464">from</span> <span class="w" data-s="87507" data-e="87592">the</span> <span class="w" data-s="87635" data-e="87677">bar</span> <span class="w" data-s="87720" data-e="87891">down</span> <span class="w" data-s="87933" data-e="88061">the</span> <span class="w" data-s="88104" data-e="88189">road.</span></p><p class="zh">没人提过路那头酒吧里那些喝醉的男人。</p></div></div>
+
+<h2>今日单词 · 30</h2>
+      <details class="card">
+        <summary>
+          <span class="idx">01</span>
+          <span class="word">leadership</span>
+          <span class="ipa">/&#x27;li:dər∫ıp/</span>
+          <span class="pos">n.</span>
+          <span class="cn">领导能力；领导阶层</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nora took over the tea house, although she had no training in leadership</div>          <div class="root"><span class="lbl">根</span>leader(领导者) + ship(身份，状态) → 领导者的身份</div>          <div class="zt"><span class="lbl">真题</span>Lion dancing teaches competence in leadership because ofthis. 正因为这一点，舞狮 可以培养领导能力。(2023)</div>          <div class="fam"><span class="lbl">族</span>leader n. 领导者 / leading adj. 主要的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">02</span>
+          <span class="word">mislead</span>
+          <span class="ipa">/mıs&#x27;li:d/</span>
+          <span class="pos">v.</span>
+          <span class="cn">误导；引入歧途；使误信</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Her uncle tried to mislead her from the first week</div>          <div class="mnem"><span class="lbl">记</span>mistake 错误，mis 表示错误； 误导。</div>          <div class="root"><span class="lbl">根</span>mis(错误) + lead(带领) → 带错路 → 误导</div>          <div class="zt"><span class="lbl">真题</span>It misleads people to rely on sunscreen for protection. 它误导人们依赖防晒霜来保护 自己。</div>          <div class="fam"><span class="lbl">族</span>misleading adj. 误导的 / lead v. 带领</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">03</span>
+          <span class="word">misunderstand</span>
+          <span class="ipa">/misandər&#x27;stænd/</span>
+          <span class="pos">v.</span>
+          <span class="cn">误解；误会</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Some neighbours misunderstood her refusal</div>          <div class="root"><span class="lbl">根</span>mis(错误) + understand(理解) → 理解错了</div>          <div class="zt"><span class="lbl">真题</span>I think that things have become very gloomy these days, lots of misunderstanding, misleading cues, a lot of what the ancients would have called sophistry. 我认为这些天事 情变得非常令人沮丧，很多误解、误导线索，很 多古人称之为诡辩的东西。(2016)</div>          <div class="fam"><span class="lbl">族</span>misunderstanding n. 误解 / understand v. 理解</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">04</span>
+          <span class="word">misfortune</span>
+          <span class="ipa">/mis&#x27;fə:rt∫ən/</span>
+          <span class="pos">n.</span>
+          <span class="cn">厄运；不幸；不幸的事故(或情况、事件)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a real misfortune for a woman of thirty</div>          <div class="mnem"><span class="lbl">记</span>fortune 命运，运气;mis 表示否 定。那这个单词就是“厄运”了。</div>          <div class="root"><span class="lbl">根</span>mis(坏) + fortune(运气) → 坏运气 → 厄运</div>          <div class="zt"><span class="lbl">真题</span>They all experienced terrible misfortunes. 他 们都经历了可怕的不幸事件。 (253</div>          <div class="fam"><span class="lbl">族</span>fortunate adj. 幸运的 / fortunately adv. 幸运地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">05</span>
+          <span class="word">guide</span>
+          <span class="ipa">/gaid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">指南；手册；导游；向导；指导者；指引者 . 给某人领路(或导游);指引</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>which she used as a guide</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“贵（gui）的 (de)”。有些“导游”的价格还是很贵的，比如爬 珠峰的“向导”，一般收费都很贵。</div>          <div class="root"><span class="lbl">根</span>靠搭配记：a tour guide 导游 / guide sb. to 引导某人</div>          <div class="zt"><span class="lbl">真题</span>He is a tour guide. 他是一个导游。(2021)</div>          <div class="fam"><span class="lbl">族</span>guidance n. 指导 / guideline n. 指导方针</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">06</span>
+          <span class="word">guideline</span>
+          <span class="ipa">/&#x27;gaidlaın/</span>
+          <span class="pos">n.</span>
+          <span class="cn">指导方针；指导原则；行动纲领；准则；参考</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Inside were his guidelines</div>          <div class="root"><span class="lbl">根</span>guide(指导) + line(线) → 画出来的一条指导线</div>          <div class="zt"><span class="lbl">真题</span>Those guidelines are outdated and extremely inadequate. 那些指导方针已经过时， 而且极不充分。(2016)</div>          <div class="fam"><span class="lbl">族</span>guide v. 引导 / guidance n. 指导</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">07</span>
+          <span class="word">measure</span>
+          <span class="ipa">/&#x27;me3ər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">措施；方法；(一定的)量，程度；标准 v. 测量;度量</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she began to measure things instead</div>          <div class="root"><span class="lbl">根</span>meas(量) + ure(名词后缀) → 量出来的结果 → 措施</div>          <div class="zt"><span class="lbl">真题</span>Tests are an effective measure of the students&#x27;abilities.考试是衡量学生能力的有效 手段。</div>          <div class="fam"><span class="lbl">族</span>measurement n. 测量 / measurable adj. 可测量的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">08</span>
+          <span class="word">rank</span>
+          <span class="ipa">/rænk/</span>
+          <span class="pos">v.</span>
+          <span class="cn">把……分等级；名列</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Then she ranked them from one to ten</div>          <div class="root"><span class="lbl">根</span>靠搭配记：rank first 名列第一 / rank A above B</div>          <div class="zt"><span class="lbl">真题</span>Initially in the wake of the recession, college enrollments expanded, boosting the ranks of young adults living at home. 最初，在 经济衰退之后，大学入学人数扩大，增加了住在 家里的年轻人的数量。(2019) (k)，我们这帮人就是跑着到处上课的老师，也 分“等级，级别”。</div>          <div class="fam"><span class="lbl">族</span>ranking n. 排名 / rank n. 等级</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">09</span>
+          <span class="word">degree</span>
+          <span class="ipa">/di&#x27;gri:/</span>
+          <span class="pos">n.</span>
+          <span class="cn">程度，度，度数；(大学)学位</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>the temperature of the water in degrees</div>          <div class="root"><span class="lbl">根</span>de(向下) + gree(步，级) → 一级一级 → 程度</div>          <div class="zt"><span class="lbl">真题</span>Today foreign students earn 30 percent of the doctoral degrees awarded in the United States.如今，在美国获得博士学位的学生中，外 国学生占30%。</div>          <div class="fam"><span class="lbl">族</span>gradual adj. 逐渐的 / graduate v. 毕业</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">10</span>
+          <span class="word">scale</span>
+          <span class="ipa">/skeıl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">规模；范围；等级；刻度；秤</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She put her teas on a kitchen scale</div>          <div class="root"><span class="lbl">根</span>靠搭配记：on a large scale 大规模地 / a kitchen scale 厨房秤</div>          <div class="zt"><span class="lbl">真题</span>Schools and teachers have consistently reported the scale of the problem since 2009. 自2009年以来，学校和教师一直在报告这个问 题的严重性。(2020)</div>          <div class="fam"><span class="lbl">族</span>scaled adj. 按比例缩放的 / scale n. 刻度</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">11</span>
+          <span class="word">chart</span>
+          <span class="ipa">/t∫a:rt/</span>
+          <span class="pos">n.</span>
+          <span class="cn">图，图表；海图</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>drew a chart on the back of an old calendar</div>          <div class="root"><span class="lbl">根</span>chart(纸，图) → 画在纸上的一张图</div>          <div class="zt"><span class="lbl">真题</span>A Google Ngram Viewer chart shows that by 1993 climate change was already more commonly used in books than global warming. 谷歌 Ngram Viewer 图表显示，到 1993 年，气候 变化在书中使用的频率已经超过了全球变暖。 (2020)</div>          <div class="fam"><span class="lbl">族</span>charter n. 宪章 / chart v. 绘制图表</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">12</span>
+          <span class="word">centimeter</span>
+          <span class="ipa"></span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>She measured the clouds in centimeters every morning</div>          <div class="root"><span class="lbl">根</span>centi(百分之一) + meter(米) → 百分之一米</div>          <div class="fam"><span class="lbl">族</span>cent n. 分 / meter n. 米</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">13</span>
+          <span class="word">kilometer</span>
+          <span class="ipa">/kı&#x27;la:mitər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">千米;公里</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>paved the last kilometer of the mountain road</div>          <div class="root"><span class="lbl">根</span>kilo(千) + meter(米) → 一千米</div>          <div class="zt"><span class="lbl">真题</span>Each of these plates is about 70 kilometers thick. 这些板块中的每个板块大约有 70 千米厚。</div>          <div class="fam"><span class="lbl">族</span>kilogram n. 千克 / meter n. 米</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">14</span>
+          <span class="word">nylon</span>
+          <span class="ipa">/&#x27;narla:n/</span>
+          <span class="pos">n.</span>
+          <span class="cn">尼龙；(女用)尼龙长袜，尼龙连裤袜 (254)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a sheet of nylon kept the place alive</div>          <div class="mnem"><span class="lbl">记</span>这个单词的发音就类似“尼龙”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：尼龙 → 音译词，读起来就是“尼龙”</div>          <div class="fam"><span class="lbl">族</span>nylons n. 尼龙长袜</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">15</span>
+          <span class="word">kettle</span>
+          <span class="ipa">/&#x27;ketl/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>only a kettle, a basin and a sheet of nylon</div>          <div class="root"><span class="lbl">根</span>谐音联想：开透 → 水烧开了就透 → 水壶</div>          <div class="zt"><span class="lbl">真题</span>A few wild tree leaves fell into the kettle and the boiling water immediately gave off pleasant fragrance. 几片野树叶落进壶里，开水 立刻散发出宜人的香味。</div>          <div class="fam"><span class="lbl">族</span>kettleful n. 一壶的量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">16</span>
+          <span class="word">basin</span>
+          <span class="ipa">/&#x27;beisn/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>a kettle, a basin and a sheet of nylon</div>          <div class="mnem"><span class="lbl">记</span>bas 的发音类似 bath(洗澡);in 里面。连到一起就是：在里面洗澡。在哪里呢？ “盆”里面啊。</div>          <div class="root"><span class="lbl">根</span>谐音联想：bas(bath 洗澡) + in(里面) → 在里面洗澡 → 盆</div>          <div class="zt"><span class="lbl">真题</span>Killer whales have colonized a range of different habitats across the globe, occupying every ocean basin on the planet, with an empire that extend from pole to pole. 虎鲸已经 在全球范围内开辟了一系列不同的栖息地，占 据了地球上的每个海洋盆地，其帝国从一极地 延伸到另一极地。(2019)</div>          <div class="fam"><span class="lbl">族</span>basinful n. 一盆之量</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">17</span>
+          <span class="word">alcohol</span>
+          <span class="ipa">/&#x27;ælkəho:l/</span>
+          <span class="pos">n.</span>
+          <span class="cn">酒精，乙醇；酒</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Add alcohol and cigarettes</div>          <div class="mnem"><span class="lbl">记</span>单词发音类似“按口喝”。按口 喝什么？“酒”啊。我们河南酒桌上有一句话： 感情深，一口闷。</div>          <div class="root"><span class="lbl">根</span>谐音联想：按口喝 → 按口喝的酒 → 酒精</div>          <div class="zt"><span class="lbl">真题</span>To help prevent headaches, drink plenty of water, and avoid alcohol and coffee. 为了帮 助预防头疼，喝大量的水并且不要喝酒和咖啡。</div>          <div class="fam"><span class="lbl">族</span>alcoholic adj. 含酒精的 / non-alcoholic adj. 不含酒精的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">18</span>
+          <span class="word">cigarette</span>
+          <span class="ipa">/&#x27;sigəret/</span>
+          <span class="pos">n.</span>
+          <span class="cn">香烟，纸烟，卷烟</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Add alcohol and cigarettes</div>          <div class="mnem"><span class="lbl">记</span>单词前半部分是cigar(雪茄)， 雪茄烟也属于一种“烟草”啊。</div>          <div class="root"><span class="lbl">根</span>cigar(雪茄) + ette(小的) → 小雪茄 → 香烟</div>          <div class="zt"><span class="lbl">真题</span>Under the law in Massachusetts, tobacco companies have to measure the nicotine content of every type of cigarette and report the results. 根据马萨诸塞州的法律，烟草公司必须测量每 种香烟的尼古丁含量并报告结果。 第十单元</div>          <div class="fam"><span class="lbl">族</span>cigar n. 雪茄烟</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">19</span>
+          <span class="word">liquor</span>
+          <span class="ipa">/&#x27;lrkər/</span>
+          <span class="pos">n.</span>
+          <span class="cn">烈性酒；含酒精饮料</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>&quot;Sell liquor and beer,&quot; he said</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“立刻”。他喝 不了“烈性酒”，只要一杯酒就立刻倒下了。</div>          <div class="root"><span class="lbl">根</span>liqu(液体) + or → 液体的酒 → 烈性酒</div>          <div class="zt"><span class="lbl">真题</span>The liquor is not for sale in many countries. 很多国家是不销售酒的。</div>          <div class="fam"><span class="lbl">族</span>liquid n. 液体 / liquid adj. 液态的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">20</span>
+          <span class="word">drunk</span>
+          <span class="ipa">/drank/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">醉的；陶醉的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nobody mentioned the drunk men from the bar down the road</div>          <div class="mnem"><span class="lbl">记</span>该单词源自 drink喝，drunk 就 是喝得太多了→醉的。</div>          <div class="root"><span class="lbl">根</span>drink(喝) 的过去分词 → 喝得太多了 → 醉的</div>          <div class="zt"><span class="lbl">真题</span>People should pay more attention to the danger of drunk driving. 人们应该更加注意酒 驾的危险。</div>          <div class="fam"><span class="lbl">族</span>drink v. 喝 / drunken adj. 醉的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">21</span>
+          <span class="word">beer</span>
+          <span class="ipa">/bir/</span>
+          <span class="pos"></span>
+          <span class="cn"></span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Sell liquor and beer</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“啤呃”→“啤 酒”呃。</div>          <div class="root"><span class="lbl">根</span>谐音联想：啤呃 → 啤酒</div>          <div class="zt"><span class="lbl">真题</span>The method for making beer has changed over time. 酿造啤酒的方法随着时间的推移而 改变。(2017)</div>          <div class="fam"><span class="lbl">族</span>beery adj. 啤酒味的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">22</span>
+          <span class="word">beverage</span>
+          <span class="ipa">/&#x27;bevərıd3/</span>
+          <span class="pos">n.</span>
+          <span class="cn">(除水以外的)饮料</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>It is just a beverage</div>          <div class="mnem"><span class="lbl">记</span>是(be)我(ver的谐音)到了一 定的年龄(age)才能喝，小孩子不能喝“饮料” 的，是到了一定年龄才能喝啊。</div>          <div class="root"><span class="lbl">根</span>bever(喝) + age(名词后缀) → 喝的东西 → 饮料</div>          <div class="zt"><span class="lbl">真题</span>The tax passed today unfairly singles out beverages—including low-and no-calorie choices. 今天通过的税收法案不公平地剔除了低卡路里 和无卡路里的饮料。(2019)</div>          <div class="fam"><span class="lbl">族</span>drink n. 饮料 / beverage n. 饮料</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">23</span>
+          <span class="word">average</span>
+          <span class="ipa">/&#x27;ævərıd3/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">平均的，正常的，普通的 n. 平均数；平均 水平</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>On average, only three cars stopped each day</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：按（a）我的 (ver)年龄(age)，为什么？因为我的年龄是这伙 人中的“平均值”。</div>          <div class="root"><span class="lbl">根</span>谐音联想：按我的年龄 → 我在这一伙人里正好是平均值</div>          <div class="zt"><span class="lbl">真题</span>I definitely feel things more strongly (255) than the average person. 我对事物的感受肯定 比一般人更强烈。(2017)</div>          <div class="fam"><span class="lbl">族</span>averagely adv. 平均地 / average v. 平均为</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">24</span>
+          <span class="word">common</span>
+          <span class="ipa">/&#x27;ka:mən/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">常见的；通常的;共有的 n. 公共用地；公 共食堂</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>became common, then commonplace</div>          <div class="root"><span class="lbl">根</span>com(共同) + mon(服务) → 大家共有的 → 常见的</div>          <div class="zt"><span class="lbl">真题</span>They will find they have something in common. 他们会发现他们有一些共同点。</div>          <div class="fam"><span class="lbl">族</span>commonly adv. 通常 / commonplace adj. 平凡的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">25</span>
+          <span class="word">commonplace</span>
+          <span class="ipa">/&#x27;ka:mənpleis/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">平凡的，普通的 n. 常见的事</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>then commonplace</div>          <div class="root"><span class="lbl">根</span>common(普通) + place(地方) → 到处都有的地方 → 平凡的</div>          <div class="zt"><span class="lbl">真题</span>During this decade new forms of entertainment, commerce, research, and communication became commonplace in the U.S.在这10年中，新的娱乐、商业、研究和通 信形式在美国变得很普遍。</div>          <div class="fam"><span class="lbl">族</span>common adj. 常见的 / commonly adv. 通常</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">26</span>
+          <span class="word">miracle</span>
+          <span class="ipa">/&#x27;mirəkl/</span>
+          <span class="pos">n.</span>
+          <span class="cn">神迹；奇迹</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Old customers called her tea a miracle</div>          <div class="mnem"><span class="lbl">记</span>该单词前部分发音非常像 mirror(镜子)。记得《白雪公主》里的恶毒皇后 吗？每天问魔镜(mirror)谁是最美的女人。魔 镜就是有“奇迹”的镜子。</div>          <div class="root"><span class="lbl">根</span>mir(惊奇) + acle(东西) → 让人惊奇的东西 → 奇迹</div>          <div class="zt"><span class="lbl">真题</span>Gamification is not a miracle cure for all workplaces as it may have negative results. 游 戏化并不是适用于所有工作场所的灵丹妙药， 因为它可能会产生负面结果。(2016)</div>          <div class="fam"><span class="lbl">族</span>miraculous adj. 奇迹般的 / miraculously adv. 奇迹般地</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">27</span>
+          <span class="word">magic</span>
+          <span class="ipa">/&#x27;mæd3ık/</span>
+          <span class="pos">n.</span>
+          <span class="cn">魔法，魔术 adj. 魔术的，有魔力的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>she worked magic with leaves and water</div>          <div class="root"><span class="lbl">根</span>mag(巫师) + ic → 巫师做的事 → 魔法</div>          <div class="zt"><span class="lbl">真题</span>We have long feared that this “revolution in distribution&quot; uses corporate black magic on our appetite. 长期以来，我们一直担心，这种“分 销革命”会利用企业的黑魔法影响我们的胃口。 (2023)</div>          <div class="fam"><span class="lbl">族</span>magical adj. 有魔力的 / magician n. 魔术师</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">28</span>
+          <span class="word">magnetic</span>
+          <span class="ipa">/mæg&#x27;netık/</span>
+          <span class="pos">adj.</span>
+          <span class="cn">磁的，有磁性的；有吸引力的，有魅力的</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>tea with a magnetic smell and a warm welcome</div>          <div class="mnem"><span class="lbl">记</span>单词可以拆分为：妈妈(ma)哥 (g)你(ne)他(t)都喜欢用 ic 卡坐公交车,ic卡 都是“有磁性的”。</div>          <div class="root"><span class="lbl">根</span>magnet(磁铁) + ic(…的) → 磁的；像磁铁一样吸引人的</div>          <div class="fam"><span class="lbl">族</span>magnet n. 磁铁 / magnetism n. 磁性</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">29</span>
+          <span class="word">pave</span>
+          <span class="ipa">/peiv/</span>
+          <span class="pos">v.</span>
+          <span class="cn">(用砖石)铺(地)</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>Nora&#x27;s father paved the last kilometer</div>          <div class="mnem"><span class="lbl">记</span>该单词发音类似“陪我”。父母 只要还在陪着你，他们就在前面为你“铺路”，让 你走。</div>          <div class="root"><span class="lbl">根</span>谐音联想：陪我 → 父母陪着你，在前面为你铺路</div>          <div class="zt"><span class="lbl">真题</span>By the end of the century there was an immense network of paved roads, residential streets，expressways.到本世纪末，已经形成了 一个由铺砌道路、住宅区街道和高速公路组成 的巨大网络。</div>          <div class="fam"><span class="lbl">族</span>pavement n. 人行道 / paved adj. 铺好的</div>
+        </div>
+      </details>
+      <details class="card">
+        <summary>
+          <span class="idx">30</span>
+          <span class="word">wayside</span>
+          <span class="ipa">/&#x27;weisaid/</span>
+          <span class="pos">n.</span>
+          <span class="cn">路边；路旁</span>
+        </summary>
+        <div class="body">
+          
+<div class="sent"><span class="lbl">课文</span>At the wayside, where the road turns</div>          <div class="root"><span class="lbl">根</span>way(路) + side(旁边) → 路旁边</div>          <div class="zt"><span class="lbl">真题</span>It&#x27;s no secret that some of the resolutions have already fallen by the wayside. —些计划已 经半途而废，这已经不是秘密了。</div>          <div class="fam"><span class="lbl">族</span>roadside n. 路边 / highway n. 公路</div>
+        </div>
+      </details>
+
+<footer>刘晓燕《四级你还在背单词吗》Unit 10 · Day 68</footer>
+</div>
+
+<script>
+const au = document.getElementById('au');
+const fill = document.getElementById('fill');
+const cur = document.getElementById('cur');
+const dur = document.getElementById('dur');
+const btn = document.getElementById('play');
+const spans = [...document.querySelectorAll('.w')];
+const pairs = [...document.querySelectorAll('.pair')];
+let idx = 0, pIdx = -1, raf = null;
+
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+// 逐词 / 逐句各存一份时间表，方便二分查找
+const times = spans.map(el => ({ s: +el.dataset.s / 1000, e: +el.dataset.e / 1000, el }));
+const pt = pairs.map(el => ({ s: +el.dataset.s0 / 1000, e: +el.dataset.s1 / 1000, el }));
+
+// 通用二分：找到时间 t 落在哪个区间
+function find(arr, t, keepIdx) {
+  let lo = 0, hi = arr.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].e <= t) lo = mid + 1;
+    else if (arr[mid].s > t) hi = mid - 1;
+    else return mid;
+  }
+  return keepIdx;   // 落在空隙：保持上一个，避免闪断
+}
+
+function highlight(t) {
+  const w = find(times, t, idx);
+  if (w !== idx) {
+    if (times[idx] && times[idx].el) times[idx].el.classList.remove('on');
+    idx = w;
+    if (times[w] && times[w].el) times[w].el.classList.add('on');
+  }
+
+  const p = find(pt, t, pIdx);
+  if (p !== pIdx) {
+    if (pt[pIdx] && pt[pIdx].el) pt[pIdx].el.classList.remove('now');
+    pIdx = p;
+    if (pt[p] && pt[p].el) {
+      pt[p].el.classList.add('now');
+      // 逐句滚动跟随 —— 句比词大，滚动不会太频繁，体验更稳
+      const r = pt[p].el.getBoundingClientRect();
+      if (r.top < 150 || r.bottom > innerHeight - 80) {
+        pt[p].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+}
+
+function tick() {
+  if (!au.paused) {
+    highlight(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+    cur.textContent = fmt(au.currentTime);
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+au.addEventListener('loadedmetadata', () => dur.textContent = fmt(au.duration));
+au.addEventListener('play',  () => { btn.textContent = '❚❚'; tick(); });
+au.addEventListener('pause', () => { btn.textContent = '▶'; cancelAnimationFrame(raf); });
+au.addEventListener('ended', () => { btn.textContent = '▶'; fill.style.width='100%'; });
+au.addEventListener('timeupdate', () => {
+  cur.textContent = fmt(au.currentTime);
+  fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+});
+
+btn.onclick = () => au.paused ? au.play() : au.pause();
+
+// 点词跳转
+spans.forEach(el => el.addEventListener('click', () => {
+  au.currentTime = +el.dataset.s / 1000;
+  if (au.paused) au.play();
+}));
+
+// 点句子空白处 -> 跳到那句开头
+pairs.forEach(el => el.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('w')) return;  // 点词走上面的逻辑
+  au.currentTime = +el.dataset.s0 / 1000;
+  if (au.paused) au.play();
+}));
+
+// 显示模式：双语 / 只看英文 / 只看中文
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.modes button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.classList.remove('mode-en', 'mode-zh');
+  if (b.dataset.mode === 'en') document.body.classList.add('mode-en');
+  if (b.dataset.mode === 'zh') document.body.classList.add('mode-zh');
+  localStorage.setItem('cet4-mode', b.dataset.mode);
+});
+// 记住上次选的模式
+(function () {
+  const saved = localStorage.getItem('cet4-mode');
+  if (saved && saved !== 'both') {
+    const b = document.querySelector(`.modes button[data-mode="${saved}"]`);
+    if (b) b.click();
+  }
+})();
+
+// 语速切换
+//
+// 用 playbackRate 变速，不切音频文件。两个原因：
+//   1. currentTime 仍在原时间轴上 —— 高亮/跳转逻辑完全不用改（曾经切 src 导致
+//      高亮时间轴和音频对不上：切到 0.75x 后，times 数组还是 1x 的，越往后偏越多）
+//   2. 省掉一份慢速音频（每天省 1.8 MB，占总量 54%）
+// 现代浏览器的 preservesPitch 默认开启，变速不变调。
+const SPEEDS = [1, 0.75];
+document.querySelectorAll('.speeds button').forEach((b, i) => b.onclick = () => {
+  document.querySelectorAll('.speeds button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  au.playbackRate = SPEEDS[i];
+  // 暂停状态下改速率不会触发 timeupdate，这里补一次让进度条同步
+  if (au.paused) {
+    cur.textContent = fmt(au.currentTime);
+    fill.style.width = (au.currentTime / au.duration * 100 || 0) + '%';
+  }
+  localStorage.setItem('cet4-rate', String(SPEEDS[i]));
+});
+
+// 记住上次选的语速
+(function () {
+  const saved = parseFloat(localStorage.getItem('cet4-rate'));
+  if (saved && saved !== 1) {
+    const i = SPEEDS.indexOf(saved);
+    if (i > 0) {
+      document.querySelectorAll('.speeds button')[i].click();
+      // 首屏自动点开会触发播放，这里立刻暂停
+      au.pause();
+    }
+  }
+})();
+</script>
+</body>
+</html>
