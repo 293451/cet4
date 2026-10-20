@@ -261,6 +261,43 @@
         "blight",
         "alight"
       ]
+    },
+    "08": {
+      "date": "2026-10-20",
+      "unit": "Unit 7~8",
+      "range": "211-240",
+      "words": [
+        "ignite",
+        "highlight",
+        "solar",
+        "sunlight",
+        "sunset",
+        "dawn",
+        "solid",
+        "consolidate",
+        "fluid",
+        "liquid",
+        "volume",
+        "minimum",
+        "maximum",
+        "vessel",
+        "pulse",
+        "impulse",
+        "flood",
+        "fluctuate",
+        "bleed",
+        "dry",
+        "bubble",
+        "bulb",
+        "gesture",
+        "engage",
+        "mortgage",
+        "cognitive",
+        "recognize",
+        "challenge",
+        "flag",
+        "global"
+      ]
     }
   },
   "review_log": []
