@@ -298,6 +298,43 @@
         "flag",
         "global"
       ]
+    },
+    "09": {
+      "date": "2026-10-21",
+      "unit": "Unit 2",
+      "range": "241-270",
+      "words": [
+        "grain",
+        "wheat",
+        "glitter",
+        "glow",
+        "sparkle",
+        "twinkle",
+        "grace",
+        "disgrace",
+        "elegant",
+        "charm",
+        "honor",
+        "glory",
+        "favour",
+        "flavour",
+        "agreeable",
+        "consensus",
+        "extraordinary",
+        "eminent",
+        "prominent",
+        "outstanding",
+        "mark",
+        "remark",
+        "comment",
+        "commentator",
+        "progress",
+        "congress",
+        "digress",
+        "aggressive",
+        "parliament",
+        "delegate"
+      ]
     }
   },
   "review_log": []
