@@ -335,6 +335,43 @@
         "parliament",
         "delegate"
       ]
+    },
+    "10": {
+      "date": "2026-10-22",
+      "unit": "Unit 2",
+      "range": "271-300",
+      "words": [
+        "delete",
+        "senator",
+        "council",
+        "count",
+        "uncountable",
+        "counter",
+        "account",
+        "accountant",
+        "counterpart",
+        "encounter",
+        "discount",
+        "repay",
+        "bill",
+        "loan",
+        "debt",
+        "lawn",
+        "bush",
+        "brush",
+        "jungle",
+        "weed",
+        "field",
+        "undergo",
+        "endure",
+        "durable",
+        "duration",
+        "suffer",
+        "infer",
+        "refer",
+        "referee",
+        "confer"
+      ]
     }
   },
   "review_log": []
