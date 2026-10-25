@@ -446,6 +446,43 @@
         "seal",
         "conceal"
       ]
+    },
+    "13": {
+      "date": "2026-10-25",
+      "unit": "Unit 2",
+      "range": "361-390",
+      "words": [
+        "reveal",
+        "uncover",
+        "load",
+        "unload",
+        "unfold",
+        "substance",
+        "withstand",
+        "distant",
+        "constant",
+        "consistent",
+        "instant",
+        "instantaneous",
+        "prompt",
+        "apart",
+        "apartment",
+        "department",
+        "particle",
+        "depart",
+        "partial",
+        "bias",
+        "neutral",
+        "acute",
+        "severe",
+        "grave",
+        "aggravate",
+        "alleviate",
+        "grieve",
+        "relieve",
+        "grateful",
+        "grant"
+      ]
     }
   },
   "review_log": []
