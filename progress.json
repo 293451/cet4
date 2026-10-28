@@ -557,6 +557,43 @@
         "ban",
         "prohibit"
       ]
+    },
+    "16": {
+      "date": "2026-10-28",
+      "unit": "Unit 3",
+      "range": "451-480",
+      "words": [
+        "exhibit",
+        "display",
+        "breeze",
+        "freeze",
+        "squeeze",
+        "emerge",
+        "submerge",
+        "emergency",
+        "submarine",
+        "marine",
+        "gaze",
+        "glance",
+        "glimpse",
+        "stare",
+        "glare",
+        "remind",
+        "recall",
+        "monument",
+        "memo",
+        "shot",
+        "fire",
+        "employ",
+        "employment",
+        "plot",
+        "flat",
+        "inflate",
+        "dense",
+        "condense",
+        "shrink",
+        "fade"
+      ]
     }
   },
   "review_log": []
