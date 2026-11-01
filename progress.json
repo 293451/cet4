@@ -705,6 +705,43 @@
         "insect",
         "worm"
       ]
+    },
+    "20": {
+      "date": "2026-11-01",
+      "unit": "Unit 3",
+      "range": "571-600",
+      "words": [
+        "wooden",
+        "assert",
+        "desert",
+        "dessert",
+        "exsert",
+        "insert",
+        "transplant",
+        "translate",
+        "transmit",
+        "transform",
+        "transport",
+        "transaction",
+        "transfer",
+        "transparent",
+        "opaque",
+        "transit",
+        "apparent",
+        "obvious",
+        "evident",
+        "evidence",
+        "loom",
+        "boom",
+        "bloom",
+        "gloom",
+        "boost",
+        "boast",
+        "raw",
+        "crude",
+        "ripe",
+        "reap"
+      ]
     }
   },
   "review_log": []
