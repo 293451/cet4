@@ -742,6 +742,43 @@
         "ripe",
         "reap"
       ]
+    },
+    "21": {
+      "date": "2026-11-02",
+      "unit": "Unit 3~4",
+      "range": "601-630",
+      "words": [
+        "harvest",
+        "yield",
+        "mature",
+        "plough",
+        "dominant",
+        "domestic",
+        "chore",
+        "dull",
+        "dumb",
+        "tedious",
+        "schedule",
+        "scheme",
+        "agenda",
+        "routine",
+        "passage",
+        "interior",
+        "exterior",
+        "external",
+        "internal",
+        "media",
+        "medium",
+        "intermediate",
+        "local",
+        "locate",
+        "allocate",
+        "site",
+        "situate",
+        "pose",
+        "posture",
+        "expose"
+      ]
     }
   },
   "review_log": []
