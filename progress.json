@@ -927,6 +927,43 @@
         "enforce",
         "reinforce"
       ]
+    },
+    "26": {
+      "date": "2026-11-07",
+      "unit": "Unit 4",
+      "range": "751-780",
+      "words": [
+        "backup",
+        "power",
+        "willpower",
+        "willing",
+        "reluctant",
+        "restrain",
+        "restrict",
+        "strain",
+        "constrain",
+        "strip",
+        "rip",
+        "grip",
+        "srtipe",
+        "trap",
+        "grasp",
+        "grab",
+        "mess",
+        "chaos",
+        "disorder",
+        "orderly",
+        "equal",
+        "equate",
+        "adequate",
+        "equivalent",
+        "coordinate",
+        "fair",
+        "fairly",
+        "affair",
+        "business",
+        "abolish"
+      ]
     }
   },
   "review_log": []
