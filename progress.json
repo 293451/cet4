@@ -1001,6 +1001,43 @@
         "infect",
         "manufacture"
       ]
+    },
+    "28": {
+      "date": "2026-11-09",
+      "unit": "Unit 4~5",
+      "range": "811-840",
+      "words": [
+        "perfect",
+        "ideal",
+        "thorough",
+        "whole",
+        "deadly",
+        "factory",
+        "territory",
+        "laboratory",
+        "lavatory",
+        "gallery",
+        "grocery",
+        "nursery",
+        "scenery",
+        "landscape",
+        "cape",
+        "landlord",
+        "invade",
+        "intrude",
+        "attack",
+        "conquer",
+        "colony",
+        "retreat",
+        "treaty",
+        "triumph",
+        "victory",
+        "negotiate",
+        "initiate",
+        "initiative",
+        "launch",
+        "utilize"
+      ]
     }
   },
   "review_log": []
