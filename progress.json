@@ -1075,6 +1075,43 @@
         "undergraduate",
         "freshman"
       ]
+    },
+    "30": {
+      "date": "2026-11-11",
+      "unit": "Unit 5",
+      "range": "871-900",
+      "words": [
+        "sophomore",
+        "junior",
+        "senior",
+        "bachelor",
+        "master",
+        "masterpiece",
+        "dropout",
+        "layman",
+        "layer",
+        "amateur",
+        "veteran",
+        "sophisticated",
+        "nourish",
+        "cultivate",
+        "rear",
+        "breed",
+        "intelligent",
+        "intellect",
+        "intellectual",
+        "acknowledge",
+        "pioneer",
+        "peer",
+        "compatible",
+        "curriculum",
+        "chemical",
+        "logic",
+        "geometry",
+        "sociology",
+        "art",
+        "articulate"
+      ]
     }
   },
   "review_log": []
