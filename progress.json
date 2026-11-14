@@ -1186,6 +1186,43 @@
         "subscribe",
         "inscribe"
       ]
+    },
+    "33": {
+      "date": "2026-11-14",
+      "unit": "Unit 5",
+      "range": "961-990",
+      "words": [
+        "script",
+        "manuscript",
+        "prescribe",
+        "skill",
+        "technique",
+        "technology",
+        "biotechnology",
+        "technician",
+        "technologist",
+        "mechanic",
+        "mechanism",
+        "drawer",
+        "overdraw",
+        "withdraw",
+        "hardware",
+        "radar",
+        "radiation",
+        "press",
+        "pressure",
+        "depress",
+        "impress",
+        "compress",
+        "repress",
+        "suppress",
+        "oppress",
+        "express",
+        "expressway",
+        "freeway",
+        "motorway",
+        "highway"
+      ]
     }
   },
   "review_log": []
