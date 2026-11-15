@@ -1223,6 +1223,43 @@
         "motorway",
         "highway"
       ]
+    },
+    "34": {
+      "date": "2026-11-15",
+      "unit": "Unit 5",
+      "range": "991-1020",
+      "words": [
+        "sidewalk",
+        "bypass",
+        "print",
+        "fingerprint",
+        "blueprint",
+        "justice",
+        "judgement",
+        "justify",
+        "court",
+        "jury",
+        "trial",
+        "crime",
+        "discrimination",
+        "sue",
+        "curse",
+        "accuse",
+        "excuse",
+        "appeal",
+        "prosecute",
+        "charge",
+        "discharge",
+        "blame",
+        "surrender",
+        "condemn",
+        "verify",
+        "witness",
+        "bystander",
+        "convict",
+        "verdict",
+        "torture"
+      ]
     }
   },
   "review_log": []
