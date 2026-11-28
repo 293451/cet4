@@ -1704,6 +1704,43 @@
         "sphere",
         "stem"
       ]
+    },
+    "47": {
+      "date": "2026-11-28",
+      "unit": "Unit 7",
+      "range": "1381-1410",
+      "words": [
+        "swear",
+        "swell",
+        "sword",
+        "arrow",
+        "sample",
+        "specimen",
+        "dizzy",
+        "dazzle",
+        "faint",
+        "insure",
+        "assure",
+        "ensure",
+        "guarantee",
+        "pledge",
+        "deliver",
+        "organ",
+        "organism",
+        "organize",
+        "function",
+        "absorb",
+        "intake",
+        "straw",
+        "digest",
+        "contagion",
+        "diagnose",
+        "surgery",
+        "surgeon",
+        "physical",
+        "physician",
+        "dose"
+      ]
     }
   },
   "review_log": []
